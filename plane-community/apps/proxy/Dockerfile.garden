@@ -1,0 +1,8 @@
+FROM caddy:2.11.3-alpine
+
+RUN apk update && apk upgrade --no-cache && apk add --no-cache curl && rm -rf /var/cache/apk/*
+
+COPY Caddyfile.garden /etc/caddy/Caddyfile
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -fsS http://127.0.0.1/healthz >/dev/null || exit 1

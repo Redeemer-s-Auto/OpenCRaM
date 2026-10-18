@@ -1,0 +1,49 @@
+{
+	{$CERT_EMAIL}
+	servers {
+		max_header_size 25MB
+		client_ip_headers X-Forwarded-For X-Real-IP
+		trusted_proxies static private_ranges
+	}
+}
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	request_body {
+		max_size {$FILE_SIZE_LIMIT}
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# Garden Work is embedded only by the Garden admin origin. Strip Plane's
+		# generic X-Frame-Options value because CSP frame-ancestors is the
+		# authoritative, origin-specific policy for this cross-origin embed.
+		-X-Frame-Options
+		Content-Security-Policy "frame-ancestors {$GARDEN_EMBED_ORIGIN:https://gardenchurch.web.app}"
+		-Server
+	}
+
+	@proxy_health path /healthz
+	respond @proxy_health 200
+
+	# Plane's god-mode is intentionally not exposed on the public Garden Work host.
+	@god_mode path /god-mode /god-mode/*
+	respond @god_mode 404
+
+	redir /spaces /spaces/ permanent
+	reverse_proxy /spaces/* space:3000
+
+	reverse_proxy /live/* live:3000
+	reverse_proxy /api/* api:8000
+	reverse_proxy /auth/* api:8000
+	reverse_proxy /static/* api:8000
+
+	reverse_proxy /{$BUCKET_NAME}/* plane-minio:9000
+	reverse_proxy /{$BUCKET_NAME} plane-minio:9000
+
+	reverse_proxy /* web:3000
+}

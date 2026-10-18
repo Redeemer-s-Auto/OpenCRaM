@@ -1,0 +1,362 @@
+name: garden-work
+
+x-api-environment: &api-environment
+  DEBUG: ${DEBUG:-0}
+  WEB_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+  APP_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+  APP_BASE_PATH: ""
+  ADMIN_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+  ADMIN_BASE_PATH: /god-mode
+  SPACE_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+  SPACE_BASE_PATH: /spaces
+  LIVE_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+  LIVE_BASE_PATH: /live
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:?Set ALLOWED_HOSTS}
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?Set CORS_ALLOWED_ORIGINS}
+  SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
+  SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-garden-work-session}
+  COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+  SESSION_SAVE_EVERY_REQUEST: ${SESSION_SAVE_EVERY_REQUEST:-0}
+  ENABLE_SIGNUP: ${ENABLE_SIGNUP:-0}
+  DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@plane-db:5432/${POSTGRES_DB:?Set POSTGRES_DB}
+  POSTGRES_HOST: plane-db
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+  POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+  REDIS_URL: ${REDIS_URL:-redis://plane-redis:6379/0}
+  REDIS_HOST: plane-redis
+  REDIS_PORT: "6379"
+  RABBITMQ_HOST: plane-mq
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_USER: ${RABBITMQ_USER:?Set RABBITMQ_USER}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}
+  RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Set RABBITMQ_VHOST}
+  AMQP_URL: amqp://${RABBITMQ_USER:?Set RABBITMQ_USER}:${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}@plane-mq:5672/${RABBITMQ_VHOST:?Set RABBITMQ_VHOST}
+  USE_MINIO: ${USE_MINIO:-1}
+  AWS_REGION: ${AWS_REGION:-}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY}
+  AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-http://plane-minio:9000}
+  AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-uploads}
+  MINIO_ENDPOINT_SSL: ${MINIO_ENDPOINT_SSL:-0}
+  FILE_SIZE_LIMIT: ${FILE_SIZE_LIMIT:-10485760}
+  API_KEY_RATE_LIMIT: ${API_KEY_RATE_LIMIT:-60/minute}
+  LIVE_SERVER_SECRET_KEY: ${LIVE_SERVER_SECRET_KEY:?Set LIVE_SERVER_SECRET_KEY}
+  GARDEN_AUTH_ENABLED: ${GARDEN_AUTH_ENABLED:-1}
+  GARDEN_AUTH_ALLOWED_ORIGINS: ${GARDEN_AUTH_ALLOWED_ORIGINS:?Set GARDEN_AUTH_ALLOWED_ORIGINS}
+  GARDEN_ADMIN_URL: ${GARDEN_ADMIN_URL:?Set GARDEN_ADMIN_URL}
+  GARDEN_FIREBASE_PROJECT_ID: ${GARDEN_FIREBASE_PROJECT_ID:?Set GARDEN_FIREBASE_PROJECT_ID}
+  GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/garden-firebase.json
+  GARDEN_FIRESTORE_PROFILE_SYNC: ${GARDEN_FIRESTORE_PROFILE_SYNC:-1}
+  GARDEN_WORKSPACE_NAME: ${GARDEN_WORKSPACE_NAME:-The Garden}
+  GARDEN_WORKSPACE_SLUG: ${GARDEN_WORKSPACE_SLUG:-the-garden}
+  GARDEN_WORKSPACE_TIMEZONE: ${GARDEN_WORKSPACE_TIMEZONE:-America/Chicago}
+  GARDEN_WORKSPACE_BOOTSTRAP: ${GARDEN_WORKSPACE_BOOTSTRAP:-0}
+  GARDEN_INTEGRATION_USER_EMAIL: ${GARDEN_INTEGRATION_USER_EMAIL:-garden-work-integration@garden.invalid}
+  GARDEN_INTEGRATION_TOKEN_LABEL: ${GARDEN_INTEGRATION_TOKEN_LABEL:-Garden Work server integration}
+  GARDEN_INTEGRATION_RATE_LIMIT: ${GARDEN_INTEGRATION_RATE_LIMIT:-600/min}
+  GARDEN_WORK_WEBHOOK_URL: ${GARDEN_WORK_WEBHOOK_URL:-}
+  GARDEN_WORK_WEBHOOK_SECRET: ${GARDEN_WORK_WEBHOOK_SECRET:-}
+  SCOUT_MONITOR: "0"
+  POSTHOG_API_KEY: ""
+  ANALYTICS_SECRET_KEY: ""
+  ANALYTICS_BASE_API: ""
+  INSTANCE_CHANGELOG_URL: ""
+
+x-backend-service: &backend-service
+  image: ${GARDEN_PLANE_API_IMAGE:-garden-plane-api:local}
+  restart: unless-stopped
+  environment: *api-environment
+  volumes:
+    - ${GARDEN_FIREBASE_CREDENTIALS_PATH:?Set GARDEN_FIREBASE_CREDENTIALS_PATH}:/run/secrets/garden-firebase.json:ro
+  networks:
+    - garden-work-internal
+
+services:
+  plane-db:
+    image: postgres:15.7-alpine
+    restart: unless-stopped
+    command: postgres -c max_connections=300
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - garden_plane_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - garden-work-internal
+
+  plane-redis:
+    image: valkey/valkey:7.2.11-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--appendonly", "yes", "--save", "60", "1000"]
+    volumes:
+      - garden_plane_valkey:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - garden-work-internal
+
+  plane-mq:
+    image: rabbitmq:3.13.6-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Set RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:?Set RABBITMQ_VHOST}
+    volumes:
+      - garden_plane_rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 15s
+    networks:
+      - garden-work-internal
+
+  plane-minio:
+    image: ${MINIO_IMAGE:?Set MINIO_IMAGE to a pinned supported S3-compatible image}
+    restart: unless-stopped
+    command: server /export --console-address :9090
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - garden_plane_uploads:/export
+    networks:
+      - garden-work-internal
+
+  migrator:
+    <<: *backend-service
+    restart: "no"
+    command: ./bin/docker-entrypoint-migrator.sh
+    depends_on:
+      plane-db:
+        condition: service_healthy
+      plane-redis:
+        condition: service_healthy
+
+  api:
+    <<: *backend-service
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.api
+    command: ./bin/docker-entrypoint-api.sh
+    volumes:
+      - ${GARDEN_FIREBASE_CREDENTIALS_PATH:?Set GARDEN_FIREBASE_CREDENTIALS_PATH}:/run/secrets/garden-firebase.json:ro
+      - garden_plane_api_logs:/code/plane/logs
+    depends_on:
+      plane-db:
+        condition: service_healthy
+      plane-redis:
+        condition: service_healthy
+      plane-mq:
+        condition: service_healthy
+      plane-minio:
+        condition: service_started
+      migrator:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/auth/firebase/health/', timeout=4).read()",
+        ]
+      interval: 15s
+      timeout: 6s
+      retries: 12
+      start_period: 25s
+
+  worker:
+    <<: *backend-service
+    command: ./bin/docker-entrypoint-worker.sh
+    volumes:
+      - garden_plane_worker_logs:/code/plane/logs
+    depends_on:
+      api:
+        condition: service_healthy
+      plane-mq:
+        condition: service_healthy
+
+  beat-worker:
+    <<: *backend-service
+    command: ./bin/docker-entrypoint-beat.sh
+    volumes:
+      - garden_plane_beat_logs:/code/plane/logs
+    depends_on:
+      api:
+        condition: service_healthy
+      plane-mq:
+        condition: service_healthy
+
+  live:
+    image: ${GARDEN_PLANE_LIVE_IMAGE:-garden-plane-live:local}
+    build:
+      context: .
+      dockerfile: ./apps/live/Dockerfile.live
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: http://api:8000
+      REDIS_URL: ${REDIS_URL:-redis://plane-redis:6379/0}
+      LIVE_SERVER_SECRET_KEY: ${LIVE_SERVER_SECRET_KEY:?Set LIVE_SERVER_SECRET_KEY}
+    depends_on:
+      api:
+        condition: service_healthy
+      plane-redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const net=require('net');const s=net.connect(3000,'127.0.0.1',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),3000)",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - garden-work-internal
+
+  web:
+    image: ${GARDEN_PLANE_WEB_IMAGE:-garden-plane-web:local}
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile.web
+      args:
+        VITE_API_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_ADMIN_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_ADMIN_BASE_PATH: /god-mode
+        VITE_LIVE_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_LIVE_BASE_PATH: /live
+        VITE_SPACE_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_SPACE_BASE_PATH: /spaces
+        VITE_WEB_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_GARDEN_AUTH_ENABLED: "1"
+        VITE_GARDEN_ADMIN_URL: ${GARDEN_ADMIN_URL:?Set GARDEN_ADMIN_URL}
+        VITE_GARDEN_WORK_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - garden-work-internal
+
+  space:
+    image: ${GARDEN_PLANE_SPACE_IMAGE:-garden-plane-space:local}
+    build:
+      context: .
+      dockerfile: ./apps/space/Dockerfile.space
+      args:
+        VITE_API_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_API_BASE_PATH: /api
+        VITE_ADMIN_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_ADMIN_BASE_PATH: /god-mode
+        VITE_SPACE_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_SPACE_BASE_PATH: /spaces
+        VITE_LIVE_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_LIVE_BASE_PATH: /live
+        VITE_WEB_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_WEB_BASE_PATH: ""
+        VITE_WEBSITE_URL: https://gardenchurch.web.app
+        VITE_SUPPORT_EMAIL: support@thegarden.church
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - garden-work-internal
+
+  admin:
+    image: ${GARDEN_PLANE_ADMIN_IMAGE:-garden-plane-admin:local}
+    build:
+      context: .
+      dockerfile: ./apps/admin/Dockerfile.admin
+      args:
+        VITE_API_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_API_BASE_PATH: /api
+        VITE_ADMIN_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_ADMIN_BASE_PATH: /god-mode
+        VITE_SPACE_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_SPACE_BASE_PATH: /spaces
+        VITE_LIVE_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_LIVE_BASE_PATH: /live
+        VITE_WEB_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
+        VITE_WEB_BASE_PATH: ""
+        VITE_WEBSITE_URL: https://gardenchurch.web.app
+        VITE_SUPPORT_EMAIL: support@thegarden.church
+    restart: unless-stopped
+    profiles: ["maintenance"]
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - garden-work-internal
+
+  proxy:
+    image: ${GARDEN_PLANE_PROXY_IMAGE:-garden-plane-proxy:local}
+    build:
+      context: ./apps/proxy
+      dockerfile: Dockerfile.garden
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?Set SITE_ADDRESS}
+      CERT_EMAIL: ${CERT_EMAIL:-}
+      FILE_SIZE_LIMIT: ${FILE_SIZE_LIMIT:-10485760}
+      BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-uploads}
+    ports:
+      - ${PUBLIC_BIND_IP:-0.0.0.0}:${LISTEN_HTTP_PORT:-80}:80
+      - ${PUBLIC_BIND_IP:-0.0.0.0}:${LISTEN_HTTPS_PORT:-443}:443
+    volumes:
+      - garden_plane_caddy_data:/data
+      - garden_plane_caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      space:
+        condition: service_healthy
+      live:
+        condition: service_healthy
+    networks:
+      - garden-work-internal
+
+networks:
+  garden-work-internal:
+    driver: bridge
+
+volumes:
+  garden_plane_pgdata:
+    name: garden_work_pgdata
+  garden_plane_valkey:
+    name: garden_work_valkey
+  garden_plane_rabbitmq:
+    name: garden_work_rabbitmq
+  garden_plane_uploads:
+    name: garden_work_uploads
+  garden_plane_api_logs:
+    name: garden_work_api_logs
+  garden_plane_worker_logs:
+    name: garden_work_worker_logs
+  garden_plane_beat_logs:
+    name: garden_work_beat_logs
+  garden_plane_caddy_data:
+    name: garden_work_caddy_data
+  garden_plane_caddy_config:
+    name: garden_work_caddy_config

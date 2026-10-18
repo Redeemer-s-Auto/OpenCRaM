@@ -1,0 +1,237 @@
+@import "../../../packages/ui/src/typography.css";
+
+/*
+ * The Garden theme overrides for the vendored Plane Community UI.
+ * Keep these overrides semantic so upstream component changes continue to inherit
+ * Garden styling without component-by-component patching.
+ */
+
+html[data-garden-work="true"] {
+  --font-heading: var(--tg-font-display);
+  --font-body: var(--tg-font-body);
+  --font-code: var(--tg-font-body);
+  --garden-bg: #f7f2e6;
+  --garden-surface: #fffdf7;
+  --garden-text: #102a1c;
+  --garden-muted-text: #466050;
+  --garden-primary: #40562E;
+  --garden-primary-hover: color-mix(in srgb, var(--garden-primary) 84%, black);
+  --garden-primary-active: color-mix(in srgb, var(--garden-primary) 72%, black);
+  --garden-primary-text: #fffdf7;
+  --garden-border: #e5ddcf;
+  --garden-border-strong: #d3c7b5;
+  --garden-danger: #b91c1c;
+
+  /* Canonical light palette for milestone one. */
+  --bg-canvas: var(--garden-bg);
+  --bg-surface-1: color-mix(in srgb, var(--garden-surface) 94%, transparent);
+  --bg-surface-2: color-mix(in srgb, var(--garden-surface) 82%, var(--garden-bg));
+  --bg-layer-1: color-mix(in srgb, var(--garden-surface) 88%, var(--garden-bg));
+  --bg-layer-1-hover: color-mix(in srgb, var(--garden-primary) 6%, var(--garden-surface));
+  --bg-layer-1-active: color-mix(in srgb, var(--garden-primary) 10%, var(--garden-surface));
+  --bg-layer-1-selected: color-mix(in srgb, var(--garden-primary) 11%, var(--garden-surface));
+  --bg-layer-2: var(--garden-surface);
+  --bg-layer-2-hover: color-mix(in srgb, var(--garden-primary) 5%, var(--garden-surface));
+  --bg-layer-2-active: color-mix(in srgb, var(--garden-primary) 8%, var(--garden-surface));
+  --bg-layer-2-selected: color-mix(in srgb, var(--garden-primary) 10%, var(--garden-surface));
+  --bg-layer-3: color-mix(in srgb, var(--garden-bg) 86%, var(--garden-surface));
+  --bg-layer-3-hover: color-mix(in srgb, var(--garden-primary) 7%, var(--garden-bg));
+  --bg-layer-3-active: color-mix(in srgb, var(--garden-primary) 11%, var(--garden-bg));
+  --bg-layer-3-selected: color-mix(in srgb, var(--garden-primary) 13%, var(--garden-bg));
+  --bg-layer-transparent: transparent;
+  --bg-layer-transparent-hover: color-mix(in srgb, var(--garden-primary) 6%, transparent);
+  --bg-layer-transparent-active: color-mix(in srgb, var(--garden-primary) 10%, transparent);
+  --bg-layer-transparent-selected: color-mix(in srgb, var(--garden-primary) 12%, transparent);
+  --bg-layer-disabled: color-mix(in srgb, var(--garden-border) 62%, var(--garden-bg));
+
+  --brand-default: var(--garden-primary);
+  --bg-accent-primary: var(--garden-primary);
+  --bg-accent-primary-hover: var(--garden-primary-hover);
+  --bg-accent-primary-active: var(--garden-primary-active);
+  --bg-accent-subtle: color-mix(in srgb, var(--garden-primary) 8%, var(--garden-surface));
+  --bg-accent-subtle-hover: color-mix(in srgb, var(--garden-primary) 12%, var(--garden-surface));
+  --bg-accent-subtle-active: color-mix(in srgb, var(--garden-primary) 16%, var(--garden-surface));
+
+  --border-subtle: var(--garden-border);
+  --border-subtle-1: color-mix(in srgb, var(--garden-border) 82%, var(--garden-text));
+  --border-strong: var(--garden-border-strong);
+  --border-strong-1: color-mix(in srgb, var(--garden-border-strong) 78%, var(--garden-text));
+  --border-disabled: color-mix(in srgb, var(--garden-border) 70%, var(--garden-bg));
+  --border-accent-strong: var(--garden-primary);
+  --border-accent-subtle: color-mix(in srgb, var(--garden-primary) 34%, var(--garden-border));
+
+  --txt-primary: var(--garden-text);
+  --txt-secondary: var(--garden-muted-text);
+  --txt-tertiary: color-mix(in srgb, var(--garden-muted-text) 78%, var(--garden-surface));
+  --txt-placeholder: color-mix(in srgb, var(--garden-muted-text) 72%, var(--garden-surface));
+  --txt-disabled: color-mix(in srgb, var(--garden-muted-text) 54%, var(--garden-surface));
+  --txt-accent-primary: var(--garden-primary);
+  --txt-accent-secondary: var(--garden-primary-hover);
+  --txt-on-color: var(--garden-primary-text);
+  --txt-inverse: var(--garden-primary-text);
+  --txt-link-primary: var(--garden-primary);
+  --txt-link-primary-hover: var(--garden-primary-hover);
+  --txt-link-secondary: var(--garden-muted-text);
+
+  --txt-icon-primary: var(--garden-text);
+  --txt-icon-secondary: var(--garden-muted-text);
+  --txt-icon-tertiary: color-mix(in srgb, var(--garden-muted-text) 76%, var(--garden-surface));
+  --txt-icon-placeholder: color-mix(in srgb, var(--garden-muted-text) 66%, var(--garden-surface));
+  --txt-icon-disabled: color-mix(in srgb, var(--garden-muted-text) 48%, var(--garden-surface));
+  --txt-icon-accent-primary: var(--garden-primary);
+  --txt-icon-accent-subtle: color-mix(in srgb, var(--garden-primary) 72%, var(--garden-surface));
+  --txt-icon-on-color: var(--garden-primary-text);
+
+  --bg-danger-primary: var(--garden-danger);
+  --border-danger-strong: var(--garden-danger);
+  --txt-danger-secondary: var(--garden-danger);
+  --txt-icon-danger-primary: var(--garden-danger);
+
+  --scrollbar-thumb: color-mix(in srgb, var(--garden-muted-text) 14%, transparent);
+  --scrollbar-thumb-surface-hover: color-mix(in srgb, var(--garden-muted-text) 20%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--garden-muted-text) 28%, transparent);
+  --scrollbar-thumb-active: color-mix(in srgb, var(--garden-muted-text) 42%, transparent);
+}
+
+html[data-garden-work="true"],
+html[data-garden-work="true"] body,
+html[data-garden-work="true"] #root {
+  background: var(--garden-bg);
+}
+
+[data-garden-work="true"] {
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--garden-primary) 8%, transparent), transparent 34rem),
+    var(--garden-bg);
+  color: var(--garden-text);
+}
+
+[data-garden-work="true"] :is(button, a, input, textarea, select, [role="button"]) {
+  transition-duration: 333ms;
+  transition-timing-function: ease;
+}
+
+[data-garden-work="true"] :is(button, [role="button"], input, select) {
+  min-height: 40px;
+}
+
+[data-garden-work="true"] :is(button, a, input, textarea, select, [role="button"]):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--garden-primary) 72%, white);
+  outline-offset: 2px;
+}
+
+[data-garden-work="true"] [data-garden-surface="topbar"],
+[data-garden-work="true"] [data-garden-surface="sidebar"] {
+  backdrop-filter: blur(16px) saturate(112%);
+  -webkit-backdrop-filter: blur(16px) saturate(112%);
+}
+
+[data-garden-work="true"] .desktop-app-container {
+  background-color: transparent;
+}
+
+@media (max-width: 900px) {
+  [data-garden-work="true"] :is(button, [role="button"], input, select) {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-garden-work="true"] *,
+  [data-garden-work="true"] *::before,
+  [data-garden-work="true"] *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+
+/* Mobile Work: treat navigation as a focused drawer and boards as a touch surface. */
+[data-garden-work="true"] .garden-mobile-sidebar-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 19;
+  width: 100%;
+  min-height: 100%;
+  border: 0;
+  background: rgba(16, 42, 28, .28);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+[data-garden-work="true"] [data-garden-sidebar="primary"][data-mobile="true"][data-collapsed="false"] {
+  width: min(88vw, 22rem) !important;
+  min-width: min(88vw, 22rem) !important;
+  max-width: min(88vw, 22rem) !important;
+  box-shadow: 18px 0 52px rgba(16, 42, 28, .2);
+}
+[data-garden-work="true"] [data-garden-sidebar][data-mobile="true"] [role="separator"] { display: none; }
+
+@media (max-width: 767px) {
+  html[data-garden-work="true"], html[data-garden-work="true"] body { overscroll-behavior: none; }
+  [data-garden-work="true"] .desktop-app-container { height: 100dvh; }
+  [data-garden-work="true"] main { min-width: 0; }
+  [data-garden-work="true"] :is(header, [role="banner"]) { padding-top: env(safe-area-inset-top); }
+  [data-garden-work="true"] :is(button, [role="button"], a) { touch-action: manipulation; }
+  [data-garden-work="true"] :is(input, textarea, select) { font-size: 16px; }
+  [data-garden-work="true"] .rounded-lg.border.border-subtle { border-inline: 0; border-bottom: 0; border-radius: 0; }
+  [data-garden-work="true"] [data-garden-sidebar="primary"][data-mobile="true"] > aside {
+    padding-top: max(.75rem, env(safe-area-inset-top));
+    padding-bottom: env(safe-area-inset-bottom);
+    border-radius: 0 1.15rem 1.15rem 0;
+    background: color-mix(in srgb, var(--garden-surface) 94%, transparent);
+    backdrop-filter: blur(22px) saturate(130%);
+    -webkit-backdrop-filter: blur(22px) saturate(130%);
+  }
+}
+/* Garden Work refresh: botanical glass without per-card compositing layers. */
+html[data-garden-work="true"] {
+  --garden-bg: #eef1e5;
+  --garden-surface: #fffdf5;
+  --garden-text: #173d2b;
+  --garden-muted-text: #476351;
+  --garden-border: #d8e0ce;
+  --garden-border-strong: #abc2a5;
+  --bg-surface-1: rgba(255,253,245,.84);
+  --bg-surface-2: #f4f6ed;
+  --bg-layer-1: #f8faf3;
+  --bg-layer-2: #fffdf7;
+  --txt-placeholder: #536b58;
+  --txt-tertiary: #536b58;
+}
+[data-garden-work="true"] body {
+  background: radial-gradient(ellipse at 0 0,#d6e8cc,transparent 55%),radial-gradient(ellipse at 100% 90%,#e8d9bc,transparent 55%),#eef1e5;
+}
+[data-garden-work="true"] [data-garden-surface="topbar"] {
+  min-height: 64px;
+  border-bottom: 1px solid rgba(255,255,255,.9);
+  background: rgba(255,253,245,.82);
+  box-shadow: 0 6px 24px rgba(29,63,39,.05);
+  gap: 12px;
+}
+[data-garden-work="true"] [data-garden-surface="rail"] { background: #e4ecdb; border-right: 1px solid #d1ddc8; }
+[data-garden-work="true"] [data-garden-surface="sidebar"] { background: rgba(245,249,237,.82); box-shadow: inset -1px 0 0 rgba(255,255,255,.9); padding-top: 18px; }
+[data-garden-work="true"] [data-garden-surface="sidebar"] > div:first-child > div:first-child > span { font-family: var(--tg-font-display); font-size: 20px; font-weight: 500; color: #214b32; }
+[data-garden-work="true"] .garden-work-brand { display: flex; align-items: center; gap: 10px; font-family: var(--tg-font-display); font-size: 20px; line-height: 1.1; color: #214b32; padding-right: 14px; border-right: 1px solid #d8e0ce; white-space: nowrap; }
+[data-garden-work="true"] .garden-work-brand > svg { width: 28px; height: 28px; }
+[data-garden-work="true"] .garden-work-brand-subtitle { display: block; margin-top: 4px; font-family: var(--tg-font-body); font-weight: 700; font-size: 8px; letter-spacing: .2em; color: #476351; }
+[data-garden-work="true"] [data-garden-surface="task"] { border-radius: 16px; padding: 16px; border-color: #d8e0ce; background: #fffdf7; box-shadow: 0 4px 12px rgba(27,59,37,.05),inset 0 1px 0 white; transition: border-color 160ms ease,box-shadow 160ms ease; }
+[data-garden-work="true"] [data-garden-surface="task"]:hover { border-color: #8baa7d; box-shadow: 0 6px 20px rgba(27,59,37,.1); }
+[data-garden-work="true"] :is([role="dialog"],[role="menu"],[role="listbox"]) { border-color: #d8e0ce; border-radius: 16px; background-color: #fffdf5; }
+[data-garden-work="true"] :is(input,textarea,select) { border-radius: 10px; }
+@media(max-width:900px) {
+  [data-garden-work="true"] .garden-work-brand { display: none; }
+  [data-garden-work="true"] [data-garden-surface="topbar"] { min-height: 56px; gap: 4px; padding-inline: 8px; }
+}
+@supports not (backdrop-filter:blur(1px)) {
+  [data-garden-work="true"] [data-garden-surface="topbar"], [data-garden-work="true"] [data-garden-surface="sidebar"] { background: #fffdf5; }
+}
+@media(prefers-reduced-transparency:reduce) {
+  [data-garden-work="true"] [data-garden-surface] { backdrop-filter: none; -webkit-backdrop-filter: none; background-color: #fffdf5; }
+}
+
+
+html[data-garden-work="true"] body { font-family: var(--tg-font-body); }
+html[data-garden-work="true"] .ProseMirror { --font-style: var(--tg-font-body); }
+html[data-garden-work="true"] .ProseMirror :is(pre, code) { font-family: var(--tg-font-body); }

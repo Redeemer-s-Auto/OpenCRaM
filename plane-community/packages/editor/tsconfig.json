@@ -1,0 +1,18 @@
+{
+  "extends": "@plane/typescript-config/react-library.json",
+  "compilerOptions": {
+    "exactOptionalPropertyTypes": false,
+    "noImplicitReturns": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "paths": {
+      "src/*": ["./src/*"],
+      "@/*": ["./src/core/*"],
+      "@/plane-editor/*": ["./src/ce/*"],
+      "@/styles/*": ["./src/styles/*"],
+      "is-emoji-supported": ["./src/core/extensions/emoji/is-emoji-supported.ts"]
+    }
+  },
+  "include": ["src/**/*", "index.d.ts"],
+  "exclude": ["dist", "build", "node_modules"]
+}

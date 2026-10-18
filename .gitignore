@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*service-account*.json
+*serviceAccount*.json
+.secrets/
+secrets/
+__pycache__/
+*.pyc
+.DS_Store
+*.log
+.turbo/

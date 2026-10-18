@@ -1,6 +1,8 @@
-# OpenCram
+# OpenCRaM
 
-The customized Plane Community Edition application extracted from [yadasa/church](https://github.com/yadasa/church). This copy preserves the Garden Work UI, Firebase identity bridge, authorization integration, and self-hosting configuration.
+OpenCRaM is an **open source CRM**. The name stands for **Open Customer Relationship Automation Management**, adding **Automation** to the traditional **Customer Relationship Management (CRM)** acronym.
+
+Built on the customized Plane Community Edition application extracted from [yadasa/church](https://github.com/yadasa/church), this copy preserves the Garden Work UI, Firebase identity bridge, authorization integration, and self-hosting configuration.
 
 ## Source
 
@@ -29,7 +31,7 @@ node scripts/plane-garden/verify-boundary.mjs
 
 ## Garden integration and self-hosting
 
-The copied Garden configuration still depends on the existing Firebase project, access projections, Garden admin application, and optional Church webhook functions. Copying the source does not create those services or replace authentication with an independent OpenCram account system. Existing domains, branding, project IDs, and integration defaults are retained from the source.
+The copied Garden configuration still depends on the existing Firebase project, access projections, Garden admin application, and optional Church webhook functions. Copying the source does not create those services or replace authentication with an independent OpenCRaM account system. Existing domains, branding, project IDs, and integration defaults are retained from the source.
 
 Before starting a separate instance, choose its domains, Firebase integration, storage, secrets, and database volumes. The checked-in `.env.garden.example` contains the original deployment's public defaults, including its bind address. Review those values before use.
 
@@ -47,4 +49,4 @@ The [original operations runbook](plane-community/GARDEN_OPERATIONS.md) describe
 
 ## Notices
 
-Plane-covered material retains its [AGPL license](plane-community/LICENSE.txt) and [copyright notices](plane-community/COPYRIGHT.txt). Original first-party material remains subject to the preserved [root license](LICENSE.md) and [third-party notices](THIRD_PARTY_NOTICES.md). The OpenCram repository name does not change those terms.
+Plane-covered material retains its [AGPL license](plane-community/LICENSE.txt) and [copyright notices](plane-community/COPYRIGHT.txt). Original first-party material remains subject to the preserved [root license](LICENSE.md) and [third-party notices](THIRD_PARTY_NOTICES.md). The OpenCRaM repository name does not change those terms.

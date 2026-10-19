@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 import uuid
 from urllib.parse import urlparse
-from typing import Any, Optional
+from typing import Optional
 
 from .http import HTTPError, JSONClient, Transport, urllib_transport
 
@@ -24,18 +24,33 @@ def notes_retry_delay(headers: dict, attempt: int, now: float) -> Optional[float
 
 
 class Notes:
-    def __init__(self, base_url: str, api_key: str, workspace: str,
-                 transport: Transport = urllib_transport, rate: float = NOTES_RATE,
-                 sleep=time.sleep, clock=time.monotonic, upload_transport: Optional[Transport] = None):
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        workspace: str,
+        transport: Transport = urllib_transport,
+        rate: float = NOTES_RATE,
+        sleep=time.sleep,
+        clock=time.monotonic,
+        upload_transport: Optional[Transport] = None,
+    ):
         self.base = base_url.rstrip("/")
         self.ws = workspace
-        self.http = JSONClient(self.base + "/api/v1", {"X-API-Key": api_key, "Accept": "application/json"},
-                               rate=rate, transport=self._wrap(transport), sleep=sleep, clock=clock)
+        self.http = JSONClient(
+            self.base + "/api/v1",
+            {"X-API-Key": api_key, "Accept": "application/json"},
+            rate=rate,
+            transport=self._wrap(transport),
+            sleep=sleep,
+            clock=clock,
+        )
         self.upload_transport = upload_transport or urllib_transport
 
     @staticmethod
     def _wrap(transport: Transport) -> Transport:
         """Turn X-RateLimit-Reset into Retry-After so the shared retry loop waits right."""
+
         def t(method, url, headers, body):
             status, h, data = transport(method, url, headers, body)
             if status == 429:
@@ -46,6 +61,7 @@ class Notes:
                         h = dict(h or {})
                         h["Retry-After"] = str(wait)
             return status, h, data
+
         return t
 
     def _p(self, path: str) -> str:
@@ -112,9 +128,11 @@ class Notes:
     # -- cards -------------------------------------------------------------
     def find_card(self, project_id: str, ext_source: str, ext_id: str) -> Optional[dict]:
         from urllib.parse import quote
+
         try:
-            return self.get(f"projects/{project_id}/work-items/?external_source={quote(ext_source)}"
-                            f"&external_id={quote(ext_id)}")
+            return self.get(
+                f"projects/{project_id}/work-items/?external_source={quote(ext_source)}&external_id={quote(ext_id)}"
+            )
         except HTTPError as e:
             if e.status == 404:
                 return None
@@ -148,17 +166,43 @@ class Notes:
     # -- files -------------------------------------------------------------
     def upload_image(self, project_id: str, name: str, mime: str, data: bytes, ext_id: str) -> str:
         """Upload an image for a card body. Returns the asset id (re-used on re-run)."""
-        payload = {"name": name, "type": mime, "size": len(data), "project_id": project_id,
-                   "external_source": "notion", "external_id": ext_id}
-        try:
-            res = self.post("assets/", payload)
-        except HTTPError as e:
-            if e.status == 409 and (e.json() or {}).get("asset_id"):
-                return (e.json() or {})["asset_id"]
-            raise
+        for attempt in range(4):
+            tag = ext_id if attempt == 0 else f"{ext_id}:retry{attempt}"
+            payload = {
+                "name": name,
+                "type": mime,
+                "size": len(data),
+                "project_id": project_id,
+                "external_source": "notion",
+                "external_id": tag,
+            }
+            try:
+                res = self.post("assets/", payload)
+                break
+            except HTTPError as e:
+                existing = (e.json() or {}).get("asset_id") if e.status == 409 else None
+                if not existing:
+                    raise
+                if self._asset_uploaded(existing):
+                    self.last_image_reused = True
+                    return existing
+                # an earlier run made the record but the file never arrived: make a fresh one
+        else:
+            raise RuntimeError(f"image {name}: earlier uploads never finished")
         self._s3(res["upload_data"], name, mime, data)
         self.patch(f"assets/{res['asset_id']}/", {"is_uploaded": True})
+        self.last_image_reused = False
         return res["asset_id"]
+
+    def _asset_uploaded(self, asset_id: str) -> bool:
+        """True when the asset's file is in storage (the v1 asset GET answers 400 until it is)."""
+        try:
+            self.get(f"assets/{asset_id}/")
+            return True
+        except HTTPError as e:
+            if e.status == 400:
+                return False
+            return True  # cannot tell: keep the record rather than making copies
 
     def attach(self, project_id: str, card_id: str, name: str, mime: str, data: bytes, ext_id: str) -> dict:
         """Attach a file to a card. Returns {"id", "asset_url"?}; re-used on re-run."""
@@ -180,8 +224,12 @@ class Notes:
         for k, v in (upload.get("fields") or {}).items():
             parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
         safe = name.replace('"', "_")
-        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{safe}"\r\n'
-                     f"Content-Type: {mime}\r\n\r\n".encode() + data + b"\r\n")
+        parts.append(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{safe}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n".encode()
+            + data
+            + b"\r\n"
+        )
         parts.append(f"--{boundary}--\r\n".encode())
         body = b"".join(parts)
         url = upload["url"]
@@ -190,6 +238,7 @@ class Notes:
         if not urlparse(url).path.endswith("/"):
             url += "/"
         status, _h, resp = self.upload_transport(
-            "POST", url, {"Content-Type": f"multipart/form-data; boundary={boundary}"}, body)
+            "POST", url, {"Content-Type": f"multipart/form-data; boundary={boundary}"}, body
+        )
         if status >= 300:
             raise HTTPError(status, resp.decode("utf-8", "replace"), url)

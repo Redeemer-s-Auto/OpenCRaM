@@ -16,24 +16,44 @@ from typing import Callable, Optional
 
 # Notion function -> Notes function (same argument order).
 FUNCTIONS = {
-    "if": "if", "and": "and", "or": "or", "not": "not", "empty": "empty",
-    "round": "round", "floor": "floor", "ceil": "ceil", "abs": "abs",
-    "min": "min", "max": "max", "sum": "sum", "toNumber": "toNumber",
-    "format": "format", "concat": "concat", "length": "length",
-    "lower": "lower", "upper": "upper", "contains": "contains",
-    "dateAdd": "dateAdd", "dateSubtract": "dateSubtract", "dateBetween": "dateBetween",
-    "year": "year", "month": "month", "date": "day",  # Notion date() = day of the month
+    "if": "if",
+    "and": "and",
+    "or": "or",
+    "not": "not",
+    "empty": "empty",
+    "round": "round",
+    "floor": "floor",
+    "ceil": "ceil",
+    "abs": "abs",
+    "min": "min",
+    "max": "max",
+    "sum": "sum",
+    "toNumber": "toNumber",
+    "format": "format",
+    "concat": "concat",
+    "length": "length",
+    "lower": "lower",
+    "upper": "upper",
+    "contains": "contains",
+    "dateAdd": "dateAdd",
+    "dateSubtract": "dateSubtract",
+    "dateBetween": "dateBetween",
+    "year": "year",
+    "month": "month",
+    "date": "day",  # Notion date() = day of the month
 }
-UNITS = {"days", "weeks", "months", "years", "hours", "minutes",
-         "day", "week", "month", "year", "hour", "minute"}
+UNITS = {"days", "weeks", "months", "years", "hours", "minutes", "day", "week", "month", "year", "hour", "minute"}
 
-_TOKEN = re.compile(r"""
+_TOKEN = re.compile(
+    r"""
     (?P<ws>\s+)
   | (?P<number>\d+(?:\.\d+)?)
   | (?P<string>"(?:[^"\\]|\\.)*")
   | (?P<op>==|!=|>=|<=|&&|\|\||[-+*/%(),<>!.?:\[\]])
   | (?P<name>[A-Za-z_][A-Za-z0-9_]*)
-""", re.VERBOSE)
+""",
+    re.VERBOSE,
+)
 
 
 class Untranslatable(Exception):

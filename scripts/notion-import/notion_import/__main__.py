@@ -61,14 +61,27 @@ def cmd_inventory(args):
     inv = Inventory(list(n.search("data_source")), list(n.search("page")))
     out = {"data_sources": [], "top_level_pages": []}
     for ds in inv.data_sources:
-        out["data_sources"].append({"id": ds["id"], "title": ds_title(ds), "path": inv.path(ds),
-                                    "rows": inv.rows[norm(ds["id"])], "last_edited": ds.get("last_edited_time"),
-                                    "inline": bool(ds.get("is_inline")),
-                                    "property_types": dict(inv.schema_counts(ds))})
+        out["data_sources"].append(
+            {
+                "id": ds["id"],
+                "title": ds_title(ds),
+                "path": inv.path(ds),
+                "rows": inv.rows[norm(ds["id"])],
+                "last_edited": ds.get("last_edited_time"),
+                "inline": bool(ds.get("is_inline")),
+                "property_types": dict(inv.schema_counts(ds)),
+            }
+        )
     for p in inv.top_level_pages():
-        out["top_level_pages"].append({"id": p["id"], "title": page_title(p), "parent": inv.parent_title(p),
-                                       "child_pages": inv.child_pages[norm(p["id"])],
-                                       "last_edited": p.get("last_edited_time")})
+        out["top_level_pages"].append(
+            {
+                "id": p["id"],
+                "title": page_title(p),
+                "parent": inv.parent_title(p),
+                "child_pages": inv.child_pages[norm(p["id"])],
+                "last_edited": p.get("last_edited_time"),
+            }
+        )
     report.dump_json(out, args.out)
     print(f"wrote {args.out}: {len(out['data_sources'])} databases, {len(out['top_level_pages'])} top-level pages")
 
@@ -76,13 +89,22 @@ def cmd_inventory(args):
 def _export(args, dry):
     n = Notion(_secret(args.token_file, "NOTION_TOKEN"))
     os.makedirs(args.out, exist_ok=True)
-    ex = Exporter(n, args.out, max_file_bytes=int(args.max_file_mb * 1024 * 1024),
-                  download_files=not dry and not args.no_files, exclude=_exclude(args),
-                  block_comments=args.block_comments, log=lambda m: print(m, file=sys.stderr))
+    ex = Exporter(
+        n,
+        args.out,
+        max_file_bytes=int(args.max_file_mb * 1024 * 1024),
+        download_files=not dry and not args.no_files,
+        exclude=_exclude(args),
+        block_comments=args.block_comments,
+        log=lambda m: print(m, file=sys.stderr),
+    )
     ex.run(_roots(args.root))
     path = ex.save()
-    print(f"snapshot: {path} ({len(ex.snap['pages'])} pages, {len(ex.snap['data_sources'])} databases, "
-          f"{len(ex.snap['files'])} files; {n.http.calls} Notion calls, {n.http.retries} retries)", file=sys.stderr)
+    print(
+        f"snapshot: {path} ({len(ex.snap['pages'])} pages, {len(ex.snap['data_sources'])} databases, "
+        f"{len(ex.snap['files'])} files; {n.http.calls} Notion calls, {n.http.retries} retries)",
+        file=sys.stderr,
+    )
     return args.out
 
 
@@ -97,8 +119,10 @@ def _plan(snapshot_dir, args):
 
 def _print_plan(plan, list_cards=False):
     for b in plan.boards.values():
-        print(f"board {b.name!r} [{b.identifier}] from {b.source_title!r}: {b.card_count} cards, "
-              f"{len(b.fields)} fields, {len(b.states)} states, {len(b.templates)} templates")
+        print(
+            f"board {b.name!r} [{b.identifier}] from {b.source_title!r}: {b.card_count} cards, "
+            f"{len(b.fields)} fields, {len(b.states)} states, {len(b.templates)} templates"
+        )
         for f in b.fields:
             extra = f" (falls back to {f.fallback.field_type})" if f.fallback else ""
             print(f"    field {f.name!r}: {f.field_type}{extra}")
@@ -122,21 +146,45 @@ def cmd_plan(args):
 def cmd_apply(args):
     from .apply import Applier
     from .notes import Notes
+
     plan = _plan(args.snapshot, args)
     notes = Notes(args.notes_url, _secret(args.api_key_file, "NOTES_API_KEY"), args.workspace)
-    ap = Applier(notes, plan, args.snapshot, log=lambda m: print(m, file=sys.stderr),
-                 private=not args.not_private, public_url=args.public_url,
-                 max_file_bytes=int(args.max_file_mb * 1024 * 1024))
-    result = ap.run()
+    ap = Applier(
+        notes,
+        plan,
+        args.snapshot,
+        log=lambda m: print(m, file=sys.stderr),
+        private=not args.not_private,
+        public_url=args.public_url,
+        max_file_bytes=int(args.max_file_mb * 1024 * 1024),
+    )
+    failure = None
+    try:
+        result = ap.run()
+    except Exception as e:  # write the report of what happened before stopping
+        failure = e
+        result = ap.result
+        result["errors"].append(f"IMPORT STOPPED: {type(e).__name__}: {e}")
     text = report.apply_report(plan, result, ap.web, args.workspace)
     path = args.report or os.path.join(args.snapshot, "import-report.md")
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(text)
-    report.dump_json({"result": result, "cards": {k: v for k, v in ap.cards.items()}},
-                     os.path.splitext(path)[0] + ".json")
+    report.dump_json(
+        {"result": result, "cards": {k: v for k, v in ap.cards.items()}}, os.path.splitext(path)[0] + ".json"
+    )
     print(f"report: {path}")
-    print(json.dumps({"created": result["created"], "updated": result["updated"],
-                      "errors": len(result["errors"]), "skipped": len(result["skipped"])}))
+    print(
+        json.dumps(
+            {
+                "created": result["created"],
+                "updated": result["updated"],
+                "errors": len(result["errors"]),
+                "skipped": len(result["skipped"]),
+            }
+        )
+    )
+    if failure is not None:
+        print(f"import stopped: {failure}", file=sys.stderr)
     return 1 if result["errors"] else 0
 
 
@@ -149,8 +197,9 @@ def cmd_run(args):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="notion_import", description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        prog="notion_import", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def notion_args(p):

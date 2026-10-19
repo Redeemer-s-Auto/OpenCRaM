@@ -7,6 +7,7 @@ that the apply step resolves to Notes ids.
 
 from __future__ import annotations
 
+import json
 import re
 from collections import Counter, OrderedDict
 from dataclasses import dataclass, field
@@ -15,7 +16,7 @@ from typing import Any, Optional
 from . import formula as fx
 from .blocks import Renderer
 from .inventory import norm
-from .richtext import plain, to_html, esc
+from .richtext import plain, esc
 
 SOURCE = "notion"
 FORBIDDEN = re.compile(r"[&+,:;$^}{*=?@#|'<>.()%!\-]")
@@ -24,16 +25,41 @@ TEXT_MAX = 1000
 LONG_MAX = 20000
 
 # Notion status groups -> Notes state groups
-STATUS_GROUP = {"to-do": "unstarted", "to do": "unstarted", "not started": "unstarted",
-                "in progress": "started", "complete": "completed", "done": "completed"}
+STATUS_GROUP = {
+    "to-do": "unstarted",
+    "to do": "unstarted",
+    "not started": "unstarted",
+    "in progress": "started",
+    "complete": "completed",
+    "done": "completed",
+}
 # Notion select colors -> hex for Notes options
-COLORS = {"default": "#9ca3af", "gray": "#9ca3af", "brown": "#a16207", "orange": "#f97316",
-          "yellow": "#eab308", "green": "#22c55e", "blue": "#3b82f6", "purple": "#a855f7",
-          "pink": "#ec4899", "red": "#ef4444"}
-ROLLUP_FN = {"count": "count", "count_values": "count_not_empty", "empty": "count_empty",
-             "not_empty": "count_not_empty", "sum": "sum", "average": "avg", "min": "min",
-             "max": "max", "earliest_date": "earliest", "latest_date": "latest",
-             "percent_checked": "percent_checked", "unique": "unique"}
+COLORS = {
+    "default": "#9ca3af",
+    "gray": "#9ca3af",
+    "brown": "#a16207",
+    "orange": "#f97316",
+    "yellow": "#eab308",
+    "green": "#22c55e",
+    "blue": "#3b82f6",
+    "purple": "#a855f7",
+    "pink": "#ec4899",
+    "red": "#ef4444",
+}
+ROLLUP_FN = {
+    "count": "count",
+    "count_values": "count_not_empty",
+    "empty": "count_empty",
+    "not_empty": "count_not_empty",
+    "sum": "sum",
+    "average": "avg",
+    "min": "min",
+    "max": "max",
+    "earliest_date": "earliest",
+    "latest_date": "latest",
+    "percent_checked": "percent_checked",
+    "unique": "unique",
+}
 NO_TARGET_FN = {"count"}
 
 
@@ -49,7 +75,7 @@ def make_identifier(name: str, taken: set) -> str:
     base = base or "NI"
     ident, n = base, 2
     while ident in taken:
-        ident = f"{base[:12 - len(str(n))]}{n}"
+        ident = f"{base[: 12 - len(str(n))]}{n}"
         n += 1
     taken.add(ident)
     return ident
@@ -62,15 +88,15 @@ class FieldSpec:
     field_type: str
     notion_prop: str = ""
     notion_type: str = ""
-    role: str = "value"              # value | end | names | snapshot
+    role: str = "value"  # value | end | names | snapshot
     options: list = field(default_factory=list)
     settings: dict = field(default_factory=dict)
     # linked fields, resolved at apply time
-    relation_target: Optional[str] = None   # board key
+    relation_target: Optional[str] = None  # board key
     two_way: bool = False
-    mirror_of: Optional[str] = None         # ext id of the primary relation (this side is its mirror)
+    mirror_of: Optional[str] = None  # ext id of the primary relation (this side is its mirror)
     mirror_name: Optional[str] = None
-    rollup: Optional[dict] = None           # {"relation": ext_id, "target": ext_id|@title.., "function"}
+    rollup: Optional[dict] = None  # {"relation": ext_id, "target": ext_id|@title.., "function"}
     formula_refs: list = field(default_factory=list)  # ext ids this formula reads
     fallback: Optional["FieldSpec"] = None  # snapshot field if the server refuses this one
     note: str = ""
@@ -82,8 +108,8 @@ class CardSpec:
     board: str
     name: str
     parent: Optional[str] = None
-    state: Optional[str] = None          # status option name
-    values: dict = field(default_factory=dict)   # field ext id -> neutral value
+    state: Optional[str] = None  # status option name
+    values: dict = field(default_factory=dict)  # field ext id -> neutral value
     body: str = ""
     attachments: list = field(default_factory=list)
     comments: list = field(default_factory=list)
@@ -98,11 +124,12 @@ class BoardSpec:
     key: str
     name: str
     identifier: str
-    kind: str                     # database | docs
+    kind: str  # database | docs
     source_title: str
     path: str = ""
+    description: str = ""
     fields: list = field(default_factory=list)
-    states: list = field(default_factory=list)   # [{"name","group","color"}]
+    states: list = field(default_factory=list)  # [{"name","group","color"}]
     status_prop: Optional[str] = None
     templates: list = field(default_factory=list)
     lost: Counter = field(default_factory=Counter)
@@ -127,15 +154,16 @@ class Plan:
     notes: list
     missing: list
     snapshot_roots: list
-    db_boards: dict = field(default_factory=dict)   # notion database id -> board key
+    db_boards: dict = field(default_factory=dict)  # notion database id -> board key
 
     def card_ids(self):
         return {c.notion_id for c in self.cards}
 
 
 class Planner:
-    def __init__(self, snap: dict, docs_board_name: str = "Docs", icon_in_title: bool = True,
-                 exclude: Optional[set] = None):
+    def __init__(
+        self, snap: dict, docs_board_name: str = "Docs", icon_in_title: bool = True, exclude: Optional[set] = None
+    ):
         self.s = snap
         self.docs_board_name = docs_board_name
         self.icon_in_title = icon_in_title
@@ -148,8 +176,8 @@ class Planner:
         self.cards: list = []
         self.taken_idents: set = set()
         self.taken_names: set = set()
-        self.row_board = {}      # page id -> board key
-        self.db_to_ds = {}       # database id -> [ds keys]
+        self.row_board = {}  # page id -> board key
+        self.db_to_ds = {}  # database id -> [ds keys]
         for k, ds in self.dss.items():
             dbid = norm((ds.get("parent") or {}).get("database_id"))
             self.db_to_ds.setdefault(dbid, []).append(k)
@@ -185,9 +213,16 @@ class Planner:
             for k in keys:
                 if k in self.boards:
                     db_boards.setdefault(dbid, k)
-        return Plan(self.boards, self.cards, self.files, self.users,
-                    list(self.s.get("notes") or []), list(self.s.get("missing") or []),
-                    list(self.s.get("roots") or []), db_boards)
+        return Plan(
+            self.boards,
+            self.cards,
+            self.files,
+            self.users,
+            list(self.s.get("notes") or []),
+            list(self.s.get("missing") or []),
+            list(self.s.get("roots") or []),
+            db_boards,
+        )
 
     # -- boards ----------------------------------------------------------
     def _unique_board_name(self, title: str, context: str) -> str:
@@ -213,8 +248,13 @@ class Planner:
     def docs_board(self) -> BoardSpec:
         if "docs" not in self.boards:
             name = self._unique_board_name(self.docs_board_name, "")
-            b = BoardSpec(key="docs", name=name, identifier=make_identifier(name, self.taken_idents),
-                          kind="docs", source_title="Plain Notion pages")
+            b = BoardSpec(
+                key="docs",
+                name=name,
+                identifier=make_identifier(name, self.taken_idents),
+                kind="docs",
+                source_title="Plain Notion pages",
+            )
             b.notes.append("Plain pages land here. Open the board's Pages link to see it as a page list.")
             self.boards["docs"] = b
         return self.boards["docs"]
@@ -222,14 +262,16 @@ class Planner:
     def _board_for_ds(self, key: str, ds: dict):
         title = plain(ds.get("title")) or "Untitled database"
         name = self._unique_board_name(title, self._context_title(ds))
-        b = BoardSpec(key=key, name=name, identifier=make_identifier(name, self.taken_idents),
-                      kind="database", source_title=title)
+        b = BoardSpec(
+            key=key, name=name, identifier=make_identifier(name, self.taken_idents), kind="database", source_title=title
+        )
         self.boards[key] = b
         props = ds.get("properties") or {}
         rows = [self.pages[r] for r in ds.get("rows") or [] if r in self.pages]
         if ds.get("views"):
-            b.lost[f"saved views (filters, sorts, groups, layouts)"] += len(ds["views"])
+            b.lost["saved views (filters, sorts, groups, layouts)"] += len(ds["views"])
         if ds.get("description") and plain(ds.get("description")):
+            b.description = plain(ds.get("description"))
             b.changed["database description (put in the board description)"] += 1
         if ds.get("public_url"):
             b.lost["published-to-web setting"] += 1
@@ -249,8 +291,13 @@ class Planner:
                     for oid in g.get("option_ids") or []:
                         group_of[oid] = STATUS_GROUP.get((g.get("name") or "").lower(), "unstarted")
                 for o in st.get("options") or []:
-                    b.states.append({"name": o["name"][:255], "group": group_of.get(o.get("id"), "unstarted"),
-                                     "color": COLORS.get(o.get("color") or "default", "#9ca3af")})
+                    b.states.append(
+                        {
+                            "name": o["name"][:255],
+                            "group": group_of.get(o.get("id"), "unstarted"),
+                            "color": COLORS.get(o.get("color") or "default", "#9ca3af"),
+                        }
+                    )
                 b.came_over["status (became the card state)"] += 1
                 continue
             spec = self._field(key, b, pname, p, ext, values)
@@ -279,25 +326,49 @@ class Planner:
                 b.changed[f"number format '{fmt}' (shown as a plain number)"] += 1
             else:
                 b.came_over["number property"] += 1
-            return FieldSpec(ext, name, "number", pname, t, settings={"decimals": 2},
-                             note="percent" if fmt == "percent" else "")
+            return FieldSpec(
+                ext, name, "number", pname, t, settings={"decimals": 2}, note="percent" if fmt == "percent" else ""
+            )
         if t in ("select", "multi_select"):
             opts = (p.get(t) or {}).get("options") or []
             b.came_over[f"{t.replace('_', '-')} property"] += 1
-            return FieldSpec(ext, name, t, pname, t,
-                             options=[{"name": o["name"][:255], "color": COLORS.get(o.get("color") or "default")} for o in opts][:500])
+            return FieldSpec(
+                ext,
+                name,
+                t,
+                pname,
+                t,
+                options=[{"name": o["name"][:255], "color": COLORS.get(o.get("color") or "default")} for o in opts][
+                    :500
+                ],
+            )
         if t == "status":  # a second status property
             opts = (p.get("status") or {}).get("options") or []
             b.changed["second status property (became a select field)"] += 1
-            return FieldSpec(ext, name, "select", pname, t,
-                             options=[{"name": o["name"][:255], "color": COLORS.get(o.get("color") or "default")} for o in opts])
+            return FieldSpec(
+                ext,
+                name,
+                "select",
+                pname,
+                t,
+                options=[{"name": o["name"][:255], "color": COLORS.get(o.get("color") or "default")} for o in opts],
+            )
         if t == "date":
             has_time = any(_has_time((v.get("date") or {}).get("start")) for v in values)
             has_end = any((v.get("date") or {}).get("end") for v in values)
             out = [FieldSpec(ext, name, "date", pname, t, settings={"include_time": has_time})]
             if has_end:
-                out.append(FieldSpec(ext + ":end", f"{name} end"[:255], "date", pname, t, role="end",
-                                     settings={"include_time": has_time}))
+                out.append(
+                    FieldSpec(
+                        ext + ":end",
+                        f"{name} end"[:255],
+                        "date",
+                        pname,
+                        t,
+                        role="end",
+                        settings={"include_time": has_time},
+                    )
+                )
                 b.changed["date range (end date in its own field)"] += 1
             if any((v.get("date") or {}).get("time_zone") for v in values):
                 b.changed["date time zone (stored as UTC)"] += 1
@@ -317,9 +388,18 @@ class Planner:
                 b.changed[f"{t.replace('_', ' ')} (kept in a text field)"] += 1
                 return FieldSpec(ext, name, "text", pname, t, role="snapshot")
             b.came_over["person property (matched by email)"] += 1
-            return [FieldSpec(ext, name, "person", pname, t, settings={"multiple": True}),
-                    FieldSpec(ext + ":names", f"{name} from Notion"[:255], "text", pname, t, role="names",
-                              note="people not matched to a Notes member")]
+            return [
+                FieldSpec(ext, name, "person", pname, t, settings={"multiple": True}),
+                FieldSpec(
+                    ext + ":names",
+                    f"{name} from Notion"[:255],
+                    "text",
+                    pname,
+                    t,
+                    role="names",
+                    note="people not matched to a Notes member",
+                ),
+            ]
         if t in ("created_time", "last_edited_time"):
             b.changed[f"{t.replace('_', ' ')} (kept in a text field)"] += 1
             return FieldSpec(ext, name, "text", pname, t, role="snapshot")
@@ -358,8 +438,15 @@ class Planner:
             ftype = "checkbox"
         elif common == "date":
             ftype = "date"
-        return FieldSpec(ext + ":snapshot", name, ftype, pname, t, role="snapshot",
-                         settings={"decimals": 2} if ftype == "number" else ({"include_time": True} if ftype == "date" else {}))
+        return FieldSpec(
+            ext + ":snapshot",
+            name,
+            ftype,
+            pname,
+            t,
+            role="snapshot",
+            settings={"decimals": 2} if ftype == "number" else ({"include_time": True} if ftype == "date" else {}),
+        )
 
     def _linked_fields(self, key: str, ds: dict):
         b = self.boards[key]
@@ -375,12 +462,19 @@ class Planner:
             target = norm(rel.get("data_source_id") or "")
             if not target and rel.get("database_id"):
                 target = (self.db_to_ds.get(norm(rel["database_id"])) or [""])[0]
-            snap = FieldSpec(ext + ":snapshot", pname[:255], "text", pname, "relation", role="snapshot",
-                             note="titles of linked pages")
+            snap = FieldSpec(
+                ext + ":snapshot",
+                pname[:255],
+                "text",
+                pname,
+                "relation",
+                role="snapshot",
+                note="titles of linked pages",
+            )
             if target in self.boards:
                 spec = FieldSpec(ext, pname[:255], "relation", pname, "relation", relation_target=target, fallback=snap)
                 if rel.get("type") == "dual_property" and target != key:
-                    other = (rel.get("dual_property") or {})
+                    other = rel.get("dual_property") or {}
                     other_name = other.get("synced_property_name")
                     other_id = other.get("synced_property_id")
                     other_ext = f"{target}:{other_id}"
@@ -388,7 +482,7 @@ class Planner:
                         spec.two_way = True
                         spec.mirror_name = other_name
                     else:
-                        spec.mirror_of = other_ext   # the other board creates it; we use its mirror
+                        spec.mirror_of = other_ext  # the other board creates it; we use its mirror
                 b.fields.append(spec)
                 by_name[pname] = spec
                 b.came_over["relation (linked cards)"] += 1
@@ -420,12 +514,22 @@ class Planner:
                     elif tgt_board and tprop.get("id"):
                         target = f"{rel_field.relation_target}:{tprop['id']}"
                         tf = tgt_board.field_by_ext(target)
-                        if tf is None or tf.field_type in ("relation", "rollup", "text", "long_text") and fn not in ("count_empty", "count_not_empty", "unique"):
+                        if (
+                            tf is None
+                            or tf.field_type in ("relation", "rollup", "text", "long_text")
+                            and fn not in ("count_empty", "count_not_empty", "unique")
+                        ):
                             target = None
                     if target:
-                        spec = FieldSpec(ext, pname[:255], "rollup", pname, t,
-                                         rollup={"relation": rel_field.ext_id, "target": target, "function": fn},
-                                         fallback=snap)
+                        spec = FieldSpec(
+                            ext,
+                            pname[:255],
+                            "rollup",
+                            pname,
+                            t,
+                            rollup={"relation": rel_field.ext_id, "target": target, "function": fn},
+                            fallback=snap,
+                        )
                 if spec:
                     b.fields.append(spec)
                     b.came_over["rollup"] += 1
@@ -433,17 +537,28 @@ class Planner:
                     b.fields.append(snap)
                     b.changed["rollup that cannot be rebuilt (frozen value as text/number)"] += 1
             elif t == "formula":
-                expr = (p.get("formula") or {}).get("expression") or ""
+                expr = names_for_ids((p.get("formula") or {}).get("expression") or "", props)
                 snap = self._snapshot_spec(ext, pname[:255], pname, t, values, "formula")
                 try:
                     out = fx.translate(expr, lambda n: self._formula_prop(key, n))
-                    rtype = {"number": "number", "text": "text", "checkbox": "checkbox", "date": "date"}.get(snap.field_type, "text")
+                    rtype = {"number": "number", "text": "text", "checkbox": "checkbox", "date": "date"}.get(
+                        snap.field_type, "text"
+                    )
                     refs = [f"{key}:{(props.get(n) or {}).get('id')}" for n in fx.referenced_props(expr)]
                     if rtype == "number" and any((self._field_type_of(b, r) == "money") for r in refs):
                         rtype = "money"
-                    b.fields.append(FieldSpec(ext, pname[:255], "formula", pname, t,
-                                              settings={"expression": out, "result_type": rtype},
-                                              formula_refs=refs, fallback=snap))
+                    b.fields.append(
+                        FieldSpec(
+                            ext,
+                            pname[:255],
+                            "formula",
+                            pname,
+                            t,
+                            settings={"expression": out, "result_type": rtype},
+                            formula_refs=refs,
+                            fallback=snap,
+                        )
+                    )
                     b.came_over["formula (rebuilt as a Notes formula)"] += 1
                 except fx.Untranslatable as e:
                     snap.note = f"formula not translated: {e}"
@@ -466,8 +581,18 @@ class Planner:
             return "State"
         if t == "created_time":
             return "Created"
-        if t in ("relation", "rollup", "people", "files", "button", "created_by", "last_edited_by",
-                 "last_edited_time", "unique_id", "verification"):
+        if t in (
+            "relation",
+            "rollup",
+            "people",
+            "files",
+            "button",
+            "created_by",
+            "last_edited_by",
+            "last_edited_time",
+            "unique_id",
+            "verification",
+        ):
             return None
         if t == "formula":
             # formulas referencing formulas work only if that one translated (checked at apply)
@@ -505,14 +630,18 @@ class Planner:
         cover = page.get("cover") or {}
         cover_html = ""
         if cover.get("type") == "external" and (cover.get("external") or {}).get("url"):
-            cover_html = (f'<image-component src="{esc(cover["external"]["url"])}" width="35%" height="auto" '
-                          f'alignment="left" status="uploaded"></image-component>')
+            cover_html = (
+                f'<image-component src="{esc(cover["external"]["url"])}" width="35%" height="auto" '
+                f'alignment="left" status="uploaded"></image-component>'
+            )
             b.changed["page cover (first image in the body; feeds the Gallery)"] += 1
         elif cover.get("type") == "file" and cover.get("_file"):
             rec = self.files.get(cover["_file"]) or {}
             if rec.get("status") in ("ok",) or str(rec.get("status", "")).startswith("not downloaded"):
-                cover_html = (f'<image-component src="@@ASSET:{cover["_file"]}@@" width="35%" height="auto" '
-                              f'alignment="left" status="uploaded"></image-component>')
+                cover_html = (
+                    f'<image-component src="@@ASSET:{cover["_file"]}@@" width="35%" height="auto" '
+                    f'alignment="left" status="uploaded"></image-component>'
+                )
                 b.changed["page cover (first image in the body; feeds the Gallery)"] += 1
             else:
                 b.lost["page cover over the size limit"] += 1
@@ -524,10 +653,17 @@ class Planner:
             b.lost["page lock"] += 1
         if page.get("public_url"):
             b.lost["page published to the web"] += 1
-        card = CardSpec(notion_id=pid, board=board, name=(title or "Untitled")[:NAME_MAX], parent=parent,
-                        body=cover_html + body, attachments=list(r.attachments),
-                        created_at=page.get("created_time"),
-                        created_by_email=self._email(page.get("created_by")), url=page.get("url") or "")
+        card = CardSpec(
+            notion_id=pid,
+            board=board,
+            name=(title or "Untitled")[:NAME_MAX],
+            parent=parent,
+            body=cover_html + body,
+            attachments=list(r.attachments),
+            created_at=page.get("created_time"),
+            created_by_email=self._email(page.get("created_by")),
+            url=page.get("url") or "",
+        )
         card._child_pages = r.child_pages  # type: ignore[attr-defined]
         # property values
         if b.kind == "database":
@@ -541,7 +677,7 @@ class Planner:
                         card.values[f.fallback.ext_id] = fv
             if b.status_prop:
                 st = (props.get(b.status_prop) or {}).get("status") or {}
-                card.state = (st.get("name") or None)
+                card.state = st.get("name") or None
             for prop in props.values():
                 if prop.get("type") == "files":
                     for fobj in prop.get("files") or []:
@@ -579,9 +715,11 @@ class Planner:
     def _history(self, page: dict) -> str:
         made = page.get("created_time") or ""
         edit = page.get("last_edited_time") or ""
-        parts = [f"Imported from Notion."]
+        parts = ["Imported from Notion."]
+
         def by(user):
             return f" by {self._user_name(user)}" if user else ""
+
         if made:
             parts.append(f"Created in Notion {made[:16].replace('T', ' ')} UTC{by(page.get('created_by'))}.")
         if edit:
@@ -609,7 +747,7 @@ class Planner:
             return _snapshot_value(f, prop, self)
         if t == "rich_text":
             text = plain(prop.get("rich_text"))
-            return text[:LONG_MAX if f.field_type == "long_text" else TEXT_MAX] or None
+            return text[: LONG_MAX if f.field_type == "long_text" else TEXT_MAX] or None
         if t == "number":
             n = prop.get("number")
             if n is None:
@@ -662,15 +800,46 @@ class Planner:
             st = None
             if b.status_prop:
                 st = ((props.get(b.status_prop) or {}).get("status") or {}).get("name")
-            b.templates.append({"notion_id": t["id"], "name": (t.get("name") or page_title(page) or "Template")[:255],
-                                "title": page_title(page) if page_title(page) != "Untitled" else "",
-                                "body": body, "values": fake.values, "state": st,
-                                "is_default": t.get("is_default", False), "attachments": r.attachments})
+            b.templates.append(
+                {
+                    "notion_id": t["id"],
+                    "name": (t.get("name") or page_title(page) or "Template")[:255],
+                    "title": page_title(page) if page_title(page) != "Untitled" else "",
+                    "body": body,
+                    "values": fake.values,
+                    "state": st,
+                    "is_default": t.get("is_default", False),
+                    "attachments": r.attachments,
+                }
+            )
             b.came_over["database template (became a card template)"] += 1
             if r.attachments:
                 b.lost["file inside a template (templates hold no attachments)"] += len(r.attachments)
             if r.child_pages:
                 b.lost["sub-page inside a template"] += len(r.child_pages)
+
+
+_INTERNAL_REF = re.compile(r"\{\{notion:block_property:([^:}]+)(?::[^}]*)?\}\}")
+
+
+def names_for_ids(expression: str, props: dict) -> str:
+    """Some Notion API versions return formulas with internal property ids
+    ({{notion:block_property:<id>:...}}) instead of prop("Name"); turn them back into names."""
+    from urllib.parse import unquote
+
+    by_id = {}
+    for name, p in props.items():
+        pid = p.get("id") or ""
+        by_id[pid] = name
+        by_id[unquote(pid)] = name
+
+    def swap(m):
+        name = by_id.get(m.group(1)) or by_id.get(unquote(m.group(1)))
+        if name is None:
+            return m.group(0)  # unknown id: the translator refuses it, value is frozen
+        return "prop(" + json.dumps(name, ensure_ascii=False) + ")"
+
+    return _INTERNAL_REF.sub(swap, expression or "")
 
 
 def page_title(page: dict) -> str:

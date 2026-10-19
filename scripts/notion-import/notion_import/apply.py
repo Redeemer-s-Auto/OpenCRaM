@@ -10,7 +10,8 @@ from __future__ import annotations
 import mimetypes
 import os
 import re
-from collections import Counter, defaultdict
+import json
+from collections import Counter
 from typing import Optional
 
 from .http import HTTPError
@@ -18,6 +19,13 @@ from .plan import SOURCE, FieldSpec, Plan, make_identifier
 from .richtext import esc
 
 LINKED = ("relation", "rollup", "formula")
+STATE_FILE = "notes-state.json"
+
+
+class ImportAborted(Exception):
+    """Stop before anything lands somewhere it should not (a board that is not private, a lost board)."""
+
+
 PLACEHOLDER = re.compile(r"@@(CARD|BOARD|ASSET|FILE):([0-9a-zA-Z]+)@@")
 ANCHOR = re.compile(r'<a href="@@(CARD|BOARD|FILE):([0-9a-zA-Z]+)@@"([^>]*)>(.*?)</a>', re.S)
 IMAGE = re.compile(r'<image-component src="@@ASSET:([0-9a-zA-Z]+)@@"[^>]*></image-component>')
@@ -29,8 +37,16 @@ def dashed(h: str) -> str:
 
 
 class Applier:
-    def __init__(self, notes, plan: Plan, snapshot_dir: str, log=print, private: bool = True,
-                 public_url: Optional[str] = None, max_file_bytes: int = 10 * 1024 * 1024):
+    def __init__(
+        self,
+        notes,
+        plan: Plan,
+        snapshot_dir: str,
+        log=print,
+        private: bool = True,
+        public_url: Optional[str] = None,
+        max_file_bytes: int = 10 * 1024 * 1024,
+    ):
         self.n = notes
         self.plan = plan
         self.dir = snapshot_dir
@@ -38,23 +54,59 @@ class Applier:
         self.private = private
         self.web = (public_url or notes.base).rstrip("/")
         self.max_file_bytes = max_file_bytes
-        self.projects = {}        # board key -> project dict
-        self.fields = {}          # field ext id -> Notes field dict
+        self.projects = {}  # board key -> project dict
+        self.fields = {}  # field ext id -> Notes field dict
         self.used_fallback = set()  # primary ext ids replaced by their snapshot
-        self.states = {}          # board key -> {lower name: state id}
-        self.cards = {}           # notion page id -> {"id", "project", "sequence_id"}
-        self.members = {}         # email -> user id
-        self.result = {"created": Counter(), "updated": Counter(), "skipped": [], "errors": [],
-                       "warnings": [], "boards": {}}
-        self.assets = {}          # (board, file key) -> asset id
+        self.states = {}  # board key -> {lower name: state id}
+        self.cards = {}  # notion page id -> {"id", "project", "sequence_id"}
+        self.members = {}  # email -> user id
+        self.result = {
+            "created": Counter(),
+            "updated": Counter(),
+            "skipped": [],
+            "errors": [],
+            "warnings": [],
+            "boards": {},
+        }
+        self.assets = {}  # (board, file key) -> asset id
+        self.existing_cards = set()  # notion ids of cards found from an earlier run
+        self.state_path = os.path.join(snapshot_dir, STATE_FILE)
+        self.state = self._read_state()
+
+    # -- local record of the boards this snapshot made (guards against duplicates) --
+    def _state_key(self):
+        return f"{self.n.base}|{self.n.ws}"
+
+    def _read_state(self):
+        try:
+            with open(self.state_path, encoding="utf-8") as fh:
+                return json.load(fh)
+        except (OSError, ValueError):
+            return {}
+
+    def _write_state(self):
+        boards = self.state.setdefault(self._state_key(), {})
+        for key, p in self.projects.items():
+            boards[key] = p.get("id")
+        with open(self.state_path, "w", encoding="utf-8") as fh:
+            json.dump(self.state, fh, indent=1)
 
     # -- entry ---------------------------------------------------------------
     def run(self):
         self._load_members()
-        existing = [p for p in self.n.projects() if p.get("external_source") == SOURCE]
-        by_ext = {p.get("external_id"): p for p in existing}
+        visible = self.n.projects()
+        by_ext = {p.get("external_id"): p for p in visible if p.get("external_source") == SOURCE}
+        visible_ids = {p.get("id") for p in visible}
+        for key, pid in self.state.get(self._state_key(), {}).items():
+            if key in self.plan.boards and pid not in visible_ids:
+                raise ImportAborted(
+                    f"The board for '{self.plan.boards[key].source_title}' was made by an earlier run "
+                    f"(id {pid}) but this API key cannot see it. Run the import with the same person's "
+                    "key, or add that person to the board. No second copy is made."
+                )
         for b in self.plan.boards.values():
             self._project(b, by_ext)
+            self._write_state()
         for b in self.plan.boards.values():
             self._states(b)
         for b in self.plan.boards.values():
@@ -70,13 +122,13 @@ class Applier:
             for f in b.fields:
                 if f.mirror_of:
                     self._mirror(b, f)
+        for b in self.plan.boards.values():  # formulas first: a rollup may total a formula field
+            for f in self._formula_order(b):
+                self._field(b, f)
         for b in self.plan.boards.values():
             for f in b.fields:
                 if f.field_type == "rollup":
                     self._field(b, f)
-        for b in self.plan.boards.values():
-            for f in self._formula_order(b):
-                self._field(b, f)
         self._cards_pass1()
         self._cards_pass2()
         for b in self.plan.boards.values():
@@ -101,16 +153,27 @@ class Applier:
         if p:
             self.projects[b.key] = p
             self.result["updated"]["board"] += 1
-            self.result["boards"][b.key] = {"name": p.get("name"), "id": p.get("id"),
-                                            "identifier": p.get("identifier"), "private": p.get("is_private")}
+            self.result["boards"][b.key] = {
+                "name": p.get("name"),
+                "id": p.get("id"),
+                "identifier": p.get("identifier"),
+                "private": p.get("is_private"),
+            }
             return
         taken = {x.get("identifier") for x in self.n.projects()}
         ident = b.identifier
         if ident in taken:
             ident = make_identifier(b.name, set(taken))
         name = b.name
-        payload = {"name": name, "identifier": ident, "external_source": SOURCE, "external_id": ext,
-                   "description": f"Imported from Notion: {b.source_title}"[:255]}
+        payload = {
+            "name": name,
+            "identifier": ident,
+            "external_source": SOURCE,
+            "external_id": ext,
+            "description": (
+                f"Imported from Notion: {b.source_title}." + (f" {b.description}" if b.description else "")
+            )[:2000],
+        }
         if self.private:
             payload.update({"network": 0, "is_private": True})
         for attempt in range(6):
@@ -129,14 +192,27 @@ class Applier:
                 raise
         else:
             raise RuntimeError(f"could not create board {b.name}")
-        if self.private and not p.get("is_private"):
-            self.result["warnings"].append(
-                f"Board '{p.get('name')}' was created but this Notes server did not make it private. "
-                "Make it private by hand before adding anyone.")
         self.projects[b.key] = p
+        if self.private and not p.get("is_private"):
+            try:
+                p = self.n.update_project(p["id"], {"is_private": True, "network": 0})
+            except HTTPError:
+                pass
+            if not p.get("is_private"):
+                self._write_state()
+                raise ImportAborted(
+                    f"Board '{p.get('name')}' was created but this Notes server did not make it private, "
+                    "so the import stopped before any card was copied. Update the server (its v1 API "
+                    "must accept is_private), or make the board private by hand and run again."
+                )
+            self.projects[b.key] = p
         self.result["created"]["board"] += 1
-        self.result["boards"][b.key] = {"name": p.get("name"), "id": p.get("id"),
-                                        "identifier": p.get("identifier"), "private": p.get("is_private")}
+        self.result["boards"][b.key] = {
+            "name": p.get("name"),
+            "id": p.get("id"),
+            "identifier": p.get("identifier"),
+            "private": p.get("is_private"),
+        }
         self.log(f"board: {p.get('name')} ({p.get('identifier')})")
 
     def _pid(self, board_key):
@@ -297,7 +373,7 @@ class Applier:
             return f.fallback.ext_id if f.fallback else None
         return f.ext_id
 
-    def _values(self, card, include_relations: bool) -> dict:
+    def _values(self, card, include_relations: bool, clear: bool = False) -> dict:
         b = self.plan.boards[card.board]
         out = {}
         for f in b.fields:
@@ -313,6 +389,8 @@ class Applier:
                 continue
             v = card.values.get(spec.ext_id)
             if v is None:
+                if clear:  # emptied in Notion since the last run: empty it here too
+                    out[field["id"]] = None
                 continue
             if spec.field_type == "select":
                 v = self._option_id(b, spec.ext_id, v)
@@ -327,6 +405,8 @@ class Applier:
             elif spec.field_type == "relation":
                 v = [self.cards[x]["id"] for x in v if x in self.cards]
             if v is None or v == []:
+                if clear:
+                    out[field["id"]] = None
                 continue
             out[field["id"]] = v
         return out
@@ -348,8 +428,7 @@ class Applier:
             visit(c)
         return out
 
-    def _card_payload(self, c, full: bool):
-        b = self.plan.boards[c.board]
+    def _card_payload(self, c, full: bool, clear: bool = False):
         p = {"name": c.name, "external_source": SOURCE, "external_id": dashed(c.notion_id)}
         if c.state:
             sid = self.states.get(c.board, {}).get(c.state.lower())
@@ -357,7 +436,7 @@ class Applier:
                 p["state"] = sid
         if c.parent and c.parent in self.cards:
             p["parent"] = self.cards[c.parent]["id"]
-        values = self._values(c, include_relations=full)
+        values = self._values(c, include_relations=full, clear=clear)
         if values:
             p["custom_fields"] = values
         body = c.body
@@ -381,13 +460,8 @@ class Applier:
             except HTTPError as e:
                 body = e.json() or {}
                 if e.status == 409 and body.get("id"):
-                    payload.pop("created_at", None)
-                    payload.pop("created_by", None)
-                    try:
-                        res = self.n.update_card(pid, body["id"], payload)
-                    except HTTPError as e2:
-                        self.result["errors"].append(f"card '{c.name}': {e2}")
-                        res = {"id": body["id"]}
+                    self.existing_cards.add(c.notion_id)
+                    res = self._update_card(c, pid, body["id"], self._card_payload(c, full=False, clear=True))
                     self.result["updated"]["card"] += 1
                 elif e.status == 400 and "custom_fields" in body:
                     # one bad value must not lose the card: save it without the values, report them
@@ -411,8 +485,28 @@ class Applier:
                     seq = self.n.get_card(pid, res["id"]).get("sequence_id")
                 except HTTPError:
                     seq = None
-            self.cards[c.notion_id] = {"id": res["id"], "project": pid, "sequence_id": seq,
-                                       "identifier": self.projects[c.board].get("identifier")}
+            self.cards[c.notion_id] = {
+                "id": res["id"],
+                "project": pid,
+                "sequence_id": seq,
+                "identifier": self.projects[c.board].get("identifier"),
+            }
+
+    def _update_card(self, c, pid, card_id, payload):
+        """PATCH a card; if a field value is refused, still save everything else."""
+        try:
+            return self.n.update_card(pid, card_id, payload)
+        except HTTPError as e:
+            if e.status == 400 and "custom_fields" in (e.json() or {}) and payload.get("custom_fields"):
+                self.result["errors"].append(f"card '{c.name}' values refused: {e.body[:300]}")
+                rest = {k: v for k, v in payload.items() if k != "custom_fields"}
+                try:
+                    return self.n.update_card(pid, card_id, rest)
+                except HTTPError as e2:
+                    self.result["errors"].append(f"card '{c.name}': {e2}")
+            else:
+                self.result["errors"].append(f"card '{c.name}': {e}")
+            return {"id": card_id}
 
     def _cards_pass2(self):
         for c in self._ordered_cards():
@@ -423,21 +517,27 @@ class Applier:
             # files first: the body links to them
             for key in dict.fromkeys(c.attachments):
                 self._attach(c, key)
-            needs = ("@@" in c.body) or any(
-                f.field_type == "relation" and c.values.get(f.ext_id) and f.ext_id not in self.used_fallback
-                and not f.mirror_of for f in self.plan.boards[c.board].fields)
+            rerun = c.notion_id in self.existing_cards
+            needs = (
+                rerun
+                or ("@@" in c.body)
+                or any(
+                    f.field_type == "relation"
+                    and c.values.get(f.ext_id)
+                    and f.ext_id not in self.used_fallback
+                    and not f.mirror_of
+                    for f in self.plan.boards[c.board].fields
+                )
+            )
             if needs:
                 payload = {}
-                values = self._values(c, include_relations=True)
+                values = self._values(c, include_relations=True, clear=rerun)
                 if values:
                     payload["custom_fields"] = values
                 if "@@" in c.body:
                     payload["description_html"] = self._fill(c, c.body)
                 if payload:
-                    try:
-                        self.n.update_card(pid, info["id"], payload)
-                    except HTTPError as e:
-                        self.result["errors"].append(f"card '{c.name}' (links/relations): {e}")
+                    self._update_card(c, pid, info["id"], payload)
             self._comments(c, info)
 
     # -- body ------------------------------------------------------------------
@@ -460,7 +560,7 @@ class Applier:
             key = m.group(1)
             asset = self._image(c, key)
             if not asset:
-                return f"<p><em>[From Notion: image could not be uploaded]</em></p>"
+                return "<p><em>[From Notion: image could not be uploaded]</em></p>"
             return m.group(0).replace(f"@@ASSET:{key}@@", asset)
 
         body = IMAGE.sub(image, body)
@@ -509,13 +609,14 @@ class Applier:
             return None
         mime = mimetypes.guess_type(rec.get("name") or "")[0] or "image/png"
         try:
-            asset = self.n.upload_image(self._pid(c.board), rec.get("name") or "image", mime, data,
-                                        ext_id=f"{c.board}:{key}")
-        except HTTPError as e:
+            asset = self.n.upload_image(
+                self._pid(c.board), rec.get("name") or "image", mime, data, ext_id=f"{c.board}:{key}"
+            )
+        except (HTTPError, RuntimeError) as e:
             self.result["errors"].append(f"image '{rec.get('name')}' on '{c.name}': {e}")
             return None
         self.assets[(c.board, key)] = asset
-        self.result["created"]["image"] += 1
+        self.result["updated" if getattr(self.n, "last_image_reused", False) else "created"]["image"] += 1
         return asset
 
     def _attach(self, c, key):
@@ -526,8 +627,9 @@ class Applier:
         info = self.cards[c.notion_id]
         mime = mimetypes.guess_type(rec.get("name") or "")[0] or "application/octet-stream"
         try:
-            res = self.n.attach(info["project"], info["id"], rec.get("name") or "file", mime, data,
-                                ext_id=f"{c.notion_id}:{key}")
+            res = self.n.attach(
+                info["project"], info["id"], rec.get("name") or "file", mime, data, ext_id=f"{c.notion_id}:{key}"
+            )
             self.result["updated" if res.get("existing") else "created"]["attachment"] += 1
         except HTTPError as e:
             self.result["errors"].append(f"file '{rec.get('name')}' on '{c.name}': {e}")
@@ -574,11 +676,17 @@ class Applier:
         try:
             have = {t["name"].lower(): t for t in self.n.templates(pid)}
         except HTTPError as e:
-            self.result["warnings"].append(f"{b.name}: card templates not available on this server ({e.status}); "
-                                           f"{len(b.templates)} Notion template(s) not brought over.")
+            self.result["warnings"].append(
+                f"{b.name}: card templates not available on this server ({e.status}); "
+                f"{len(b.templates)} Notion template(s) not brought over."
+            )
             return
         fake_card = type("C", (), {})()
+        seen = Counter()
         for t in b.templates:
+            seen[t["name"].lower()] += 1
+            if seen[t["name"].lower()] > 1:  # two Notion templates with one name: keep both
+                t = dict(t, name=f"{t['name']} {seen[t['name'].lower()]}"[:255])
             fake_card.board, fake_card.values, fake_card.notion_id = b.key, t["values"], t["notion_id"]
             values = self._values(fake_card, include_relations=False)
             body = PLACEHOLDER.sub("", ANCHOR.sub(lambda m: m.group(4), IMAGE.sub("", t["body"])))
@@ -601,5 +709,6 @@ class Applier:
 
 def _rich_html(rich) -> str:
     from .richtext import to_html
+
     text = to_html(rich or [])
     return f"<p>{text}</p>" if text else ""

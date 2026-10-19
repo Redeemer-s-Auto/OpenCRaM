@@ -35,9 +35,15 @@ def _guard(method: str, path: str) -> None:
 
 
 class Notion:
-    def __init__(self, token: str, transport: Transport = urllib_transport,
-                 base_url: str = "https://api.notion.com", rate: float = NOTION_RATE,
-                 sleep=None, clock=None):
+    def __init__(
+        self,
+        token: str,
+        transport: Transport = urllib_transport,
+        base_url: str = "https://api.notion.com",
+        rate: float = NOTION_RATE,
+        sleep=None,
+        clock=None,
+    ):
         kw = {}
         if sleep is not None:
             kw["sleep"] = sleep
@@ -46,7 +52,10 @@ class Notion:
         self.http = JSONClient(
             base_url,
             {"Authorization": f"Bearer {token}", "Notion-Version": NOTION_VERSION},
-            rate=rate, transport=transport, **kw)
+            rate=rate,
+            transport=transport,
+            **kw,
+        )
 
     # -- raw ---------------------------------------------------------------
     def _req(self, method: str, path: str, payload: Any = None) -> Any:
@@ -125,6 +134,7 @@ class Notion:
     def comments(self, block_id: str) -> Optional[list]:
         """Open comments on a page or block; None if the integration lacks the right."""
         from .http import HTTPError
+
         try:
             return list(self._paginate_get(f"/v1/comments?block_id={block_id}"))
         except HTTPError as e:
@@ -159,6 +169,7 @@ class Notion:
     def file_size(self, url: str) -> Optional[int]:
         """Size of a Notion-hosted file without downloading it (one-byte range request)."""
         import urllib.request
+
         req = urllib.request.Request(url, headers={"Range": "bytes=0-0", "User-Agent": "notion-import"})
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
@@ -173,6 +184,7 @@ class Notion:
 
 def stream_download(url: str, max_bytes: Optional[int]) -> Optional[bytes]:
     import urllib.request
+
     req = urllib.request.Request(url, headers={"User-Agent": "notion-import"})
     with urllib.request.urlopen(req, timeout=300) as resp:
         length = resp.headers.get("Content-Length")

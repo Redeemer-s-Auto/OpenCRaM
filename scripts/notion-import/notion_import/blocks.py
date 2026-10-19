@@ -20,9 +20,16 @@ from typing import Optional
 from .richtext import esc, plain, to_html
 
 CALLOUT_BG = {
-    "gray": "gray", "brown": "peach", "orange": "orange", "yellow": "orange",
-    "green": "green", "blue": "light-blue", "purple": "purple", "pink": "pink",
-    "red": "pink", "default": "gray",
+    "gray": "gray",
+    "brown": "peach",
+    "orange": "orange",
+    "yellow": "orange",
+    "green": "green",
+    "blue": "light-blue",
+    "purple": "purple",
+    "pink": "pink",
+    "red": "pink",
+    "default": "gray",
 }
 LIST_TYPES = ("bulleted_list_item", "numbered_list_item", "to_do")
 
@@ -37,12 +44,12 @@ def _resolve(page_id: str) -> str:
 
 class Renderer:
     def __init__(self, files: Optional[dict] = None):
-        self.files = files or {}         # snapshot["files"]
-        self.losses = Counter()          # what changed or was not brought over
-        self.changed = Counter()         # came over, but changed
-        self.attachments = []            # file keys to attach to the card
-        self.child_pages = []            # notion page ids of sub-pages, in order
-        self.child_databases = []        # notion database ids
+        self.files = files or {}  # snapshot["files"]
+        self.losses = Counter()  # what changed or was not brought over
+        self.changed = Counter()  # came over, but changed
+        self.attachments = []  # file keys to attach to the card
+        self.child_pages = []  # notion page ids of sub-pages, in order
+        self.child_databases = []  # notion database ids
         self.mentions_people = 0
         self.mentions_dates = 0
 
@@ -63,7 +70,7 @@ class Renderer:
 
     def placeholder(self, what: str) -> str:
         self.losses[what] += 1
-        return f'<p><em>[From Notion: {esc(what)} - not brought over]</em></p>'
+        return f"<p><em>[From Notion: {esc(what)} - not brought over]</em></p>"
 
     # -- entry -------------------------------------------------------------
     def render(self, blocks: list) -> str:
@@ -94,9 +101,11 @@ class Renderer:
                 d = b.get("to_do") or {}
                 checked = bool(d.get("checked"))
                 box = '<input type="checkbox" checked>' if checked else '<input type="checkbox">'
-                lis.append(f'<li data-type="taskItem" data-checked="{"true" if checked else "false"}">'
-                           f'<label>{box}<span></span></label><div><p>{self.rt(d.get("rich_text"))}</p>'
-                           f'{self.children(b)}</div></li>')
+                lis.append(
+                    f'<li data-type="taskItem" data-checked="{"true" if checked else "false"}">'
+                    f"<label>{box}<span></span></label><div><p>{self.rt(d.get('rich_text'))}</p>"
+                    f"{self.children(b)}</div></li>"
+                )
             return '<ul data-type="taskList">' + "".join(lis) + "</ul>"
         tag = "ul" if t == "bulleted_list_item" else "ol"
         lis = [f"<li><p>{self.rt((b.get(t) or {}).get('rich_text'))}</p>{self.children(b)}</li>" for b in items]
@@ -122,8 +131,9 @@ class Renderer:
             lang = esc((d.get("language") or "plain text").replace(" ", "-"))
             code = esc(plain(d.get("rich_text")))
             cap = plain(d.get("caption"))
-            return (f'<pre><code class="language-{lang}">{code}</code></pre>'
-                    + (f"<p><em>{esc(cap)}</em></p>" if cap else ""))
+            return f'<pre><code class="language-{lang}">{code}</code></pre>' + (
+                f"<p><em>{esc(cap)}</em></p>" if cap else ""
+            )
         if t == "divider":
             return "<hr>"
         if t == "toggle":
@@ -145,8 +155,10 @@ class Renderer:
                 self.changed["link preview (shown as a link)"] += 1
             if not url:
                 return self.placeholder(f"{t} without a link")
-            return (f'<p>{"🔗 " if t != "embed" else "🧩 "}<a href="{esc(url)}" target="_blank" '
-                    f'rel="noopener noreferrer nofollow">{esc(cap)}</a></p>')
+            return (
+                f'<p>{"🔗 " if t != "embed" else "🧩 "}<a href="{esc(url)}" target="_blank" '
+                f'rel="noopener noreferrer nofollow">{esc(cap)}</a></p>'
+            )
         if t in ("child_page", "child_database") and b.get("excluded"):
             what = "sub-page" if t == "child_page" else "inline database"
             self.changed[f"{what} left out on purpose (excluded)"] += 1
@@ -158,7 +170,7 @@ class Renderer:
         if t == "child_database":
             title = d.get("title") or "Untitled database"
             if b.get("database_data_sources") is not None and not b.get("database_data_sources"):
-                return self.placeholder(f"linked database view \"{title}\" (the API cannot read linked views)")
+                return self.placeholder(f'linked database view "{title}" (the API cannot read linked views)')
             self.child_databases.append(b["id"].replace("-", "").lower())
             self.changed["inline database (became its own board, linked here)"] += 1
             dbid = b["id"].replace("-", "").lower()
@@ -193,9 +205,11 @@ class Renderer:
         return self.placeholder(f"{(t or 'unknown').replace('_', ' ')} block")
 
     def toggle(self, title_html: str, inner: str) -> str:
-        return ('<details data-block-type="toggle" data-open="false">'
-                f'<summary data-block-type="toggle-title">{title_html}</summary>'
-                f'<div data-block-type="toggle-content">{inner or "<p></p>"}</div></details>')
+        return (
+            '<details data-block-type="toggle" data-open="false">'
+            f'<summary data-block-type="toggle-title">{title_html}</summary>'
+            f'<div data-block-type="toggle-content">{inner or "<p></p>"}</div></details>'
+        )
 
     def callout(self, b: dict, d: dict) -> str:
         icon = d.get("icon") or {}
@@ -241,8 +255,10 @@ class Renderer:
             url = (d.get("external") or {}).get("url") or ""
             if t == "image":
                 self.changed["image from an outside link (still loads from that link)"] += 1
-                return (f'<image-component src="{esc(url)}" width="35%" height="auto" alignment="left" '
-                        f'status="uploaded"></image-component>' + cap_html)
+                return (
+                    f'<image-component src="{esc(url)}" width="35%" height="auto" alignment="left" '
+                    f'status="uploaded"></image-component>' + cap_html
+                )
             self.changed[f"{t} from an outside link (kept as a link)"] += 1
             return f'<p>📎 <a href="{esc(url)}" target="_blank" rel="noopener noreferrer nofollow">{esc(cap or url)}</a></p>'
         key = d.get("_file")
@@ -253,17 +269,22 @@ class Renderer:
         if not rec or rec.get("status") != "ok":
             status = (rec or {}).get("status") or "not downloaded"
             if status == "too big":
-                return self.placeholder(f"{t} \"{name}\" is over the Notes file size limit")
+                return self.placeholder(f'{t} "{name}" is over the Notes file size limit')
             if status.startswith("not downloaded"):
                 # dry run: count what would come over, show the planned line
                 self.changed[f"{t} (re-uploaded to Notes)"] += 1
                 if t == "image":
-                    return f'<image-component src="@@ASSET:{key}@@" width="35%" height="auto" alignment="left" status="uploaded"></image-component>' + cap_html
+                    return (
+                        f'<image-component src="@@ASSET:{key}@@" width="35%" height="auto" alignment="left" status="uploaded"></image-component>'
+                        + cap_html
+                    )
                 self.attachments.append(key)
                 return f'<p>📎 <a href="@@FILE:{key}@@">{esc(name)}</a></p>' + cap_html
-            return self.placeholder(f"{t} \"{name}\" ({status})")
+            return self.placeholder(f'{t} "{name}" ({status})')
         if t == "image":
-            return (f'<image-component src="@@ASSET:{key}@@" width="35%" height="auto" alignment="left" '
-                    f'status="uploaded"></image-component>' + cap_html)
+            return (
+                f'<image-component src="@@ASSET:{key}@@" width="35%" height="auto" alignment="left" '
+                f'status="uploaded"></image-component>' + cap_html
+            )
         self.attachments.append(key)
         return f'<p>📎 <a href="@@FILE:{key}@@">{esc(name)}</a></p>' + cap_html

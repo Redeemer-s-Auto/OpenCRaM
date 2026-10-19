@@ -23,7 +23,10 @@ Copies Notion databases and pages into Notes boards and cards. Python 3.10+, sta
 
 ## Use
 
-Run from this folder (`scripts/notion-import`):
+Run from this folder (`scripts/notion-import`). Keep the token files, snapshot folders and
+reports **outside the repository**: a snapshot holds full page contents and downloaded files.
+Run a re-import with the same Notes API key as the first run (the snapshot folder remembers which
+boards it made, and the importer stops rather than make a second copy of a board it cannot see).
 
     # 1. what can the token see?
     python -m notion_import inventory --token-file token.txt --out inventory.json

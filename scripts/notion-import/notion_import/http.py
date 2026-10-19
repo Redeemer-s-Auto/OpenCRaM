@@ -26,8 +26,9 @@ class HTTPError(Exception):
 class RateLimiter:
     """Allow at most `rate` calls per second (simple spacing)."""
 
-    def __init__(self, rate: float, clock: Callable[[], float] = time.monotonic,
-                 sleep: Callable[[float], None] = time.sleep):
+    def __init__(
+        self, rate: float, clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep
+    ):
         self.interval = 1.0 / rate if rate > 0 else 0.0
         self.clock = clock
         self.sleep = sleep
@@ -59,10 +60,16 @@ def urllib_transport(method: str, url: str, headers: dict, body: Optional[bytes]
 class JSONClient:
     """JSON API client: spacing between calls, retries on 429 and 5xx."""
 
-    def __init__(self, base_url: str, headers: dict, rate: float,
-                 transport: Transport = urllib_transport, max_retries: int = 6,
-                 sleep: Callable[[float], None] = time.sleep,
-                 clock: Callable[[], float] = time.monotonic):
+    def __init__(
+        self,
+        base_url: str,
+        headers: dict,
+        rate: float,
+        transport: Transport = urllib_transport,
+        max_retries: int = 6,
+        sleep: Callable[[float], None] = time.sleep,
+        clock: Callable[[], float] = time.monotonic,
+    ):
         self.base_url = base_url.rstrip("/")
         self.headers = headers
         self.limiter = RateLimiter(rate, clock=clock, sleep=sleep)
@@ -77,9 +84,15 @@ class JSONClient:
             return path
         return self.base_url + "/" + path.lstrip("/")
 
-    def request(self, method: str, path: str, payload: Any = None,
-                raw_body: Optional[bytes] = None, extra_headers: Optional[dict] = None,
-                expect_json: bool = True) -> Any:
+    def request(
+        self,
+        method: str,
+        path: str,
+        payload: Any = None,
+        raw_body: Optional[bytes] = None,
+        extra_headers: Optional[dict] = None,
+        expect_json: bool = True,
+    ) -> Any:
         url = self.url(path)
         headers = dict(self.headers)
         if extra_headers:
@@ -96,8 +109,7 @@ class JSONClient:
             # 429 is always safe to retry. A 5xx is retried for reads, and for writes only when
             # the request most likely never reached the app (gateway errors, network errors):
             # a 500 on a POST may have half-done the work, so it is reported, not repeated.
-            retry_5xx = status >= 500 and status != 501 and (
-                method == "GET" or status in (502, 503, 504, 599))
+            retry_5xx = status >= 500 and status != 501 and (method == "GET" or status in (502, 503, 504, 599))
             if status == 429 or retry_5xx:
                 if attempt >= self.max_retries:
                     raise HTTPError(status, data.decode("utf-8", "replace"), url)
@@ -132,4 +144,4 @@ def retry_delay(headers: dict, attempt: int) -> float:
             return max(0.5, min(float(value), 120.0))
         except ValueError:
             pass
-    return min(2.0 ** attempt, 60.0)
+    return min(2.0**attempt, 60.0)

@@ -39,14 +39,23 @@ def safe_name(name: str) -> str:
 
 def file_name_from_url(url: str) -> str:
     from urllib.parse import unquote, urlparse
+
     path = urlparse(url).path
     return safe_name(unquote(path.rsplit("/", 1)[-1]) or "file")
 
 
 class Exporter:
-    def __init__(self, notion, out_dir: str, max_file_bytes: int = DEFAULT_MAX_FILE,
-                 download_files: bool = True, log=print, max_pages: Optional[int] = None,
-                 block_comments: bool = False, exclude: Optional[set] = None):
+    def __init__(
+        self,
+        notion,
+        out_dir: str,
+        max_file_bytes: int = DEFAULT_MAX_FILE,
+        download_files: bool = True,
+        log=print,
+        max_pages: Optional[int] = None,
+        block_comments: bool = False,
+        exclude: Optional[set] = None,
+    ):
         self.n = notion
         self.exclude = {norm(x) for x in (exclude or set())}
         self.out_dir = out_dir
@@ -64,8 +73,8 @@ class Exporter:
             "data_sources": {},
             "pages": {},
             "files": {},
-            "missing": [],          # objects we could not read (not shared, linked views)
-            "notes": [],            # export-wide notes (e.g. comments not readable)
+            "missing": [],  # objects we could not read (not shared, linked views)
+            "notes": [],  # export-wide notes (e.g. comments not readable)
             "comments_readable": True,
         }
         self._seen_pages = set()
@@ -74,15 +83,26 @@ class Exporter:
     def run(self, roots: list) -> dict:
         os.makedirs(self.files_dir, exist_ok=True)
         self._load_users()
-        for root in roots:
-            kind, rid = root
-            self.snap["roots"].append({"kind": kind, "id": norm(rid)})
-            if kind == "data_source":
-                self.export_data_source(rid)
-            elif kind == "database":
-                self.export_database(rid)
-            else:
-                self.export_page(rid)
+        self.snap["complete"] = False
+        try:
+            for root in roots:
+                kind, rid = root
+                self.snap["roots"].append({"kind": kind, "id": norm(rid)})
+                if kind == "data_source":
+                    self.export_data_source(rid)
+                elif kind == "database":
+                    self.export_database(rid)
+                else:
+                    self.export_page(rid)
+            self.snap["complete"] = True
+        except BaseException as e:
+            # keep what was read so far; the plan report says the export stopped early
+            self.snap["notes"].append(
+                f"The export stopped early ({type(e).__name__}: {str(e)[:200]}); "
+                "the snapshot holds only what was read before that."
+            )
+            self.save()
+            raise
         return self.snap
 
     def save(self) -> str:
@@ -114,8 +134,13 @@ class Exporter:
         try:
             db = self.n.database(dashed(database_id))
         except HTTPError as e:
-            self.snap["missing"].append({"kind": "database", "id": norm(database_id),
-                                         "why": "linked view or not shared" if e.status in (400, 404) else f"HTTP {e.status}"})
+            self.snap["missing"].append(
+                {
+                    "kind": "database",
+                    "id": norm(database_id),
+                    "why": "linked view or not shared" if e.status in (400, 404) else f"HTTP {e.status}",
+                }
+            )
             return []
         ids = []
         for ds in db.get("data_sources") or []:
@@ -133,10 +158,26 @@ class Exporter:
             self.snap["missing"].append({"kind": "data_source", "id": key, "why": f"HTTP {e.status}"})
             return
         self.log(f"database: {_title(ds.get('title'))}")
-        entry = {k: ds.get(k) for k in ("id", "title", "description", "properties", "parent",
-                                         "database_parent", "icon", "cover", "is_inline",
-                                         "created_time", "last_edited_time", "created_by",
-                                         "last_edited_by", "public_url", "url")}
+        entry = {
+            k: ds.get(k)
+            for k in (
+                "id",
+                "title",
+                "description",
+                "properties",
+                "parent",
+                "database_parent",
+                "icon",
+                "cover",
+                "is_inline",
+                "created_time",
+                "last_edited_time",
+                "created_by",
+                "last_edited_by",
+                "public_url",
+                "url",
+            )
+        }
         entry["rows"] = []
         entry["templates"] = []
         entry["views"] = self.n.views(dashed(ds_id))
@@ -169,9 +210,23 @@ class Exporter:
             except HTTPError as e:
                 self.snap["missing"].append({"kind": "page", "id": key, "why": f"HTTP {e.status}"})
                 return
-        page = {k: page_obj.get(k) for k in ("id", "parent", "properties", "icon", "cover", "url",
-                                              "public_url", "created_time", "last_edited_time",
-                                              "created_by", "last_edited_by", "is_locked")}
+        page = {
+            k: page_obj.get(k)
+            for k in (
+                "id",
+                "parent",
+                "properties",
+                "icon",
+                "cover",
+                "url",
+                "public_url",
+                "created_time",
+                "last_edited_time",
+                "created_by",
+                "last_edited_by",
+                "is_locked",
+            )
+        }
         if template_of:
             page["template_of"] = template_of
         self._fill_long_properties(page)
@@ -209,11 +264,20 @@ class Exporter:
         got = self.n.comments(dashed(block_id))
         if got is None:
             self.snap["comments_readable"] = False
-            self.snap["notes"].append("Comments were not read: the Notion integration does not have the "
-                                      "'Read comments' capability.")
+            self.snap["notes"].append(
+                "Comments were not read: the Notion integration does not have the 'Read comments' capability."
+            )
             return []
-        return [{"id": c.get("id"), "rich_text": c.get("rich_text"), "created_by": norm((c.get("created_by") or {}).get("id")),
-                 "created_time": c.get("created_time"), "discussion_id": c.get("discussion_id")} for c in got]
+        return [
+            {
+                "id": c.get("id"),
+                "rich_text": c.get("rich_text"),
+                "created_by": norm((c.get("created_by") or {}).get("id")),
+                "created_time": c.get("created_time"),
+                "discussion_id": c.get("discussion_id"),
+            }
+            for c in got
+        ]
 
     def _blocks(self, block_id: str, depth: int = 0) -> list:
         out = []

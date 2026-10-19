@@ -19,6 +19,7 @@ def esc(text: str) -> str:
 def _notion_page_id_from_url(url: str) -> Optional[str]:
     """Pull a 32-hex page id out of a notion.so / notion.site / app.notion.com link."""
     import re
+
     if not url or "notion." not in url:
         return None
     path = url.split("?")[0].split("#")[0].lower()
@@ -26,8 +27,12 @@ def _notion_page_id_from_url(url: str) -> Optional[str]:
     return m[-1].replace("-", "") if m else None
 
 
-def to_html(rich: list, resolve: Optional[LinkResolver] = None, notes: Optional[list] = None,
-            user_name: Optional[Callable[[str], str]] = None) -> str:
+def to_html(
+    rich: list,
+    resolve: Optional[LinkResolver] = None,
+    notes: Optional[list] = None,
+    user_name: Optional[Callable[[str], str]] = None,
+) -> str:
     """Convert rich text to inline HTML.
 
     `resolve` maps a Notion page id to a Notes card URL (link rewriting).

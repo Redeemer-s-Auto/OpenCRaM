@@ -20,11 +20,13 @@ env_value() {
 
 compose config --quiet
 
-echo "[notes] Building images one at a time..."
-for svc in api proxy live space web; do
-  echo "[notes] build $svc ($(date +%T))"
-  compose build "$svc"
-done
+if [[ "${NOTES_SKIP_BUILD:-0}" != "1" ]]; then
+  echo "[notes] Building images one at a time..."
+  for svc in api proxy live space web; do
+    echo "[notes] build $svc ($(date +%T))"
+    compose build "$svc"
+  done
+fi
 
 echo "[notes] Starting state services..."
 compose up -d plane-db plane-redis plane-mq plane-minio
@@ -44,7 +46,7 @@ compose up -d --remove-orphans api worker beat-worker live web space proxy
 
 echo "[notes] Waiting for API readiness..."
 for i in $(seq 1 40); do
-  if compose exec -T api python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/auth/firebase/health/', timeout=3).read()" >/dev/null 2>&1; then break; fi
+  if compose exec -T api python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:8000' + os.environ.get('NOTES_API_HEALTH_PATH', '/auth/firebase/health/'), timeout=3).read()" >/dev/null 2>&1; then break; fi
   [[ "$i" == 40 ]] && { compose ps; echo "[notes] API did not become ready." >&2; exit 1; }
   sleep 3
 done

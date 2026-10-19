@@ -6,6 +6,21 @@
 # file so a deployment can run with Plane's own sign-in until its Firebase bridge
 # is configured.
 services:
+  # The Garden healthcheck (/auth/firebase/health/) returns 503 unless
+  # GARDEN_AUTH_ENABLED=1 and a Firebase credential exists. NOTES_API_HEALTH_PATH
+  # lets a deployment without the bridge use Plane's own health route ("/").
+  api:
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:8000' + os.environ.get('NOTES_API_HEALTH_PATH', '/auth/firebase/health/'), timeout=4).read()",
+        ]
+    environment:
+      NOTES_API_HEALTH_PATH: ${NOTES_API_HEALTH_PATH:-/auth/firebase/health/}
+
   web:
     build:
       args:

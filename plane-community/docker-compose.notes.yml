@@ -1,0 +1,17 @@
+# Redeemer's Auto Notes overrides, layered on docker-compose.garden.yml:
+#   docker compose --env-file <env> -f docker-compose.garden.yml -f docker-compose.notes.yml ...
+#
+# GARDEN_AUTH_ENABLED (API) and VITE_GARDEN_AUTH_ENABLED (web build) must agree.
+# The Garden file hard-codes the web build arg to "1"; this reads it from the env
+# file so a deployment can run with Plane's own sign-in until its Firebase bridge
+# is configured.
+services:
+  web:
+    build:
+      args:
+        VITE_GARDEN_AUTH_ENABLED: ${GARDEN_AUTH_ENABLED:-1}
+        VITE_WEBSITE_URL: ${NOTES_WEBSITE_URL:-https://redeemersauto.com}
+
+  proxy:
+    environment:
+      GARDEN_EMBED_ORIGIN: ${GARDEN_EMBED_ORIGIN:?Set GARDEN_EMBED_ORIGIN}

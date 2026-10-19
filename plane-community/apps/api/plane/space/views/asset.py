@@ -8,6 +8,8 @@ import uuid
 # Django imports
 from django.conf import settings
 from django.http import HttpResponseRedirect
+from django.db.models import CharField
+from django.db.models.functions import Cast
 from django.utils import timezone
 
 # Third party imports
@@ -17,6 +19,7 @@ from rest_framework.response import Response
 
 from plane.bgtasks.storage_metadata_task import get_asset_object_metadata
 from plane.db.models import DeployBoard, FileAsset
+from plane.sharing.visibility import restricted_issue_ids
 from plane.settings.storage import S3Storage
 from plane.utils.path_validator import sanitize_filename
 
@@ -43,7 +46,16 @@ class EntityAssetEndpoint(BaseAPIView):
             )
 
         # get the asset id — scope to project to prevent cross-project IDOR
-        asset = FileAsset.objects.get(
+        # Files of restricted work items never reach a public board.
+        asset = (
+            FileAsset.objects.exclude(issue_id__in=restricted_issue_ids())
+            .exclude(comment__issue_id__in=restricted_issue_ids())
+            .exclude(
+                entity_identifier__in=restricted_issue_ids()
+                .annotate(issue_text=Cast("issue_id", CharField()))
+                .values("issue_text")
+            )
+        ).get(
             workspace_id=deploy_board.workspace_id,
             project_id=deploy_board.project_id,
             pk=pk,

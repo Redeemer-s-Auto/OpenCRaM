@@ -89,6 +89,7 @@ WEBHOOK_DISALLOWED_DOMAINS = [
     for _d in _webhook_disallowed_domains_raw.split(",")
     if _d.strip()
 ]
+SHARING_WEBHOOK_INCLUDE_RESTRICTED = os.environ.get("SHARING_WEBHOOK_INCLUDE_RESTRICTED", "0") == "1"
 
 # Allowed Hosts
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
@@ -111,6 +112,7 @@ INSTALLED_APPS = [
     "plane.license",
     "plane.api",
     "plane.authentication",
+    "plane.sharing",
     # Third-party things
     "rest_framework",
     "corsheaders",

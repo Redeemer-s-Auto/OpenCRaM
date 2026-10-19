@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from .base import BaseAPIView
 from plane.db.models import Issue, ProjectMember, IssueRelation
 from plane.utils.issue_search import search_issues
+from plane.sharing.visibility import visible_issues
 
 
 class IssueSearchEndpoint(BaseAPIView):
@@ -113,6 +114,7 @@ class IssueSearchEndpoint(BaseAPIView):
             project__project_projectmember__is_active=True,
             project__archived_at__isnull=True,
         )
+        issues = visible_issues(issues, request.user)
 
         if workspace_search == "false":
             issues = self.filter_issues_by_project(project_id, issues)

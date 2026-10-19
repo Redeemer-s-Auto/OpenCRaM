@@ -27,6 +27,7 @@ from plane.utils.content_validator import validate_html_content
 from plane.utils.issue_filters import issue_filters
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.db.models.intake import SourceType
+from plane.sharing.visibility import restricted_issue_ids
 
 
 class IntakeIssuePublicViewSet(BaseViewSet):
@@ -69,6 +70,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
                 workspace_id=project_deploy_board.workspace_id,
                 project_id=project_deploy_board.project_id,
             )
+            .exclude(pk__in=restricted_issue_ids())
             .filter(**filters)
             .annotate(bridge_id=F("issue_intake__id"))
             .select_related("workspace", "project", "state", "parent")
@@ -76,6 +78,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
             .order_by("issue_intake__snoozed_till", "issue_intake__status")
             .annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                .exclude(pk__in=restricted_issue_ids())
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -186,7 +189,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        intake_issue = IntakeIssue.objects.get(
+        intake_issue = IntakeIssue.objects.exclude(issue_id__in=restricted_issue_ids()).get(
             pk=pk,
             workspace_id=project_deploy_board.workspace_id,
             project_id=project_deploy_board.project_id,
@@ -247,7 +250,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        intake_issue = IntakeIssue.objects.get(
+        intake_issue = IntakeIssue.objects.exclude(issue_id__in=restricted_issue_ids()).get(
             pk=pk,
             workspace_id=project_deploy_board.workspace_id,
             project_id=project_deploy_board.project_id,
@@ -269,7 +272,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        intake_issue = IntakeIssue.objects.get(
+        intake_issue = IntakeIssue.objects.exclude(issue_id__in=restricted_issue_ids()).get(
             pk=pk,
             workspace_id=project_deploy_board.workspace_id,
             project_id=project_deploy_board.project_id,

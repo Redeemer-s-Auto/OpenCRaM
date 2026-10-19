@@ -25,6 +25,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
 # Module imports
+from plane.sharing.guard import enforce_item_access
 from plane.authentication.session import BaseSessionAuthentication
 from plane.utils.exception_logger import log_exception
 from plane.utils.private_projects import check_private_project_access
@@ -44,6 +45,7 @@ class TimezoneMixin:
         self.perform_authentication(request)
         check_private_project_access(self, request)
         super().initial(request, *args, **kwargs)
+        enforce_item_access(request, kwargs)
         if request.user.is_authenticated:
             timezone.activate(zoneinfo.ZoneInfo(request.user.user_timezone))
         else:

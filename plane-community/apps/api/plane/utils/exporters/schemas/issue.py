@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from django.db.models import F, QuerySet
 
 from plane.db.models import CycleIssue, FileAsset
+from plane.sharing.visibility import restricted_issue_ids
 
 from .base import (
     DateField,
@@ -184,8 +185,12 @@ class IssueExportSchema(ExportSchema):
             return self._format_date(last_cycle.cycle.end_date)
         return ""
 
+    def _hidden(self, issue_id) -> bool:
+        # This schema has no viewer, so no restricted item is named in an export row.
+        return issue_id in (self.context.get("restricted_ids") or set())
+
     def prepare_parent(self, i):
-        if not i.parent:
+        if not i.parent or self._hidden(i.parent_id):
             return ""
         return f"{i.parent.project.identifier}-{i.parent.sequence_id}"
 
@@ -196,9 +201,12 @@ class IssueExportSchema(ExportSchema):
         relations = {
             r.relation_type: f"{r.related_issue.project.identifier}-{r.related_issue.sequence_id}"
             for r in i.issue_relation.all()
+            if not self._hidden(r.related_issue_id)
         }
         reverse_relations = {}
         for relation in i.issue_related.all():
+            if self._hidden(relation.issue_id):
+                continue
             reverse_relations[IssueRelationChoices._REVERSE_MAPPING[relation.relation_type]] = (
                 f"{relation.issue.project.identifier}-{relation.issue.sequence_id}"
             )
@@ -211,4 +219,5 @@ class IssueExportSchema(ExportSchema):
         return {
             "attachments_dict": get_issue_attachments_dict(queryset),
             "cycles_dict": get_issue_last_cycles_dict(queryset),
+            "restricted_ids": set(restricted_issue_ids().values_list("issue_id", flat=True)),
         }

@@ -15,7 +15,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 # Third part imports
 from rest_framework import status
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, NotFound
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -23,10 +23,22 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
 # Module imports
+from plane.db.models import IssueComment
+from plane.sharing.guard import enforce_item_access
+from plane.sharing.visibility import restricted_issue_ids
 from plane.utils.exception_logger import log_exception
 from plane.utils.paginator import BasePaginator
 from plane.utils.private_projects import check_published_anchor
 from plane.authentication.session import BaseSessionAuthentication
+
+
+def hide_restricted_on_public_board(kwargs):
+    """Restricted work items never appear on a public board, whoever is signed in."""
+    issue_id = kwargs.get("issue_id")
+    if not issue_id and kwargs.get("comment_id"):
+        issue_id = IssueComment.all_objects.filter(pk=kwargs["comment_id"]).values_list("issue_id", flat=True).first()
+    if issue_id and restricted_issue_ids().filter(issue_id=issue_id).exists():
+        raise NotFound("The required object does not exist.")
 
 
 class TimezoneMixin:
@@ -39,6 +51,8 @@ class TimezoneMixin:
         # A private project is never public, even if it was published before.
         check_published_anchor(self)
         super().initial(request, *args, **kwargs)
+        enforce_item_access(request, kwargs)
+        hide_restricted_on_public_board(kwargs)
         if request.user.is_authenticated:
             timezone.activate(zoneinfo.ZoneInfo(request.user.user_timezone))
         else:

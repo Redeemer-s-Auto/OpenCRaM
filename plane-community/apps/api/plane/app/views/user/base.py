@@ -51,6 +51,7 @@ from plane.bgtasks.user_deactivation_email_task import user_deactivation_email
 from plane.utils.host import base_host
 from plane.bgtasks.user_email_update_task import send_email_update_magic_code, send_email_update_confirmation
 from plane.authentication.rate_limit import EmailVerificationThrottle
+from plane.sharing.visibility import visible_activity
 
 
 logger = logging.getLogger("plane")
@@ -380,7 +381,7 @@ class UpdateUserTourCompletedEndpoint(BaseAPIView):
 
 class UserActivityEndpoint(BaseAPIView, BasePaginator):
     def get(self, request):
-        queryset = IssueActivity.objects.filter(actor=request.user).select_related(
+        queryset = visible_activity(IssueActivity.objects, request.user).filter(actor=request.user).select_related(
             "actor", "workspace", "issue", "project"
         )
 

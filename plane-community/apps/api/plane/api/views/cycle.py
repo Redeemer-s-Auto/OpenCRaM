@@ -47,6 +47,8 @@ from plane.db.models import (
     UserFavorite,
 )
 from plane.utils.cycle_transfer_issues import transfer_cycle_issues
+from plane.sharing.models import AccessLevel
+from plane.sharing.visibility import hidden_issue_ids, visible_issues
 from plane.utils.order_queryset import CYCLE_ORDER_BY_ALLOWLIST, ISSUE_ORDER_BY_ALLOWLIST, sanitize_order_by
 from plane.utils.host import base_host
 from .base import BaseAPIView
@@ -103,6 +105,7 @@ class CycleListCreateAPIEndpoint(BaseAPIView):
                 total_issues=Count(
                     "issue_cycle",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
                         issue_cycle__deleted_at__isnull=True,
@@ -113,6 +116,7 @@ class CycleListCreateAPIEndpoint(BaseAPIView):
                 completed_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="completed",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -124,6 +128,7 @@ class CycleListCreateAPIEndpoint(BaseAPIView):
                 cancelled_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="cancelled",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -135,6 +140,7 @@ class CycleListCreateAPIEndpoint(BaseAPIView):
                 started_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="started",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -146,6 +152,7 @@ class CycleListCreateAPIEndpoint(BaseAPIView):
                 unstarted_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="unstarted",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -157,6 +164,7 @@ class CycleListCreateAPIEndpoint(BaseAPIView):
                 backlog_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="backlog",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -431,6 +439,7 @@ class CycleDetailAPIEndpoint(BaseAPIView):
                 total_issues=Count(
                     "issue_cycle",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
                         issue_cycle__deleted_at__isnull=True,
@@ -441,6 +450,7 @@ class CycleDetailAPIEndpoint(BaseAPIView):
                 completed_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="completed",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -452,6 +462,7 @@ class CycleDetailAPIEndpoint(BaseAPIView):
                 cancelled_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="cancelled",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -463,6 +474,7 @@ class CycleDetailAPIEndpoint(BaseAPIView):
                 started_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="started",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -474,6 +486,7 @@ class CycleDetailAPIEndpoint(BaseAPIView):
                 unstarted_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="unstarted",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -485,6 +498,7 @@ class CycleDetailAPIEndpoint(BaseAPIView):
                 backlog_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="backlog",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -681,6 +695,7 @@ class CycleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                 total_issues=Count(
                     "issue_cycle",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
                         issue_cycle__deleted_at__isnull=True,
@@ -691,6 +706,7 @@ class CycleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                 completed_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="completed",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -702,6 +718,7 @@ class CycleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                 cancelled_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="cancelled",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -713,6 +730,7 @@ class CycleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                 started_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="started",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -724,6 +742,7 @@ class CycleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                 unstarted_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="unstarted",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -735,6 +754,7 @@ class CycleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                 backlog_issues=Count(
                     "issue_cycle__issue__state__group",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="backlog",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -742,11 +762,17 @@ class CycleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                     ),
                 )
             )
-            .annotate(total_estimates=Sum("issue_cycle__issue__estimate_point__key"))
+            .annotate(
+                total_estimates=Sum(
+                    "issue_cycle__issue__estimate_point__key",
+                    filter=~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
+                )
+            )
             .annotate(
                 completed_estimates=Sum(
                     "issue_cycle__issue__estimate_point__key",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="completed",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -758,6 +784,7 @@ class CycleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                 started_estimates=Sum(
                     "issue_cycle__issue__estimate_point__key",
                     filter=Q(
+                        ~Q(issue_cycle__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_cycle__issue__state__group="started",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -859,9 +886,11 @@ class CycleIssueListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
-        return (
+        return visible_issues(
             CycleIssue.objects.annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("issue_id"))
+                sub_issues_count=visible_issues(
+                    Issue.issue_objects.filter(parent=OuterRef("issue_id")), self.request.user
+                )
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -879,7 +908,9 @@ class CycleIssueListCreateAPIEndpoint(BaseAPIView):
             .select_related("issue", "issue__state", "issue__project")
             .prefetch_related("issue__assignees", "issue__labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
-            .distinct()
+            .distinct(),
+            self.request.user,
+            field="issue_id",
         )
 
     @cycle_docs(
@@ -906,9 +937,10 @@ class CycleIssueListCreateAPIEndpoint(BaseAPIView):
         # List
         order_by = sanitize_order_by(request.GET.get("order_by", "created_at"), ISSUE_ORDER_BY_ALLOWLIST, "created_at")
         issues = (
-            Issue.issue_objects.filter(issue_cycle__cycle_id=cycle_id, issue_cycle__deleted_at__isnull=True)
+            visible_issues(Issue.issue_objects.all(), request.user)
+            .filter(issue_cycle__cycle_id=cycle_id, issue_cycle__deleted_at__isnull=True)
             .annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                sub_issues_count=visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -943,7 +975,9 @@ class CycleIssueListCreateAPIEndpoint(BaseAPIView):
         return self.paginate(
             request=request,
             queryset=(issues),
-            on_results=lambda issues: IssueSerializer(issues, many=True, fields=self.fields, expand=self.expand).data,
+            on_results=lambda issues: IssueSerializer(
+                issues, many=True, fields=self.fields, expand=self.expand, context={"user": request.user}
+            ).data,
         )
 
     @cycle_docs(
@@ -987,6 +1021,14 @@ class CycleIssueListCreateAPIEndpoint(BaseAPIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Only work items the caller may edit can be moved into the cycle.
+        issues = [
+            str(i)
+            for i in visible_issues(
+                Issue.issue_objects.filter(pk__in=issues), request.user, min_level=AccessLevel.EDIT
+            ).values_list("id", flat=True)
+        ]
 
         # Get all CycleWorkItems already created
         cycle_issues = list(CycleIssue.objects.filter(~Q(cycle_id=cycle_id), issue_id__in=issues))
@@ -1081,9 +1123,11 @@ class CycleIssueDetailAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
-        return (
+        return visible_issues(
             CycleIssue.objects.annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("issue_id"))
+                sub_issues_count=visible_issues(
+                    Issue.issue_objects.filter(parent=OuterRef("issue_id")), self.request.user
+                )
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -1101,7 +1145,9 @@ class CycleIssueDetailAPIEndpoint(BaseAPIView):
             .select_related("issue", "issue__state", "issue__project")
             .prefetch_related("issue__assignees", "issue__labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
-            .distinct()
+            .distinct(),
+            self.request.user,
+            field="issue_id",
         )
 
     @cycle_docs(
@@ -1122,7 +1168,7 @@ class CycleIssueDetailAPIEndpoint(BaseAPIView):
         Retrieve details of a specific cycle work item.
         Returns paginated results with work item details, assignees, and labels.
         """
-        cycle_issue = CycleIssue.objects.get(
+        cycle_issue = visible_issues(CycleIssue.objects.all(), request.user, field="issue_id").get(
             workspace__slug=slug,
             project_id=project_id,
             cycle_id=cycle_id,

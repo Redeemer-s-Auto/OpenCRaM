@@ -27,6 +27,7 @@ from plane.db.models import (
     WorkspaceUserPreference,
 )
 from plane.utils.constants import RESTRICTED_WORKSPACE_SLUGS
+from .favorite import entity_hidden
 from plane.utils.url import contains_url
 from plane.utils.content_validator import (
     validate_html_content,
@@ -316,6 +317,10 @@ class WorkspaceRecentVisitSerializer(BaseSerializer):
     def get_entity_data(self, obj):
         entity_name = obj.entity_name
         entity_identifier = obj.entity_identifier
+
+        request = self.context.get("request")
+        if entity_hidden(entity_name, entity_identifier, getattr(request, "user", None)):
+            return None
 
         entity_model, entity_serializer = get_entity_model_and_serializer(entity_name)
 

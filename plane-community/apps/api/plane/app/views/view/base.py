@@ -48,6 +48,8 @@ from .. import BaseViewSet
 from plane.db.models import UserFavorite
 from plane.utils.filters import ComplexFilterBackend
 from plane.utils.filters import IssueFilterSet
+from plane.app.serializers.issue import hide_issue_refs
+from plane.sharing.visibility import hidden_issue_ids, visible_issues
 
 
 class WorkspaceViewViewSet(BaseViewSet):
@@ -192,6 +194,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
             )
             .annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                .exclude(id__in=hidden_issue_ids(self.request.user))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -217,7 +220,9 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
         )
 
     def get_queryset(self):
-        return Issue.issue_objects.filter(workspace__slug=self.kwargs.get("slug"))
+        return visible_issues(
+            Issue.issue_objects.filter(workspace__slug=self.kwargs.get("slug")), self.request.user
+        )
 
     @method_decorator(gzip_page)
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
@@ -255,7 +260,9 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
             order_by=order_by_param,
             request=request,
             queryset=issue_queryset,
-            on_results=lambda issues: attach_custom_fields(list(ViewIssueListSerializer(issues, many=True).data)),
+            on_results=lambda issues: hide_issue_refs(
+                attach_custom_fields(list(ViewIssueListSerializer(issues, many=True).data)), request.user
+            ),
             total_count_queryset=total_issue_count_queryset,
         )
 

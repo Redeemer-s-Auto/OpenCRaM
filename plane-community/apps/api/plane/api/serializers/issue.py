@@ -33,6 +33,7 @@ from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
 )
+from plane.sharing.visibility import hidden_issue_ids
 
 from .base import BaseSerializer
 from .cycle import CycleLiteSerializer, CycleSerializer
@@ -130,13 +131,13 @@ class IssueSerializer(BaseSerializer):
             raise serializers.ValidationError("State is not valid please pass a valid state_id")
 
         # Check parent issue is from workspace as it can be cross workspace
-        if (
-            data.get("parent")
-            and not Issue.objects.filter(
+        if data.get("parent") and (
+            not Issue.objects.filter(
                 workspace_id=self.context.get("workspace_id"),
                 project_id=self.context.get("project_id"),
                 pk=data.get("parent").id,
             ).exists()
+            or str(data.get("parent").id) in self._hidden_issue_ids()
         ):
             raise serializers.ValidationError("Parent is not valid issue_id please pass a valid issue_id")
 
@@ -304,8 +305,19 @@ class IssueSerializer(BaseSerializer):
         instance.updated_at = timezone.now()
         return super().update(instance, validated_data)
 
+    def _hidden_issue_ids(self):
+        """Ids of work items hidden from the context ``user`` (empty when no user is given)."""
+        if "user" not in self.context:
+            return set()
+        if "_hidden_issue_ids" not in self.context:
+            self.context["_hidden_issue_ids"] = {str(row["issue_id"]) for row in hidden_issue_ids(self.context["user"])}
+        return self.context["_hidden_issue_ids"]
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
+        # A visible child must not reveal a hidden parent.
+        if data.get("parent") and str(instance.parent_id) in self._hidden_issue_ids():
+            data["parent"] = None
         if "assignees" in self.fields:
             if "assignees" in self.expand:
                 from .user import UserLiteSerializer

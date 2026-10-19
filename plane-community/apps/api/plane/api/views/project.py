@@ -42,6 +42,7 @@ from plane.bgtasks.webhook_task import model_activity, webhook_activity
 from plane.utils.private_projects import visible_projects_q
 from plane.utils.exception_logger import log_exception
 from .base import BaseAPIView
+from plane.sharing.visibility import visible_issues, visible_pages
 from plane.utils.host import base_host
 from plane.utils.order_queryset import PROJECT_ORDER_BY_ALLOWLIST, sanitize_order_by
 from plane.api.serializers import (
@@ -783,20 +784,24 @@ class ProjectSummaryAPIEndpoint(BaseAPIView):
                 .values("count")
             ),
             "issues": lambda: (
-                Issue.objects.filter(project_id=OuterRef("pk"))
+                visible_issues(Issue.objects.filter(project_id=OuterRef("pk")), self.request.user)
                 .exclude(state__group=StateGroup.TRIAGE.value)
                 .values("project_id")
                 .annotate(count=Count("*"))
                 .values("count")
             ),
             "intakes": lambda: (
-                IntakeIssue.objects.filter(project_id=OuterRef("pk"))
+                visible_issues(
+                    IntakeIssue.objects.filter(project_id=OuterRef("pk")), self.request.user, field="issue_id"
+                )
                 .values("project_id")
                 .annotate(count=Count("*"))
                 .values("count")
             ),
             "pages": lambda: (
-                ProjectPage.objects.filter(project_id=OuterRef("pk"))
+                visible_pages(
+                    ProjectPage.objects.filter(project_id=OuterRef("pk")), self.request.user, field="page_id"
+                )
                 .values("project_id")
                 .annotate(count=Count("*"))
                 .values("count")

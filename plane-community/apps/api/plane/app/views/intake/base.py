@@ -52,6 +52,9 @@ from plane.utils.timezone_converter import user_timezone_converter
 from plane.utils.global_paginator import paginate
 from plane.utils.host import base_host
 from plane.db.models.intake import SourceType
+from plane.app.serializers.issue import hide_issue_refs
+from plane.sharing.visibility import can_view_issue, hidden_issue_ids, visible_issues
+from plane.utils.uuid import is_valid_uuid
 
 
 class IntakeViewSet(BaseViewSet):
@@ -66,7 +69,13 @@ class IntakeViewSet(BaseViewSet):
                 workspace__slug=self.kwargs.get("slug"),
                 project_id=self.kwargs.get("project_id"),
             )
-            .annotate(pending_issue_count=Count("issue_intake", filter=Q(issue_intake__status=-2)))
+            .annotate(
+                pending_issue_count=Count(
+                    "issue_intake",
+                    filter=Q(issue_intake__status=-2)
+                    & ~Q(issue_intake__issue_id__in=hidden_issue_ids(self.request.user)),
+                )
+            )
             .select_related("workspace", "project")
         )
 
@@ -100,9 +109,12 @@ class IntakeIssueViewSet(BaseViewSet):
 
     def get_queryset(self):
         return (
-            Issue.objects.filter(
-                project_id=self.kwargs.get("project_id"),
-                workspace__slug=self.kwargs.get("slug"),
+            visible_issues(
+                Issue.objects.filter(
+                    project_id=self.kwargs.get("project_id"),
+                    workspace__slug=self.kwargs.get("slug"),
+                ),
+                self.request.user,
             )
             .select_related("workspace", "project", "state", "parent")
             .prefetch_related("assignees", "labels", "issue_module__module")
@@ -133,7 +145,7 @@ class IntakeIssueViewSet(BaseViewSet):
                 .values("count")
             )
             .annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                sub_issues_count=visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -183,7 +195,11 @@ class IntakeIssueViewSet(BaseViewSet):
         project = Project.objects.get(pk=project_id)
         filters = issue_filters(request.GET, "GET", "issue__")
         intake_issue = (
-            IntakeIssue.objects.filter(intake_id=intake.id, project_id=project_id, **filters)
+            visible_issues(
+                IntakeIssue.objects.filter(intake_id=intake.id, project_id=project_id, **filters),
+                request.user,
+                field="issue_id",
+            )
             .select_related("issue")
             .prefetch_related("issue__labels")
             .annotate(
@@ -222,7 +238,9 @@ class IntakeIssueViewSet(BaseViewSet):
         return self.paginate(
             request=request,
             queryset=(intake_issue),
-            on_results=lambda intake_issues: IntakeIssueSerializer(intake_issues, many=True).data,
+            on_results=lambda intake_issues: hide_issue_refs(
+                IntakeIssueSerializer(intake_issues, many=True).data, request.user
+            ),
         )
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
@@ -335,6 +353,14 @@ class IntakeIssueViewSet(BaseViewSet):
     def partial_update(self, request, slug, project_id, pk):
         skip_activity = request.data.pop("skip_activity", False)
         is_description_update = request.data.get("description_html") is not None
+
+        # Marking as a duplicate of an item the user cannot see is refused like an unknown id.
+        duplicate_to = request.data.get("duplicate_to")
+        if duplicate_to and is_valid_uuid(str(duplicate_to)) and not can_view_issue(request.user, duplicate_to):
+            return Response(
+                {"duplicate_to": [f'Invalid pk "{duplicate_to}" - object does not exist.']},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         intake_id = Intake.objects.filter(workspace__slug=slug, project_id=project_id).first()
         intake_issue = IntakeIssue.objects.get(
@@ -500,7 +526,7 @@ class IntakeIssueViewSet(BaseViewSet):
             .get(intake_id=intake_id.id, issue_id=pk, project_id=project_id)
         )
         serializer = IntakeIssueDetailSerializer(intake_issue).data
-        return Response(serializer, status=status.HTTP_200_OK)
+        return Response(hide_issue_refs(serializer, request.user), status=status.HTTP_200_OK)
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], creator=True, model=Issue)
     def retrieve(self, request, slug, project_id, pk):
@@ -547,7 +573,7 @@ class IntakeIssueViewSet(BaseViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
         issue = IntakeIssueDetailSerializer(intake_issue).data
-        return Response(issue, status=status.HTTP_200_OK)
+        return Response(hide_issue_refs(issue, request.user), status=status.HTTP_200_OK)
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=Issue)
     def destroy(self, request, slug, project_id, pk):

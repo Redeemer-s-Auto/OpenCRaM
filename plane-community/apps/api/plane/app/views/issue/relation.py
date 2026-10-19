@@ -32,6 +32,8 @@ from plane.db.models import (
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.utils.issue_relation_mapper import get_actual_relation
 from plane.utils.host import base_host
+from plane.sharing.visibility import can_view_issue, visible_issues
+from plane.utils.uuid import is_valid_uuid
 
 
 class IssueRelationViewSet(BaseViewSet):
@@ -100,7 +102,7 @@ class IssueRelationViewSet(BaseViewSet):
         )
 
         queryset = (
-            Issue.issue_objects.filter(workspace__slug=slug)
+            visible_issues(Issue.issue_objects.filter(workspace__slug=slug), request.user)
             .select_related("workspace", "project", "state", "parent")
             .prefetch_related("assignees", "labels", "issue_module__module")
             .annotate(
@@ -124,7 +126,7 @@ class IssueRelationViewSet(BaseViewSet):
                 .values("count")
             )
             .annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                sub_issues_count=visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -220,11 +222,16 @@ class IssueRelationViewSet(BaseViewSet):
         # Scope to workspace to prevent cross-tenant IDOR
         # Relations can cross projects so only workspace scope is enforced
         issues = list(
-            Issue.issue_objects.filter(
-                workspace__slug=slug,
-                pk__in=issues,
+            visible_issues(
+                Issue.issue_objects.filter(
+                    workspace__slug=slug,
+                    pk__in=issues,
+                ),
+                request.user,
             ).values_list("id", flat=True)
         )
+        # The activity log must name only the items actually related.
+        requested_data = {**request.data, "issues": [str(issue) for issue in issues]}
 
         issue_relation = IssueRelation.objects.bulk_create(
             [
@@ -247,7 +254,7 @@ class IssueRelationViewSet(BaseViewSet):
 
         issue_activity.delay(
             type="issue_relation.activity.created",
-            requested_data=json.dumps(request.data, cls=DjangoJSONEncoder),
+            requested_data=json.dumps(requested_data, cls=DjangoJSONEncoder),
             actor_id=str(request.user.id),
             issue_id=str(issue_id),
             project_id=str(project_id),
@@ -270,6 +277,8 @@ class IssueRelationViewSet(BaseViewSet):
 
     def remove_relation(self, request, slug, project_id, issue_id):
         related_issue = request.data.get("related_issue", None)
+        if related_issue and is_valid_uuid(str(related_issue)) and not can_view_issue(request.user, related_issue):
+            return Response({"error": "The required object does not exist."}, status=status.HTTP_404_NOT_FOUND)
 
         issue_relations = IssueRelation.objects.filter(
             workspace__slug=slug,

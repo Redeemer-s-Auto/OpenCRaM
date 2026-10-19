@@ -40,6 +40,7 @@ from plane.db.models import (
     WorkspaceMember,
 )
 from plane.db.models.intake import IntakeIssueStatus
+from plane.sharing.visibility import hidden_issue_ids
 from plane.utils.private_projects import visible_projects_q
 from plane.utils.host import base_host
 from plane.utils.order_queryset import PROJECT_ORDER_BY_ALLOWLIST, sanitize_order_by
@@ -169,7 +170,8 @@ class ProjectViewSet(BaseViewSet):
                     filter=Q(
                         project_intakeissue__status=IntakeIssueStatus.PENDING.value,
                         project_intakeissue__deleted_at__isnull=True,
-                    ),
+                    )
+                    & ~Q(project_intakeissue__issue_id__in=hidden_issue_ids(self.request.user)),
                 )
             )
             .annotate(inbox_view=F("intake_view"))

@@ -42,6 +42,7 @@ from plane.db.models import (
     ProjectPage,
     WorkspaceMember,
 )
+from plane.sharing.visibility import visible_issues, visible_pages
 
 
 class GlobalSearchEndpoint(BaseAPIView):
@@ -104,6 +105,8 @@ class GlobalSearchEndpoint(BaseAPIView):
 
         if workspace_search == "false" and project_id:
             issues = issues.filter(project_id=project_id)
+
+        issues = visible_issues(issues, self.request.user)
 
         return issues.distinct().values(
             "name",
@@ -170,12 +173,16 @@ class GlobalSearchEndpoint(BaseAPIView):
                 q |= Q(**{f"{field}__icontains": query})
 
         pages = (
-            Page.objects.filter(
-                q,
-                projects__project_projectmember__member=self.request.user,
-                projects__project_projectmember__is_active=True,
-                projects__archived_at__isnull=True,
-                workspace__slug=slug,
+            visible_pages(
+                Page.objects.filter(
+                    q,
+                    Q(owned_by=self.request.user) | Q(access=0),
+                    projects__project_projectmember__member=self.request.user,
+                    projects__project_projectmember__is_active=True,
+                    projects__archived_at__isnull=True,
+                    workspace__slug=slug,
+                ),
+                self.request.user,
             )
             .annotate(
                 project_ids=Coalesce(
@@ -255,6 +262,8 @@ class GlobalSearchEndpoint(BaseAPIView):
 
         if workspace_search == "false" and project_id:
             issues = issues.filter(project_id=project_id)
+
+        issues = visible_issues(issues, self.request.user)
 
         return (
             issues.order_by("-created_at")
@@ -400,12 +409,15 @@ class SearchEndpoint(BaseAPIView):
                                 q |= Q(**{f"{field}__icontains": query})
 
                     issues = (
-                        Issue.issue_objects.filter(
-                            q,
-                            project__project_projectmember__member=self.request.user,
-                            project__project_projectmember__is_active=True,
-                            workspace__slug=slug,
-                            project_id=project_id,
+                        visible_issues(
+                            Issue.issue_objects.filter(
+                                q,
+                                project__project_projectmember__member=self.request.user,
+                                project__project_projectmember__is_active=True,
+                                workspace__slug=slug,
+                                project_id=project_id,
+                            ),
+                            request.user,
                         )
                         .order_by("-created_at")
                         .distinct()
@@ -508,13 +520,16 @@ class SearchEndpoint(BaseAPIView):
                             q |= Q(**{f"{field}__icontains": query})
 
                     pages = (
-                        Page.objects.filter(
-                            q,
-                            projects__project_projectmember__member=self.request.user,
-                            projects__project_projectmember__is_active=True,
-                            projects__id=project_id,
-                            workspace__slug=slug,
-                            access=0,
+                        visible_pages(
+                            Page.objects.filter(
+                                q,
+                                projects__project_projectmember__member=self.request.user,
+                                projects__project_projectmember__is_active=True,
+                                projects__id=project_id,
+                                workspace__slug=slug,
+                                access=0,
+                            ),
+                            request.user,
                         )
                         .order_by("-created_at")
                         .distinct()
@@ -606,11 +621,14 @@ class SearchEndpoint(BaseAPIView):
                                 q |= Q(**{f"{field}__icontains": query})
 
                     issues = (
-                        Issue.issue_objects.filter(
-                            q,
-                            project__project_projectmember__member=self.request.user,
-                            project__project_projectmember__is_active=True,
-                            workspace__slug=slug,
+                        visible_issues(
+                            Issue.issue_objects.filter(
+                                q,
+                                project__project_projectmember__member=self.request.user,
+                                project__project_projectmember__is_active=True,
+                                workspace__slug=slug,
+                            ),
+                            request.user,
                         )
                         .order_by("-created_at")
                         .distinct()
@@ -711,13 +729,16 @@ class SearchEndpoint(BaseAPIView):
                             q |= Q(**{f"{field}__icontains": query})
 
                     pages = (
-                        Page.objects.filter(
-                            q,
-                            projects__project_projectmember__member=self.request.user,
-                            projects__project_projectmember__is_active=True,
-                            workspace__slug=slug,
-                            access=0,
-                            is_global=True,
+                        visible_pages(
+                            Page.objects.filter(
+                                q,
+                                projects__project_projectmember__member=self.request.user,
+                                projects__project_projectmember__is_active=True,
+                                workspace__slug=slug,
+                                access=0,
+                                is_global=True,
+                            ),
+                            request.user,
                         )
                         .order_by("-created_at")
                         .distinct()

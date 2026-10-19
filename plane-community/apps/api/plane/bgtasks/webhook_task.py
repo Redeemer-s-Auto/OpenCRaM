@@ -53,6 +53,8 @@ from plane.license.utils.instance_value import get_email_configuration
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
 from plane.utils.url_security import pinned_fetch
+from plane.sharing.services import read_sharing
+from plane.sharing.visibility import restricted_issue_ids
 
 
 SERIALIZER_MAPPER = {
@@ -81,6 +83,58 @@ MODEL_MAPPER = {
 
 
 logger = logging.getLogger("plane.worker")
+
+
+# Events about rows that belong to one work item, and how to find it.
+WORK_ITEM_CHILD_MODELS = {
+    "issue_comment": IssueComment,
+    "cycle_issue": CycleIssue,
+    "module_issue": ModuleIssue,
+    "intake_issue": IntakeIssue,
+}
+
+
+def _uuid_values(values):
+    found = []
+    for value in values:
+        try:
+            found.append(str(uuid.UUID(str(value))))
+        except (ValueError, TypeError, AttributeError):
+            continue
+    return found
+
+
+def sharing_for_webhook(event, event_id, values):
+    """Sharing rules for one webhook event. Returns (skip, sharing).
+
+    Restricted work items (and comments, cycle/module links, activity that name
+    one) are not sent unless SHARING_WEBHOOK_INCLUDE_RESTRICTED is on; then the
+    payload carries the item's sharing settings.
+    """
+    if event == "issue":
+        issue_id = event_id
+    elif event in WORK_ITEM_CHILD_MODELS:
+        issue_id = (
+            WORK_ITEM_CHILD_MODELS[event].all_objects.filter(pk=event_id).values_list("issue_id", flat=True).first()
+        )
+    else:
+        issue_id = None
+    candidates = _uuid_values([issue_id, *values] if issue_id else values)
+    if not candidates:
+        return False, None
+    restricted = {
+        str(pk)
+        for pk in Issue.all_objects.filter(pk__in=candidates)
+        .filter(pk__in=restricted_issue_ids())
+        .values_list("id", flat=True)
+    }
+    if not restricted:
+        return False, None
+    if not settings.SHARING_WEBHOOK_INCLUDE_RESTRICTED:
+        return True, None
+    if issue_id and str(issue_id) in restricted:
+        return False, read_sharing(issue=Issue.all_objects.get(pk=issue_id))
+    return False, None
 
 
 def get_issue_prefetches():
@@ -248,6 +302,7 @@ def webhook_send_task(
     action: str,
     current_site: str,
     activity: Optional[Dict[str, Any]],
+    sharing: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Send webhook notifications to configured endpoints.
@@ -292,6 +347,8 @@ def webhook_send_task(
             "data": event_data,
             "activity": activity,
         }
+        if sharing is not None:
+            payload["sharing"] = sharing
 
         # Use HMAC for generating signature
         if webhook.secret_key:
@@ -447,6 +504,10 @@ def webhook_activity(
         if event == "issue_comment":
             webhooks = webhooks.filter(issue_comment=True)
 
+        skip, sharing = sharing_for_webhook(event, event_id, [old_value, new_value, old_identifier, new_identifier])
+        if skip:
+            return
+
         for webhook in webhooks:
             webhook_send_task.delay(
                 webhook_id=webhook.id,
@@ -463,6 +524,7 @@ def webhook_activity(
                     "old_identifier": old_identifier,
                     "new_identifier": new_identifier,
                 },
+                sharing=sharing,
             )
         return
     except Exception as e:

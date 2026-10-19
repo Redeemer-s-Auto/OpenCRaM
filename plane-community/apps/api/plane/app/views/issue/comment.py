@@ -23,6 +23,10 @@ from plane.db.models import IssueComment, ProjectMember, CommentReaction, Projec
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.utils.host import base_host
 from plane.bgtasks.webhook_task import model_activity
+from plane.sharing.guard import SAFE_METHODS
+from plane.sharing.models import AccessLevel
+from plane.sharing.visibility import can_reach, issue_access_level
+from rest_framework.exceptions import NotFound, PermissionDenied
 
 
 class IssueCommentViewSet(BaseViewSet):
@@ -163,6 +167,17 @@ class IssueCommentViewSet(BaseViewSet):
 class CommentReactionViewSet(BaseViewSet):
     serializer_class = CommentReactionSerializer
     model = CommentReaction
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        # The URL names the comment, not the work item, so the request guard cannot see it.
+        issue_id = IssueComment.objects.filter(pk=kwargs.get("comment_id")).values_list("issue_id", flat=True).first()
+        level = issue_access_level(request.user, issue_id) if issue_id else None
+        if level is not None and level <= 0:
+            raise NotFound("The required object does not exist.")
+        required = AccessLevel.VIEW if request.method in SAFE_METHODS else AccessLevel.COMMENT
+        if not can_reach(level, required):
+            raise PermissionDenied("You don't have the required permissions.")
 
     def get_queryset(self):
         return (

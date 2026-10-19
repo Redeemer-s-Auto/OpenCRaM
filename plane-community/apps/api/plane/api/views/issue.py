@@ -165,6 +165,8 @@ from plane.utils.openapi import (
     WORKSPACE_NOT_FOUND_RESPONSE,
 )
 from plane.bgtasks.work_item_link_task import crawl_work_item_link_title
+from plane.sharing.models import AccessLevel
+from plane.sharing.visibility import hidden_issue_ids, issue_access_level, visible_issues
 
 
 def user_has_issue_permission(user_id, project_id, issue=None, allowed_roles=None, allow_creator=True):
@@ -199,9 +201,9 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
         return self.kwargs.get("project_identifier", None)
 
     def get_queryset(self):
-        return (
+        return visible_issues(
             Issue.issue_objects.annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                sub_issues_count=visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -215,7 +217,9 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
             .prefetch_related("assignees")
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
-        ).distinct()
+            .distinct(),
+            self.request.user,
+        )
 
     @extend_schema(
         operation_id="get_workspace_work_item",
@@ -244,17 +248,18 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
         """
         if issue_identifier and project_identifier:
             issue = Issue.issue_objects.annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                sub_issues_count=visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
-            ).get(
+            )
+            issue = visible_issues(issue, request.user).get(
                 workspace__slug=slug,
                 project__identifier=project_identifier,
                 sequence_id=issue_identifier,
             )
             return Response(
-                IssueSerializer(issue, fields=self.fields, expand=self.expand).data,
+                IssueSerializer(issue, fields=self.fields, expand=self.expand, context={"user": request.user}).data,
                 status=status.HTTP_200_OK,
             )
 
@@ -271,9 +276,9 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
-        return (
+        return visible_issues(
             Issue.issue_objects.annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                sub_issues_count=visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -287,7 +292,9 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             .prefetch_related("assignees")
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
-        ).distinct()
+            .distinct(),
+            self.request.user,
+        )
 
     @work_item_docs(
         operation_id="list_work_items",
@@ -338,14 +345,14 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
         external_source = request.GET.get("external_source")
 
         if external_id and external_source:
-            issue = Issue.objects.get(
+            issue = visible_issues(Issue.objects.all(), request.user).get(
                 external_id=external_id,
                 external_source=external_source,
                 workspace__slug=slug,
                 project_id=project_id,
             )
             return Response(
-                IssueSerializer(issue, fields=self.fields, expand=self.expand).data,
+                IssueSerializer(issue, fields=self.fields, expand=self.expand, context={"user": request.user}).data,
                 status=status.HTTP_200_OK,
             )
 
@@ -388,7 +395,9 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             )
         )
 
-        total_issue_queryset = Issue.issue_objects.filter(project_id=project_id, workspace__slug=slug)
+        total_issue_queryset = visible_issues(
+            Issue.issue_objects.filter(project_id=project_id, workspace__slug=slug), request.user
+        )
 
         # custom_field_filters={"customfield_<id>__<lookup>": value, ...} (all must match)
         custom_field_filters = request.GET.get("custom_field_filters")
@@ -447,7 +456,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             queryset=(issue_queryset),
             total_count_queryset=total_issue_queryset,
             on_results=lambda issues: IssueSerializer(
-                prefetch_onto(issues), many=True, fields=self.fields, expand=self.expand
+                prefetch_onto(issues), many=True, fields=self.fields, expand=self.expand, context={"user": request.user}
             ).data,
         )
 
@@ -484,6 +493,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
                 "project_id": project_id,
                 "workspace_id": project.workspace_id,
                 "default_assignee_id": project.default_assignee_id,
+                "user": request.user,
             },
         )
 
@@ -504,13 +514,11 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
                     external_id=request.data.get("external_id"),
                     external_source=request.data.get("external_source"),
                 ).first()
-                return Response(
-                    {
-                        "error": "Issue with the same external id and external source already exists",
-                        "id": str(issue.id),
-                    },
-                    status=status.HTTP_409_CONFLICT,
-                )
+                conflict = {"error": "Issue with the same external id and external source already exists"}
+                # Do not hand out the id of a work item the caller may not see.
+                if not visible_issues(Issue.objects.filter(pk=issue.id), request.user).exists():
+                    return Response(conflict, status=status.HTTP_409_CONFLICT)
+                return Response({**conflict, "id": str(issue.id)}, status=status.HTTP_409_CONFLICT)
 
             serializer.save()
             # Refetch the issue
@@ -556,9 +564,9 @@ class IssueDetailAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
-        return (
+        return visible_issues(
             Issue.issue_objects.annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                sub_issues_count=visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -572,7 +580,9 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             .prefetch_related("assignees")
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
-        ).distinct()
+            .distinct(),
+            self.request.user,
+        )
 
     @work_item_docs(
         operation_id="retrieve_work_item",
@@ -604,13 +614,14 @@ class IssueDetailAPIEndpoint(BaseAPIView):
         """
 
         issue = Issue.issue_objects.annotate(
-            sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+            sub_issues_count=visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
             .order_by()
             .annotate(count=Func(F("id"), function="Count"))
             .values("count")
-        ).get(workspace__slug=slug, project_id=project_id, pk=pk)
+        )
+        issue = visible_issues(issue, request.user).get(workspace__slug=slug, project_id=project_id, pk=pk)
         return Response(
-            IssueSerializer(issue, fields=self.fields, expand=self.expand).data,
+            IssueSerializer(issue, fields=self.fields, expand=self.expand, context={"user": request.user}).data,
             status=status.HTTP_200_OK,
         )
 
@@ -660,6 +671,14 @@ class IssueDetailAPIEndpoint(BaseAPIView):
                     external_id=external_id,
                     external_source=external_source,
                 )
+                # Restricted item: hidden callers get a bare 404, viewers may not change it.
+                level = issue_access_level(request.user, issue.id)
+                if level is not None and level <= 0:
+                    return Response({"error": "Work item not found"}, status=status.HTTP_404_NOT_FOUND)
+                if level is not None and level < AccessLevel.EDIT:
+                    return Response(
+                        {"error": "You don't have the required permissions."}, status=status.HTTP_403_FORBIDDEN
+                    )
 
                 # Get the current instance of the issue in order to track
                 # changes and dispatch the issue activity
@@ -674,6 +693,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
                     context={
                         "project_id": project_id,
                         "workspace_id": project.workspace_id,
+                        "user": request.user,
                     },
                     partial=True,
                 )
@@ -720,6 +740,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
                         "project_id": project_id,
                         "workspace_id": project.workspace_id,
                         "default_assignee_id": project.default_assignee_id,
+                        "user": request.user,
                     },
                 )
 
@@ -805,7 +826,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
         serializer = IssueSerializer(
             issue,
             data=request.data,
-            context={"project_id": project_id, "workspace_id": project.workspace_id},
+            context={"project_id": project_id, "workspace_id": project.workspace_id, "user": request.user},
             partial=True,
         )
         if serializer.is_valid():
@@ -1144,7 +1165,8 @@ class IssueLinkListCreateAPIEndpoint(BaseAPIView):
 
     def get_queryset(self):
         return (
-            IssueLink.objects.filter(workspace__slug=self.kwargs.get("slug"))
+            visible_issues(IssueLink.objects.all(), self.request.user, field="issue_id")
+            .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(issue_id=self.kwargs.get("issue_id"))
             .filter(
@@ -1249,7 +1271,8 @@ class IssueLinkDetailAPIEndpoint(BaseAPIView):
 
     def get_queryset(self):
         return (
-            IssueLink.objects.filter(workspace__slug=self.kwargs.get("slug"))
+            visible_issues(IssueLink.objects.all(), self.request.user, field="issue_id")
+            .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(issue_id=self.kwargs.get("issue_id"))
             .filter(
@@ -1392,7 +1415,8 @@ class IssueCommentListCreateAPIEndpoint(BaseAPIView):
 
     def get_queryset(self):
         return (
-            IssueComment.objects.filter(workspace__slug=self.kwargs.get("slug"))
+            visible_issues(IssueComment.objects.all(), self.request.user, field="issue_id")
+            .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(issue_id=self.kwargs.get("issue_id"))
             .filter(
@@ -1548,7 +1572,8 @@ class IssueCommentDetailAPIEndpoint(BaseAPIView):
 
     def get_queryset(self):
         return (
-            IssueComment.objects.filter(workspace__slug=self.kwargs.get("slug"))
+            visible_issues(IssueComment.objects.all(), self.request.user, field="issue_id")
+            .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(issue_id=self.kwargs.get("issue_id"))
             .filter(
@@ -1743,6 +1768,9 @@ class IssueActivityListAPIEndpoint(BaseAPIView):
         """
         issue_activities = (
             IssueActivity.objects.filter(issue_id=issue_id, workspace__slug=slug, project_id=project_id)
+            # Drop entries that point at a hidden work item (parent, relations).
+            .exclude(old_identifier__in=hidden_issue_ids(request.user))
+            .exclude(new_identifier__in=hidden_issue_ids(request.user))
             .filter(
                 ~Q(field__in=["comment", "vote", "reaction", "draft"]),
                 project__project_projectmember__member=self.request.user,
@@ -1801,6 +1829,8 @@ class IssueActivityDetailAPIEndpoint(BaseAPIView):
         issue_activity = (
             (
                 IssueActivity.objects.filter(issue_id=issue_id, workspace__slug=slug, project_id=project_id, id=pk)
+                .exclude(old_identifier__in=hidden_issue_ids(request.user))
+                .exclude(new_identifier__in=hidden_issue_ids(request.user))
                 .filter(
                     ~Q(field__in=["comment", "vote", "reaction", "draft"]),
                     project__project_projectmember__member=self.request.user,
@@ -2298,12 +2328,15 @@ class IssueSearchEndpoint(BaseAPIView):
                 q |= Q(**{f"{field}__icontains": query})
 
         # Filter issues
-        issues = Issue.issue_objects.filter(
-            q,
-            project__project_projectmember__member=self.request.user,
-            project__project_projectmember__is_active=True,
-            project__archived_at__isnull=True,
-            workspace__slug=slug,
+        issues = visible_issues(
+            Issue.issue_objects.filter(
+                q,
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+                project__archived_at__isnull=True,
+                workspace__slug=slug,
+            ),
+            request.user,
         )
 
         # Apply project filter if not searching across workspace
@@ -2397,9 +2430,13 @@ class IssueRelationListCreateAPIEndpoint(BaseAPIView):
         Retrieve all relationships for a work item organized by relation type.
         Returns a structured response with relations grouped by type.
         """
-        relations = IssueRelation.objects.filter(
-            Q(issue_id=issue_id) | Q(related_issue_id=issue_id),
-            workspace__slug=slug,
+        relations = (
+            IssueRelation.objects.filter(
+                Q(issue_id=issue_id) | Q(related_issue_id=issue_id),
+                workspace__slug=slug,
+            )
+            .exclude(issue_id__in=hidden_issue_ids(request.user))
+            .exclude(related_issue_id__in=hidden_issue_ids(request.user))
         ).values(
             "relation_type",
             "issue_id",
@@ -2547,9 +2584,12 @@ class IssueRelationListCreateAPIEndpoint(BaseAPIView):
         # Scope to workspace to prevent cross-tenant IDOR
         # Relations can cross projects so only workspace scope is enforced
         issues = list(
-            Issue.issue_objects.filter(
-                workspace__slug=slug,
-                pk__in=issues,
+            visible_issues(
+                Issue.issue_objects.filter(
+                    workspace__slug=slug,
+                    pk__in=issues,
+                ),
+                request.user,
             ).values_list("id", flat=True)
         )
 

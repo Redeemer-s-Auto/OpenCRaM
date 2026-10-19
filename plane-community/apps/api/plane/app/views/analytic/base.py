@@ -32,6 +32,7 @@ from plane.db.models import (
 from plane.utils.analytics_plot import build_graph_plot, VALID_ANALYTICS_FIELDS, VALID_YAXIS
 from plane.utils.issue_filters import issue_filters
 from plane.app.permissions import allow_permission, ROLE
+from plane.sharing.visibility import visible_issues
 
 
 class AnalyticsEndpoint(BaseAPIView):
@@ -57,9 +58,11 @@ class AnalyticsEndpoint(BaseAPIView):
 
         # Additional filters that need to be applied
         filters = issue_filters(request.GET, "GET")
+        # Work items hidden from this user are left out of every number.
+        issues = visible_issues(Issue.issue_objects.all(), request.user)
 
         # Get the issues for the workspace with the additional filters applied
-        queryset = Issue.issue_objects.filter(workspace__slug=slug, **filters)
+        queryset = issues.filter(workspace__slug=slug, **filters)
 
         # Get the total issue count
         total_issues = queryset.count()
@@ -70,7 +73,7 @@ class AnalyticsEndpoint(BaseAPIView):
         state_details = {}
         if x_axis in ["state_id"] or segment in ["state_id"]:
             state_details = (
-                Issue.issue_objects.filter(workspace__slug=slug, **filters)
+                issues.filter(workspace__slug=slug, **filters)
                 .distinct("state_id")
                 .order_by("state_id")
                 .values("state_id", "state__name", "state__color")
@@ -79,7 +82,7 @@ class AnalyticsEndpoint(BaseAPIView):
         label_details = {}
         if x_axis in ["labels__id"] or segment in ["labels__id"]:
             label_details = (
-                Issue.objects.filter(
+                visible_issues(Issue.objects.all(), request.user).filter(
                     workspace__slug=slug,
                     **filters,
                     labels__id__isnull=False,
@@ -93,7 +96,7 @@ class AnalyticsEndpoint(BaseAPIView):
         assignee_details = {}
         if x_axis in ["assignees__id"] or segment in ["assignees__id"]:
             assignee_details = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     Q(Q(assignees__avatar__isnull=False) | Q(assignees__avatar_asset__isnull=False)),
                     workspace__slug=slug,
                     **filters,
@@ -132,7 +135,7 @@ class AnalyticsEndpoint(BaseAPIView):
         cycle_details = {}
         if x_axis in ["issue_cycle__cycle_id"] or segment in ["issue_cycle__cycle_id"]:
             cycle_details = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     workspace__slug=slug,
                     **filters,
                     issue_cycle__cycle_id__isnull=False,
@@ -146,7 +149,7 @@ class AnalyticsEndpoint(BaseAPIView):
         module_details = {}
         if x_axis in ["issue_module__module_id"] or segment in ["issue_module__module_id"]:
             module_details = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     workspace__slug=slug,
                     **filters,
                     issue_module__module_id__isnull=False,
@@ -192,7 +195,7 @@ class SavedAnalyticEndpoint(BaseAPIView):
         analytic_view = AnalyticView.objects.get(pk=analytic_id, workspace__slug=slug)
 
         filter = analytic_view.query
-        queryset = Issue.issue_objects.filter(**filter)
+        queryset = visible_issues(Issue.issue_objects.filter(**filter), request.user)
 
         x_axis = analytic_view.query_dict.get("x_axis", False)
         y_axis = analytic_view.query_dict.get("y_axis", False)
@@ -240,7 +243,7 @@ class ExportAnalyticsEndpoint(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        analytic_export_task.delay(email=request.user.email, data=request.data, slug=slug)
+        analytic_export_task.delay(email=request.user.email, data=request.data, slug=slug, user_id=str(request.user.id))
 
         return Response(
             {"message": f"Once the export is ready it will be emailed to you at {str(request.user.email)}"},
@@ -252,7 +255,7 @@ class DefaultAnalyticsEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug):
         filters = issue_filters(request.GET, "GET")
-        base_issues = Issue.issue_objects.filter(workspace__slug=slug, **filters)
+        base_issues = visible_issues(Issue.issue_objects.filter(workspace__slug=slug, **filters), request.user)
 
         total_issues = base_issues.count()
 
@@ -411,9 +414,10 @@ class ProjectStatsEndpoint(BaseAPIView):
             projects = projects.filter(id__in=project_ids.split(","))
 
         annotations = {}
+        issues = visible_issues(Issue.issue_objects.all(), request.user)
         if "total_issues" in requested_fields:
             annotations["total_issues"] = (
-                Issue.issue_objects.filter(project_id=OuterRef("pk"))
+                issues.filter(project_id=OuterRef("pk"))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -421,7 +425,7 @@ class ProjectStatsEndpoint(BaseAPIView):
 
         if "completed_issues" in requested_fields:
             annotations["completed_issues"] = (
-                Issue.issue_objects.filter(project_id=OuterRef("pk"), state__group__in=["completed", "cancelled"])
+                issues.filter(project_id=OuterRef("pk"), state__group__in=["completed", "cancelled"])
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")

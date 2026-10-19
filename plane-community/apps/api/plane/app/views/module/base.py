@@ -66,6 +66,7 @@ from plane.bgtasks.webhook_task import model_activity
 from .. import BaseAPIView, BaseViewSet
 from plane.bgtasks.recent_visited_task import recent_visited_task
 from plane.utils.host import base_host
+from plane.sharing.visibility import visible_issues
 
 
 class ModuleViewSet(BaseViewSet):
@@ -83,8 +84,10 @@ class ModuleViewSet(BaseViewSet):
             project_id=self.kwargs.get("project_id"),
             workspace__slug=self.kwargs.get("slug"),
         )
+        # Counts and sums leave out work items hidden from this user.
+        issues = visible_issues(Issue.issue_objects.all(), self.request.user)
         cancelled_issues = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 state__group="cancelled",
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
@@ -94,7 +97,7 @@ class ModuleViewSet(BaseViewSet):
             .values("cnt")
         )
         completed_issues = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 state__group="completed",
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
@@ -104,7 +107,7 @@ class ModuleViewSet(BaseViewSet):
             .values("cnt")
         )
         started_issues = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 state__group="started",
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
@@ -114,7 +117,7 @@ class ModuleViewSet(BaseViewSet):
             .values("cnt")
         )
         unstarted_issues = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 state__group="unstarted",
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
@@ -124,7 +127,7 @@ class ModuleViewSet(BaseViewSet):
             .values("cnt")
         )
         backlog_issues = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 state__group="backlog",
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
@@ -134,7 +137,7 @@ class ModuleViewSet(BaseViewSet):
             .values("cnt")
         )
         total_issues = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
             )
@@ -143,7 +146,7 @@ class ModuleViewSet(BaseViewSet):
             .values("cnt")
         )
         completed_estimate_point = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 estimate_point__estimate__type="points",
                 state__group="completed",
                 issue_module__module_id=OuterRef("pk"),
@@ -155,7 +158,7 @@ class ModuleViewSet(BaseViewSet):
         )
 
         total_estimate_point = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 estimate_point__estimate__type="points",
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
@@ -165,7 +168,7 @@ class ModuleViewSet(BaseViewSet):
             .values("total_estimate_points")[:1]
         )
         backlog_estimate_point = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 estimate_point__estimate__type="points",
                 state__group="backlog",
                 issue_module__module_id=OuterRef("pk"),
@@ -176,7 +179,7 @@ class ModuleViewSet(BaseViewSet):
             .values("backlog_estimate_point")[:1]
         )
         unstarted_estimate_point = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 estimate_point__estimate__type="points",
                 state__group="unstarted",
                 issue_module__module_id=OuterRef("pk"),
@@ -187,7 +190,7 @@ class ModuleViewSet(BaseViewSet):
             .values("unstarted_estimate_point")[:1]
         )
         started_estimate_point = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 estimate_point__estimate__type="points",
                 state__group="started",
                 issue_module__module_id=OuterRef("pk"),
@@ -198,7 +201,7 @@ class ModuleViewSet(BaseViewSet):
             .values("started_estimate_point")[:1]
         )
         cancelled_estimate_point = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 estimate_point__estimate__type="points",
                 state__group="cancelled",
                 issue_module__module_id=OuterRef("pk"),
@@ -394,12 +397,13 @@ class ModuleViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def retrieve(self, request, slug, project_id, pk):
+        issues = visible_issues(Issue.issue_objects.all(), request.user)
         queryset = (
             self.get_queryset()
             .filter(archived_at__isnull=True)
             .filter(pk=pk)
             .annotate(
-                sub_issues=Issue.issue_objects.filter(
+                sub_issues=issues.filter(
                     project_id=self.kwargs.get("project_id"),
                     parent__isnull=False,
                     issue_module__module_id=pk,
@@ -428,7 +432,7 @@ class ModuleViewSet(BaseViewSet):
 
         if estimate_type:
             assignee_distribution = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     issue_module__module_id=pk,
                     issue_module__deleted_at__isnull=True,
                     workspace__slug=slug,
@@ -490,7 +494,7 @@ class ModuleViewSet(BaseViewSet):
             )
 
             label_distribution = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     issue_module__module_id=pk,
                     issue_module__deleted_at__isnull=True,
                     workspace__slug=slug,
@@ -533,10 +537,11 @@ class ModuleViewSet(BaseViewSet):
                     project_id=project_id,
                     plot_type="points",
                     module_id=pk,
+                    user=request.user,
                 )
 
         assignee_distribution = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 issue_module__module_id=pk,
                 issue_module__deleted_at__isnull=True,
                 workspace__slug=slug,
@@ -589,7 +594,7 @@ class ModuleViewSet(BaseViewSet):
         )
 
         label_distribution = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 issue_module__module_id=pk,
                 issue_module__deleted_at__isnull=True,
                 workspace__slug=slug,
@@ -636,6 +641,7 @@ class ModuleViewSet(BaseViewSet):
                 project_id=project_id,
                 plot_type="issues",
                 module_id=pk,
+                user=request.user,
             )
 
         recent_visited_task.delay(

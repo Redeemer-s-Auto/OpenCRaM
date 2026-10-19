@@ -14,12 +14,15 @@ from plane.app.views.base import BaseAPIView
 from plane.db.models import Cycle
 from plane.app.permissions import WorkspaceViewerPermission
 from plane.app.serializers.cycle import CycleSerializer
+from plane.sharing.visibility import hidden_issue_ids
 
 
 class WorkspaceCyclesEndpoint(BaseAPIView):
     permission_classes = [WorkspaceViewerPermission]
 
     def get(self, request, slug):
+        # Counts leave out work items hidden from this user.
+        hidden = hidden_issue_ids(request.user)
         cycles = (
             Cycle.objects.filter(
                 workspace__slug=slug,
@@ -34,7 +37,7 @@ class WorkspaceCyclesEndpoint(BaseAPIView):
             .annotate(
                 total_issues=Count(
                     "issue_cycle",
-                    filter=Q(
+                    filter=~Q(issue_cycle__issue_id__in=hidden) & Q(
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
                         issue_cycle__deleted_at__isnull=True,
@@ -45,7 +48,7 @@ class WorkspaceCyclesEndpoint(BaseAPIView):
             .annotate(
                 completed_issues=Count(
                     "issue_cycle__issue__state__group",
-                    filter=Q(
+                    filter=~Q(issue_cycle__issue_id__in=hidden) & Q(
                         issue_cycle__issue__state__group="completed",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -57,7 +60,7 @@ class WorkspaceCyclesEndpoint(BaseAPIView):
             .annotate(
                 cancelled_issues=Count(
                     "issue_cycle__issue__state__group",
-                    filter=Q(
+                    filter=~Q(issue_cycle__issue_id__in=hidden) & Q(
                         issue_cycle__issue__state__group="cancelled",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -69,7 +72,7 @@ class WorkspaceCyclesEndpoint(BaseAPIView):
             .annotate(
                 started_issues=Count(
                     "issue_cycle__issue__state__group",
-                    filter=Q(
+                    filter=~Q(issue_cycle__issue_id__in=hidden) & Q(
                         issue_cycle__issue__state__group="started",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -81,7 +84,7 @@ class WorkspaceCyclesEndpoint(BaseAPIView):
             .annotate(
                 unstarted_issues=Count(
                     "issue_cycle__issue__state__group",
-                    filter=Q(
+                    filter=~Q(issue_cycle__issue_id__in=hidden) & Q(
                         issue_cycle__issue__state__group="unstarted",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -93,7 +96,7 @@ class WorkspaceCyclesEndpoint(BaseAPIView):
             .annotate(
                 backlog_issues=Count(
                     "issue_cycle__issue__state__group",
-                    filter=Q(
+                    filter=~Q(issue_cycle__issue_id__in=hidden) & Q(
                         issue_cycle__issue__state__group="backlog",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,

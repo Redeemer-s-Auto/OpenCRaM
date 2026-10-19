@@ -21,6 +21,7 @@ from django.utils import timezone
 
 # Module imports
 from plane.db.models import Issue, Project
+from plane.sharing.visibility import visible_issues
 
 VALID_ANALYTICS_FIELDS = [
     "state_id",
@@ -120,7 +121,10 @@ def build_graph_plot(queryset, x_axis, y_axis, segment=None):
     return sort_data(grouped_data, temp_axis)
 
 
-def burndown_plot(queryset, slug, project_id, plot_type, cycle_id=None, module_id=None):
+def burndown_plot(queryset, slug, project_id, plot_type, cycle_id=None, module_id=None, user=None):
+    # ``queryset.total_issues`` must already leave out items hidden from ``user``.
+    # ``user=None`` (no viewer) leaves out every restricted item.
+    issues = visible_issues(Issue.issue_objects.all(), user)
     # Total Issues in Cycle or Module
     total_issues = queryset.total_issues
     # check whether the estimate is a point or not
@@ -131,7 +135,7 @@ def burndown_plot(queryset, slug, project_id, plot_type, cycle_id=None, module_i
         estimate__type="points",
     ).exists()
     if estimate_type and plot_type == "points" and cycle_id:
-        issue_estimates = Issue.issue_objects.filter(
+        issue_estimates = issues.filter(
             workspace__slug=slug,
             project_id=project_id,
             issue_cycle__cycle_id=cycle_id,
@@ -143,7 +147,7 @@ def burndown_plot(queryset, slug, project_id, plot_type, cycle_id=None, module_i
         total_estimate_points = sum(issue_estimates)
 
     if estimate_type and plot_type == "points" and module_id:
-        issue_estimates = Issue.issue_objects.filter(
+        issue_estimates = issues.filter(
             workspace__slug=slug,
             project_id=project_id,
             issue_module__module_id=module_id,
@@ -168,7 +172,7 @@ def burndown_plot(queryset, slug, project_id, plot_type, cycle_id=None, module_i
 
         if plot_type == "points":
             completed_issues_estimate_point_distribution = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     workspace__slug=slug,
                     project_id=project_id,
                     issue_cycle__cycle_id=cycle_id,
@@ -182,7 +186,7 @@ def burndown_plot(queryset, slug, project_id, plot_type, cycle_id=None, module_i
             )
         else:
             completed_issues_distribution = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     workspace__slug=slug,
                     project_id=project_id,
                     issue_cycle__cycle_id=cycle_id,
@@ -206,7 +210,7 @@ def burndown_plot(queryset, slug, project_id, plot_type, cycle_id=None, module_i
 
         if plot_type == "points":
             completed_issues_estimate_point_distribution = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     workspace__slug=slug,
                     project_id=project_id,
                     issue_module__module_id=module_id,
@@ -220,7 +224,7 @@ def burndown_plot(queryset, slug, project_id, plot_type, cycle_id=None, module_i
             )
         else:
             completed_issues_distribution = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     workspace__slug=slug,
                     project_id=project_id,
                     issue_module__module_id=module_id,

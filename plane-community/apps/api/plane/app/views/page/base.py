@@ -54,6 +54,9 @@ from plane.bgtasks.page_version_task import track_page_version
 from plane.bgtasks.recent_visited_task import recent_visited_task
 from plane.bgtasks.copy_s3_object import copy_s3_objects_of_description_and_assets
 from plane.app.permissions import ProjectPagePermission
+from plane.sharing.models import ItemRestriction, ItemShare
+from plane.sharing.services import copy_restriction
+from plane.sharing.visibility import can_view_page, hidden_issue_ids, visible_pages
 
 
 def unarchive_archive_page_and_descendants(page_id, archived_at):
@@ -86,8 +89,7 @@ class PageViewSet(BaseViewSet):
             workspace__slug=self.kwargs.get("slug"),
         )
         return self.filter_queryset(
-            super()
-            .get_queryset()
+            visible_pages(super().get_queryset(), self.request.user)
             .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(
                 projects__project_projectmember__member=self.request.user,
@@ -127,6 +129,9 @@ class PageViewSet(BaseViewSet):
         )
 
     def create(self, request, slug, project_id):
+        parent = request.data.get("parent", None)
+        if parent and not can_view_page(request.user, parent):
+            return Response({"error": "Parent page not found"}, status=status.HTTP_400_BAD_REQUEST)
         serializer = PageSerializer(
             data=request.data,
             context={
@@ -165,7 +170,7 @@ class PageViewSet(BaseViewSet):
 
             parent = request.data.get("parent", None)
             if parent:
-                _ = Page.objects.get(
+                _ = visible_pages(Page.objects.all(), request.user).get(
                     pk=parent,
                     workspace__slug=slug,
                     projects__id=project_id,
@@ -228,8 +233,10 @@ class PageViewSet(BaseViewSet):
         if page is None:
             return Response({"error": "Page not found"}, status=status.HTTP_404_NOT_FOUND)
         else:
-            issue_ids = PageLog.objects.filter(page_id=page_id, entity_name="issue").values_list(
-                "entity_identifier", flat=True
+            issue_ids = (
+                PageLog.objects.filter(page_id=page_id, entity_name="issue")
+                .exclude(entity_identifier__in=hidden_issue_ids(request.user))
+                .values_list("entity_identifier", flat=True)
             )
             data = PageDetailSerializer(page).data
             data["issue_ids"] = issue_ids
@@ -420,7 +427,7 @@ class PageViewSet(BaseViewSet):
 
     def summary(self, request, slug, project_id):
         queryset = (
-            Page.objects.filter(workspace__slug=slug)
+            visible_pages(Page.objects.filter(workspace__slug=slug), request.user)
             .filter(
                 projects__project_projectmember__member=self.request.user,
                 projects__project_projectmember__is_active=True,
@@ -499,7 +506,7 @@ class PagesDescriptionViewSet(BaseViewSet):
     permission_classes = [ProjectPagePermission]
 
     def retrieve(self, request, slug, project_id, page_id):
-        page = Page.objects.get(
+        page = visible_pages(Page.objects.all(), request.user).get(
             Q(owned_by=self.request.user) | Q(access=0),
             pk=page_id,
             workspace__slug=slug,
@@ -519,7 +526,7 @@ class PagesDescriptionViewSet(BaseViewSet):
         return response
 
     def partial_update(self, request, slug, project_id, page_id):
-        page = Page.objects.get(
+        page = visible_pages(Page.objects.all(), request.user).get(
             Q(owned_by=self.request.user) | Q(access=0),
             pk=page_id,
             workspace__slug=slug,
@@ -592,6 +599,9 @@ class PageDuplicateEndpoint(BaseAPIView):
 
         # get all the project ids where page is present
         project_ids = ProjectPage.objects.filter(page_id=page_id).values_list("project_id", flat=True)
+        restriction = ItemRestriction.objects.filter(page_id=page_id).first()
+        shares = list(ItemShare.objects.filter(page_id=page_id))
+        original_owner_id = page.owned_by_id
 
         page.pk = None
         page.name = f"{page.name} (Copy)"
@@ -609,6 +619,10 @@ class PageDuplicateEndpoint(BaseAPIView):
                 created_by_id=page.created_by_id,
                 updated_by_id=page.updated_by_id,
             )
+
+        # A copy of a restricted page stays restricted to the same people.
+        if restriction is not None:
+            copy_restriction(page, restriction, shares, original_owner_id)
 
         page_transaction.delay(
             new_description_html=page.description_html,

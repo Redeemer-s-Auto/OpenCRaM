@@ -17,12 +17,15 @@ from plane.app.views.base import BaseAPIView
 from plane.db.models import Module, ModuleLink
 from plane.app.permissions import WorkspaceViewerPermission
 from plane.app.serializers.module import ModuleSerializer
+from plane.sharing.visibility import hidden_issue_ids
 
 
 class WorkspaceModulesEndpoint(BaseAPIView):
     permission_classes = [WorkspaceViewerPermission]
 
     def get(self, request, slug):
+        # Counts leave out work items hidden from this user.
+        hidden = hidden_issue_ids(request.user)
         modules = (
             Module.objects.filter(
                 workspace__slug=slug,
@@ -44,7 +47,7 @@ class WorkspaceModulesEndpoint(BaseAPIView):
             .annotate(
                 total_issues=Count(
                     "issue_module",
-                    filter=Q(
+                    filter=~Q(issue_module__issue_id__in=hidden) & Q(
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
                         issue_module__deleted_at__isnull=True,
@@ -55,7 +58,7 @@ class WorkspaceModulesEndpoint(BaseAPIView):
             .annotate(
                 completed_issues=Count(
                     "issue_module",
-                    filter=Q(
+                    filter=~Q(issue_module__issue_id__in=hidden) & Q(
                         issue_module__issue__state__group="completed",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -67,7 +70,7 @@ class WorkspaceModulesEndpoint(BaseAPIView):
             .annotate(
                 cancelled_issues=Count(
                     "issue_module",
-                    filter=Q(
+                    filter=~Q(issue_module__issue_id__in=hidden) & Q(
                         issue_module__issue__state__group="cancelled",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -79,7 +82,7 @@ class WorkspaceModulesEndpoint(BaseAPIView):
             .annotate(
                 started_issues=Count(
                     "issue_module",
-                    filter=Q(
+                    filter=~Q(issue_module__issue_id__in=hidden) & Q(
                         issue_module__issue__state__group="started",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -91,7 +94,7 @@ class WorkspaceModulesEndpoint(BaseAPIView):
             .annotate(
                 unstarted_issues=Count(
                     "issue_module",
-                    filter=Q(
+                    filter=~Q(issue_module__issue_id__in=hidden) & Q(
                         issue_module__issue__state__group="unstarted",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -103,7 +106,7 @@ class WorkspaceModulesEndpoint(BaseAPIView):
             .annotate(
                 backlog_issues=Count(
                     "issue_module",
-                    filter=Q(
+                    filter=~Q(issue_module__issue_id__in=hidden) & Q(
                         issue_module__issue__state__group="backlog",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,

@@ -23,6 +23,7 @@ from plane.db.models import ExporterHistory, Issue, IssueComment, IssueRelation,
 from plane.utils.exception_logger import log_exception
 from plane.utils.porters.exporter import DataExporter
 from plane.utils.porters.serializers.issue import IssueExportSerializer
+from plane.sharing.visibility import visible_issues
 
 
 def create_zip_file(files: List[tuple[str, str | bytes]]) -> io.BytesIO:
@@ -144,9 +145,14 @@ def issue_export_task(
         exporter_instance.status = "processing"
         exporter_instance.save(update_fields=["status"])
 
+        # The export is for the user who started it: items hidden from them are left
+        # out, and so are hidden parents and related items named by visible ones.
+        user = exporter_instance.initiated_by
+
         # Build base queryset for issues
         workspace_issues = (
-            Issue.objects.filter(
+            visible_issues(Issue.objects.all(), user)
+            .filter(
                 workspace__id=workspace_id,
                 project_id__in=project_ids,
                 project__project_projectmember__member=exporter_instance.initiated_by_id,
@@ -176,15 +182,19 @@ def issue_export_task(
                 ),
                 Prefetch(
                     "issue_relation",
-                    queryset=IssueRelation.objects.select_related("related_issue", "related_issue__project"),
+                    queryset=visible_issues(IssueRelation.objects.all(), user, field="related_issue_id").select_related(
+                        "related_issue", "related_issue__project"
+                    ),
                 ),
                 Prefetch(
                     "issue_related",
-                    queryset=IssueRelation.objects.select_related("issue", "issue__project"),
+                    queryset=visible_issues(IssueRelation.objects.all(), user, field="issue_id").select_related(
+                        "issue", "issue__project"
+                    ),
                 ),
                 Prefetch(
                     "parent",
-                    queryset=Issue.objects.select_related("type", "project"),
+                    queryset=visible_issues(Issue.objects.all(), user).select_related("type", "project"),
                 ),
             )
         )

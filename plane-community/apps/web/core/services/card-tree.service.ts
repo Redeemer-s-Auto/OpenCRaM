@@ -42,8 +42,10 @@ export class CardTreeService extends APIService {
   }
 
   /** Top cards of a project (no parent, or a parent in another project / out of sight). */
-  async projectRoots(workspaceSlug: string, projectId: string, offset = 0): Promise<TCardPage> {
-    return this.get(`/api/workspaces/${workspaceSlug}/card-tree/`, { params: { project_id: projectId, offset } })
+  async projectRoots(workspaceSlug: string, projectId: string, offset = 0, limit?: number): Promise<TCardPage> {
+    return this.get(`/api/workspaces/${workspaceSlug}/card-tree/`, {
+      params: { project_id: projectId, offset, limit },
+    })
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;
@@ -51,8 +53,8 @@ export class CardTreeService extends APIService {
   }
 
   /** Visible sub-cards of a card, from any project. */
-  async children(workspaceSlug: string, parentId: string, offset = 0): Promise<TCardPage> {
-    return this.get(`/api/workspaces/${workspaceSlug}/card-tree/`, { params: { parent_id: parentId, offset } })
+  async children(workspaceSlug: string, parentId: string, offset = 0, limit?: number): Promise<TCardPage> {
+    return this.get(`/api/workspaces/${workspaceSlug}/card-tree/`, { params: { parent_id: parentId, offset, limit } })
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;
@@ -69,8 +71,8 @@ export class CardTreeService extends APIService {
   }
 
   /** Every visible card of a project, newest edit first (page list layout). */
-  async pageList(workspaceSlug: string, projectId: string, offset = 0): Promise<TCardPage> {
-    return this.get(`/api/workspaces/${workspaceSlug}/projects/${projectId}/page-list/`, { params: { offset } })
+  async pageList(workspaceSlug: string, projectId: string, offset = 0, limit?: number): Promise<TCardPage> {
+    return this.get(`/api/workspaces/${workspaceSlug}/projects/${projectId}/page-list/`, { params: { offset, limit } })
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

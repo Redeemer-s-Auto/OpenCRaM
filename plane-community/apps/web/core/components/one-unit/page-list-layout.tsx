@@ -113,10 +113,10 @@ export const PageListLayout = observer(function PageListLayout() {
   const [open, setOpen] = useState<Set<string>>(new Set());
 
   const load = useCallback(
-    (offset: number) => {
+    (offset: number, limit?: number) => {
       if (!workspaceSlug || !projectId) return;
       cardTreeService
-        .pageList(workspaceSlug, projectId, offset)
+        .pageList(workspaceSlug, projectId, offset, limit)
         .then((page) => {
           setCards((previous) => (offset === 0 ? page.results : [...(previous ?? []), ...page.results]));
           setNextOffset(page.next_offset);
@@ -129,11 +129,16 @@ export const PageListLayout = observer(function PageListLayout() {
 
   useEffect(() => {
     load(0);
-    // pick up cards made or edited elsewhere when the person comes back to the tab
-    const onFocus = () => load(0);
+  }, [load]);
+
+  // Pick up cards made or edited elsewhere when the person comes back to the tab,
+  // keeping everything already loaded with "Load more" (server caps one page at 1000).
+  const shown = cards?.length ?? 0;
+  useEffect(() => {
+    const onFocus = () => load(0, Math.min(Math.max(shown, 500), 1000));
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [load]);
+  }, [load, shown]);
 
   const tree = useMemo(() => nestCards(cards ?? []), [cards]);
 

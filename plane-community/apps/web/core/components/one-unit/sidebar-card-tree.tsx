@@ -12,10 +12,11 @@ import { cn } from "@plane/utils";
 import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
 import type { TCardNode, TCardPage } from "@/services/card-tree.service";
 import { cardTreeService } from "@/services/card-tree.service";
+import { CARD_TREE_PAGE_SIZE } from "./flags";
 
 const MAX_DEPTH = 8;
 
-type TLoader = (offset: number) => Promise<TCardPage>;
+type TLoader = (offset: number, limit?: number) => Promise<TCardPage>;
 
 /** Loads one level of the tree lazily, with "Show more" paging. */
 function useLevel(load: TLoader, enabled: boolean) {
@@ -25,9 +26,9 @@ function useLevel(load: TLoader, enabled: boolean) {
   const [busy, setBusy] = useState(false);
 
   const fetchPage = useCallback(
-    (offset: number) => {
+    (offset: number, limit?: number) => {
       setBusy(true);
-      load(offset)
+      load(offset, limit)
         .then((page) => {
           setRows((previous) => (offset === 0 ? page.results : [...(previous ?? []), ...page.results]));
           setNextOffset(page.next_offset);
@@ -42,6 +43,15 @@ function useLevel(load: TLoader, enabled: boolean) {
   useEffect(() => {
     if (enabled && rows === undefined) fetchPage(0);
   }, [enabled, rows, fetchPage]);
+
+  // Coming back to the tab reloads what is already shown (names, new and moved cards).
+  const shown = rows?.length ?? 0;
+  useEffect(() => {
+    if (!enabled) return;
+    const onFocus = () => fetchPage(0, Math.min(Math.max(shown, CARD_TREE_PAGE_SIZE), 200));
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [enabled, shown, fetchPage]);
 
   return { rows, nextOffset, failed, busy, more: () => nextOffset !== null && fetchPage(nextOffset) };
 }
@@ -80,7 +90,7 @@ function TreeNode(props: { workspaceSlug: string; node: TCardNode; depth: number
   const href = `/${workspaceSlug}/browse/${identifier}/`;
   const canOpen = node.child_count > 0 && depth < MAX_DEPTH;
   const loadChildren = useCallback(
-    (offset: number) => cardTreeService.children(workspaceSlug, node.id, offset),
+    (offset: number, limit?: number) => cardTreeService.children(workspaceSlug, node.id, offset, limit),
     [workspaceSlug, node.id]
   );
 
@@ -117,7 +127,7 @@ export function SidebarCardTree(props: { workspaceSlug: string; projectId: strin
   const { workspaceSlug, projectId } = props;
   const [open, setOpen] = useState(true);
   const loadRoots = useCallback(
-    (offset: number) => cardTreeService.projectRoots(workspaceSlug, projectId, offset),
+    (offset: number, limit?: number) => cardTreeService.projectRoots(workspaceSlug, projectId, offset, limit),
     [workspaceSlug, projectId]
   );
   return (

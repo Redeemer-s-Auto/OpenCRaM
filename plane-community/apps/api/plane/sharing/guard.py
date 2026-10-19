@@ -25,7 +25,7 @@ PAGE_PATH = re.compile(rf"/pages/({UUID})(?:/|$)")
 # Writes on these sub-resources need only "Can comment".
 COMMENT_PATH = re.compile(r"/(?:comments|reactions|comment-reactions|votes)(?:/|$)")
 # Writes on these sub-resources need only "Can view" (they change nothing others see).
-VIEW_WRITE_PATH = re.compile(r"/(?:subscribe|subscribers|mark-read|favorite|recent-visit)(?:/|$)")
+VIEW_WRITE_PATH = re.compile(r"/(?:subscribe|subscribers|mark-read|favorite|favorite-pages|recent-visit)(?:/|$)")
 
 ISSUE_KWARGS = ("issue_id", "work_item_id")
 PAGE_KWARGS = ("page_id",)

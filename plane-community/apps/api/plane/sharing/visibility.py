@@ -98,6 +98,14 @@ def visible_pages(queryset: QuerySet, user, field="pk", min_level=AccessLevel.VI
     return queryset.exclude(**{f"{field}__in": hidden_page_ids(user, min_level)})
 
 
+def visible_activity(queryset, user):
+    """Drop activity on hidden work items and rows that point at one (parent, relations)."""
+    hidden = hidden_issue_ids(user)
+    return visible_issues(queryset, user, field="issue_id").exclude(
+        Q(old_identifier__in=hidden) | Q(new_identifier__in=hidden)
+    )
+
+
 def restricted_issue_ids():
     return ItemRestriction.objects.filter(issue__isnull=False).values("issue_id")
 

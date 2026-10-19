@@ -54,7 +54,8 @@ from plane.bgtasks.page_version_task import track_page_version
 from plane.bgtasks.recent_visited_task import recent_visited_task
 from plane.bgtasks.copy_s3_object import copy_s3_objects_of_description_and_assets
 from plane.app.permissions import ProjectPagePermission
-from plane.sharing.models import AccessLevel, ItemRestriction, ItemShare, ShareTarget
+from plane.sharing.models import ItemRestriction, ItemShare
+from plane.sharing.services import copy_restriction
 from plane.sharing.visibility import can_view_page, hidden_issue_ids, visible_pages
 
 
@@ -72,36 +73,6 @@ def unarchive_archive_page_and_descendants(page_id, archived_at):
     # Execute the SQL query
     with connection.cursor() as cursor:
         cursor.execute(sql, [page_id, archived_at])
-
-
-def copy_restriction(page, restriction, shares, original_owner_id):
-    """Give a duplicated page the restriction and share list of its source."""
-    ItemRestriction.objects.create(workspace_id=restriction.workspace_id, page=page)
-    copied = [
-        ItemShare(
-            workspace_id=share.workspace_id,
-            page=page,
-            target_type=share.target_type,
-            member_id=share.member_id,
-            project_id=share.project_id,
-            group_id=share.group_id,
-            level=share.level,
-        )
-        for share in shares
-    ]
-    # The source page's owner keeps full access to the copy.
-    if original_owner_id != page.owned_by_id:
-        copied = [s for s in copied if not (s.target_type == ShareTarget.MEMBER and s.member_id == original_owner_id)]
-        copied.append(
-            ItemShare(
-                workspace_id=restriction.workspace_id,
-                page=page,
-                target_type=ShareTarget.MEMBER,
-                member_id=original_owner_id,
-                level=AccessLevel.EDIT,
-            )
-        )
-    ItemShare.objects.bulk_create(copied)
 
 
 class PageViewSet(BaseViewSet):

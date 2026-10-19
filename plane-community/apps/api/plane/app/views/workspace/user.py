@@ -63,15 +63,8 @@ from plane.utils.order_queryset import ACTIVITY_ORDER_BY_ALLOWLIST, order_issue_
 from plane.utils.paginator import GroupedOffsetPaginator, SubGroupedOffsetPaginator
 from plane.utils.filters import ComplexFilterBackend
 from plane.utils.filters import IssueFilterSet
-from plane.sharing.visibility import hidden_issue_ids, visible_issues
-
-
-def visible_activity(queryset, user):
-    """Drop activity on hidden work items and rows that point at one (parent, relations)."""
-    hidden = hidden_issue_ids(user)
-    return visible_issues(queryset, user, field="issue_id").exclude(
-        Q(old_identifier__in=hidden) | Q(new_identifier__in=hidden)
-    )
+from plane.app.serializers.issue import hide_issue_refs
+from plane.sharing.visibility import hidden_issue_ids, visible_activity, visible_issues
 
 
 class UserLastProjectWithWorkspaceEndpoint(BaseAPIView):
@@ -196,9 +189,9 @@ class WorkspaceUserProfileIssuesEndpoint(BaseAPIView):
                         order_by=order_by_param,
                         queryset=issue_queryset,
                         total_count_queryset=total_issue_queryset,
-                        on_results=lambda issues: issue_on_results(
+                        on_results=lambda issues: hide_issue_refs(issue_on_results(
                             group_by=group_by, issues=issues, sub_group_by=sub_group_by
-                        ),
+                        ), request.user),
                         paginator_cls=SubGroupedOffsetPaginator,
                         group_by_fields=issue_group_values(
                             field=group_by,
@@ -230,9 +223,9 @@ class WorkspaceUserProfileIssuesEndpoint(BaseAPIView):
                     order_by=order_by_param,
                     queryset=issue_queryset,
                     total_count_queryset=total_issue_queryset,
-                    on_results=lambda issues: issue_on_results(
+                    on_results=lambda issues: hide_issue_refs(issue_on_results(
                         group_by=group_by, issues=issues, sub_group_by=sub_group_by
-                    ),
+                    ), request.user),
                     paginator_cls=GroupedOffsetPaginator,
                     group_by_fields=issue_group_values(
                         field=group_by,
@@ -256,7 +249,7 @@ class WorkspaceUserProfileIssuesEndpoint(BaseAPIView):
                 request=request,
                 queryset=issue_queryset,
                 total_count_queryset=total_issue_queryset,
-                on_results=lambda issues: issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by),
+                on_results=lambda issues: hide_issue_refs(issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by), request.user),
             )
 
 

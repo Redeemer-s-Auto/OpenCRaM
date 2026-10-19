@@ -47,6 +47,7 @@ from .. import BaseViewSet
 from plane.db.models import UserFavorite
 from plane.utils.filters import ComplexFilterBackend
 from plane.utils.filters import IssueFilterSet
+from plane.app.serializers.issue import hide_issue_refs
 from plane.sharing.visibility import hidden_issue_ids, visible_issues
 
 
@@ -258,7 +259,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
             order_by=order_by_param,
             request=request,
             queryset=issue_queryset,
-            on_results=lambda issues: ViewIssueListSerializer(issues, many=True).data,
+            on_results=lambda issues: hide_issue_refs(ViewIssueListSerializer(issues, many=True).data, request.user),
             total_count_queryset=total_issue_count_queryset,
         )
 

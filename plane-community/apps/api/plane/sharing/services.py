@@ -120,3 +120,33 @@ def write_sharing(workspace, data, issue=None, page=None):
         for target_type, level, fields in shares
     )
     return read_sharing(issue, page)
+
+
+def copy_restriction(page, restriction, shares, original_owner_id):
+    """Give a duplicated page the restriction and share list of its source."""
+    ItemRestriction.objects.create(workspace_id=restriction.workspace_id, page=page)
+    copied = [
+        ItemShare(
+            workspace_id=share.workspace_id,
+            page=page,
+            target_type=share.target_type,
+            member_id=share.member_id,
+            project_id=share.project_id,
+            group_id=share.group_id,
+            level=share.level,
+        )
+        for share in shares
+    ]
+    # The source page's owner keeps full access to the copy.
+    if original_owner_id != page.owned_by_id:
+        copied = [s for s in copied if not (s.target_type == ShareTarget.MEMBER and s.member_id == original_owner_id)]
+        copied.append(
+            ItemShare(
+                workspace_id=restriction.workspace_id,
+                page=page,
+                target_type=ShareTarget.MEMBER,
+                member_id=original_owner_id,
+                level=AccessLevel.EDIT,
+            )
+        )
+    ItemShare.objects.bulk_create(copied)

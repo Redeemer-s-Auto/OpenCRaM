@@ -41,6 +41,7 @@ from plane.utils.filters import IssueFilterSet
 from .. import BaseViewSet
 from plane.utils.host import base_host
 from plane.sharing.models import AccessLevel
+from plane.app.serializers.issue import hide_issue_refs
 from plane.sharing.visibility import hidden_issue_ids, visible_issues
 
 
@@ -142,9 +143,9 @@ class ModuleIssueViewSet(BaseViewSet):
                         order_by=order_by_param,
                         queryset=issue_queryset,
                         total_count_queryset=total_issue_queryset,
-                        on_results=lambda issues: issue_on_results(
+                        on_results=lambda issues: hide_issue_refs(issue_on_results(
                             group_by=group_by, issues=issues, sub_group_by=sub_group_by
-                        ),
+                        ), request.user),
                         paginator_cls=SubGroupedOffsetPaginator,
                         group_by_fields=issue_group_values(
                             field=group_by,
@@ -179,9 +180,9 @@ class ModuleIssueViewSet(BaseViewSet):
                     order_by=order_by_param,
                     queryset=issue_queryset,
                     total_count_queryset=total_issue_queryset,
-                    on_results=lambda issues: issue_on_results(
+                    on_results=lambda issues: hide_issue_refs(issue_on_results(
                         group_by=group_by, issues=issues, sub_group_by=sub_group_by
-                    ),
+                    ), request.user),
                     paginator_cls=GroupedOffsetPaginator,
                     group_by_fields=issue_group_values(
                         field=group_by,
@@ -207,7 +208,7 @@ class ModuleIssueViewSet(BaseViewSet):
                 request=request,
                 queryset=issue_queryset,
                 total_count_queryset=total_issue_queryset,
-                on_results=lambda issues: issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by),
+                on_results=lambda issues: hide_issue_refs(issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by), request.user),
             )
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])

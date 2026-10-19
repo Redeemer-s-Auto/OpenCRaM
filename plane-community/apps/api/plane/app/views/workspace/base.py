@@ -51,7 +51,7 @@ from plane.utils.url import contains_url
 from plane.utils.analytics_events import WORKSPACE_CREATED, WORKSPACE_DELETED
 from plane.utils.csv_utils import sanitize_csv_row
 from plane.sharing.visibility import visible_issues
-from plane.app.views.workspace.user import visible_activity
+from plane.sharing.visibility import visible_activity
 
 
 class WorkSpaceViewSet(BaseViewSet):

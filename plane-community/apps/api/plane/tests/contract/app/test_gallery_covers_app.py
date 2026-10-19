@@ -60,7 +60,10 @@ class TestGalleryCovers:
         assert response.status_code == 200
         rows = {r["name"]: r for r in response.data["results"]}
         # Body images win over attachments.
-        assert rows["both"]["cover_image"] == f"/api/assets/v2/workspaces/{workspace.slug}/projects/{project.id}/{body.id}/"
+        assert (
+            rows["both"]["cover_image"]
+            == f"/api/assets/v2/workspaces/{workspace.slug}/projects/{project.id}/{body.id}/"
+        )
         assert str(attach.id) not in rows["both"]["cover_image"]
         assert rows["attachment"]["cover_image"].endswith(f"/attachments/{a2.id}/")
         assert rows["pdf"]["cover_image"] is None

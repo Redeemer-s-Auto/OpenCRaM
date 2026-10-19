@@ -29,6 +29,7 @@ import {
   getTabIndex,
 } from "@plane/utils";
 // components
+import { TemplatePicker } from "@/components/issue-templates/template-picker";
 import {
   IssueDefaultProperties,
   IssueDescriptionEditor,
@@ -368,6 +369,14 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
                     disabled={!!data?.id || !!data?.sourceIssueId || isProjectSelectionDisabled}
                     handleFormChange={handleFormChange}
                   />
+                  {!data?.id && !data?.sourceIssueId && !isDraft && workspaceSlug && projectId && (
+                    <TemplatePicker
+                      workspaceSlug={workspaceSlug.toString()}
+                      projectId={projectId}
+                      currentTitle={watch("name")}
+                      onCreated={onClose}
+                    />
+                  )}
                 </div>
               </div>
               {watch("parent_id") && selectedParentIssue && (

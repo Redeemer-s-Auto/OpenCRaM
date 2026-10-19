@@ -30,6 +30,7 @@ export type TProjectSettingsTabs =
   | "states"
   | "labels"
   | "custom_fields"
+  | "templates"
   | "estimates"
   | "automations";
 export type TProjectSettingsItem = {

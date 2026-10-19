@@ -39,6 +39,7 @@ const LAYOUTS = [
   EIssueLayoutTypes.KANBAN,
   EIssueLayoutTypes.CALENDAR,
   EIssueLayoutTypes.SPREADSHEET,
+  EIssueLayoutTypes.GALLERY,
   EIssueLayoutTypes.GANTT,
 ];
 

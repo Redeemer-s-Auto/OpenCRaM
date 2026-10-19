@@ -19,6 +19,7 @@ export enum EIssueLayoutTypes {
   CALENDAR = "calendar",
   GANTT = "gantt_chart",
   SPREADSHEET = "spreadsheet",
+  GALLERY = "gallery",
 }
 
 export enum EIssueServiceType {
@@ -81,6 +82,8 @@ export type TBaseIssue = {
 
   /** Custom field values, keyed by field id. Only the project's live fields. */
   custom_fields?: TCustomFieldValues;
+  /** Gallery cover: path of the first image in the body, else the first image attachment. */
+  cover_image?: string | null;
 };
 
 type IssueRelation = {

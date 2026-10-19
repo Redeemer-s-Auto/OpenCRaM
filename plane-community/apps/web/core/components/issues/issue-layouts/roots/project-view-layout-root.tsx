@@ -23,6 +23,7 @@ import { ProjectViewCalendarLayout } from "../calendar/roots/project-view-root";
 import { BaseGanttRoot } from "../gantt";
 import { ProjectViewKanBanLayout } from "../kanban/roots/project-view-root";
 import { ProjectViewListLayout } from "../list/roots/project-view-root";
+import { ProjectViewGalleryLayout } from "../gallery/roots/project-view-root";
 import { ProjectViewSpreadsheetLayout } from "../spreadsheet/roots/project-view-root";
 
 function ProjectViewIssueLayout(props: { activeLayout: EIssueLayoutTypes | undefined; viewId: string }) {
@@ -37,6 +38,8 @@ function ProjectViewIssueLayout(props: { activeLayout: EIssueLayoutTypes | undef
       return <BaseGanttRoot viewId={props.viewId} />;
     case EIssueLayoutTypes.SPREADSHEET:
       return <ProjectViewSpreadsheetLayout />;
+    case EIssueLayoutTypes.GALLERY:
+      return <ProjectViewGalleryLayout />;
     default:
       return null;
   }

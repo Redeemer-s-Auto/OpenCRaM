@@ -28,6 +28,7 @@ function ActiveLoader(props: { layout: EIssueLayoutTypes }) {
     case EIssueLayoutTypes.KANBAN:
       return <KanbanLayoutLoader />;
     case EIssueLayoutTypes.SPREADSHEET:
+    case EIssueLayoutTypes.GALLERY:
       return <SpreadsheetLayoutLoader />;
     case EIssueLayoutTypes.CALENDAR:
       return <CalendarLayoutLoader />;

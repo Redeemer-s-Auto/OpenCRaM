@@ -27,6 +27,7 @@ import { CycleCalendarLayout } from "../calendar/roots/cycle-root";
 import { BaseGanttRoot } from "../gantt";
 import { CycleKanBanLayout } from "../kanban/roots/cycle-root";
 import { CycleListLayout } from "../list/roots/cycle-root";
+import { CycleGalleryLayout } from "../gallery/roots/cycle-root";
 import { CycleSpreadsheetLayout } from "../spreadsheet/roots/cycle-root";
 
 function CycleIssueLayout(props: {
@@ -45,6 +46,8 @@ function CycleIssueLayout(props: {
       return <BaseGanttRoot viewId={props.cycleId} isCompletedCycle={props.isCompletedCycle} />;
     case EIssueLayoutTypes.SPREADSHEET:
       return <CycleSpreadsheetLayout />;
+    case EIssueLayoutTypes.GALLERY:
+      return <CycleGalleryLayout />;
     default:
       return null;
   }

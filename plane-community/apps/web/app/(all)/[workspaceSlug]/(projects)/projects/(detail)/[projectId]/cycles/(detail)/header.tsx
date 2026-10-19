@@ -192,6 +192,7 @@ export const CycleIssuesHeader = observer(function CycleIssuesHeader() {
                   EIssueLayoutTypes.KANBAN,
                   EIssueLayoutTypes.CALENDAR,
                   EIssueLayoutTypes.SPREADSHEET,
+                  EIssueLayoutTypes.GALLERY,
                   EIssueLayoutTypes.GANTT,
                 ]}
                 onChange={(layout) => handleLayoutChange(layout)}
@@ -205,6 +206,7 @@ export const CycleIssuesHeader = observer(function CycleIssuesHeader() {
                   EIssueLayoutTypes.KANBAN,
                   EIssueLayoutTypes.CALENDAR,
                   EIssueLayoutTypes.SPREADSHEET,
+                  EIssueLayoutTypes.GALLERY,
                   EIssueLayoutTypes.GANTT,
                 ]}
                 onChange={(layout) => handleLayoutChange(layout)}

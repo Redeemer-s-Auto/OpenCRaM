@@ -60,6 +60,12 @@ export const ISSUE_LAYOUT_MAP: TIssueLayoutMap = {
     i18n_title: "issue.layouts.title.gantt",
     i18n_label: "issue.layouts.gantt",
   },
+  // Keep last: some mobile headers index this list by position.
+  [EIssueLayoutTypes.GALLERY]: {
+    key: EIssueLayoutTypes.GALLERY,
+    i18n_title: "issue.layouts.title.gallery",
+    i18n_label: "issue.layouts.gallery",
+  },
 };
 
 export const ISSUE_LAYOUTS: {

@@ -16,7 +16,8 @@ import { useAppRailPreferences } from "@/hooks/use-navigation-preferences";
 import { Tooltip } from "@plane/propel/tooltip";
 import { AppSidebarItem } from "@/components/sidebar/sidebar-item";
 import { InboxIcon } from "@plane/propel/icons";
-import { GardenWorkIcon, isGardenWork } from "@/components/common/garden-work-icon";
+import { BrandMark } from "@/components/common/brand-mark";
+import { GardenWorkIcon, showGardenIcons } from "@/components/common/garden-work-icon";
 import { gardenOrgName } from "@/lib/garden-config";
 import useSWR from "swr";
 import { useWorkspaceNotifications } from "@/hooks/store/notifications";
@@ -55,7 +56,8 @@ export const TopNavigationRoot = observer(function TopNavigationRoot() {
     >
       {/* Workspace Menu */}
       <div className="flex flex-1 items-center gap-3 shrink-0">
-        {isGardenWork ? <span className="garden-work-brand"><GardenWorkIcon className="size-5" /><span>{gardenOrgName}<span className="garden-work-brand-subtitle">WORKSPACE</span></span></span> : null}
+        <BrandMark />
+        {showGardenIcons ? <span className="garden-work-brand"><GardenWorkIcon className="size-5" /><span>{gardenOrgName}<span className="garden-work-brand-subtitle">WORKSPACE</span></span></span> : null}
         <WorkspaceMenuRoot variant="top-navigation" />
       </div>
       {/* Power K Search */}
@@ -71,7 +73,7 @@ export const TopNavigationRoot = observer(function TopNavigationRoot() {
               href: `/${workspaceSlug?.toString()}/notifications/`,
               icon: (
                 <div className="relative">
-                  {isGardenWork ? <GardenWorkIcon name="inbox" className="size-5" /> : <InboxIcon className="size-5" />}
+                  {showGardenIcons ? <GardenWorkIcon name="inbox" className="size-5" /> : <InboxIcon className="size-5" />}
                   {totalNotifications > 0 && (
                     <span className="absolute top-0 right-0 size-2 rounded-full bg-danger-primary" />
                   )}

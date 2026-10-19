@@ -21,6 +21,7 @@ import { useCommandPalette } from "@/hooks/store/use-command-palette";
 import { useProject } from "@/hooks/store/use-project";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
+import { brand } from "@/lib/brand-config";
 
 import { gardenAccessUrl, gardenAdminConfigured, gardenMode } from "@/lib/garden-config";
 
@@ -170,8 +171,8 @@ export const NoProjectsEmptyState = observer(function NoProjectsEmptyState() {
               >
                 <span className="my-auto text-24">{item.icon}</span>
               </div>
-              <h3 className="mb-2 text-13 font-medium text-primary">{t(item.title)}</h3>
-              <p className="mb-2 text-11 text-tertiary">{t(item.description)}</p>
+              <h3 className="mb-2 text-13 font-medium text-primary">{t(item.title, { appName: brand.productName })}</h3>
+              <p className="mb-2 text-11 text-tertiary">{t(item.description, { appName: brand.productName })}</p>
               {isStateComplete ? (
                 <div className="flex w-fit items-center gap-2 rounded-full bg-[#17a34a] p-1">
                   <CheckIcon className="size-3 text-accent-primary text-on-color" />

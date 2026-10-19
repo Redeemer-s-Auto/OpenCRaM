@@ -25,6 +25,7 @@ import type { Route } from "./+types/root";
 // components
 import { LogoSpinner } from "@/components/common/logo-spinner";
 // lib
+import { brand } from "@/lib/brand-config";
 import { gardenAdminOrigin, gardenAppName, gardenMode, gardenOrgName } from "@/lib/garden-config";
 import { isStaleAssetError, recoverFromStaleAsset } from "@/lib/stale-asset-error";
 // local
@@ -86,7 +87,17 @@ function GardenEmbeddedNavigationBridge() {
 }
 
 export const links: LinksFunction = () => {
-  const iconLinks = gardenMode
+  // Hub theme: the deployment's own icon (VITE_BRAND_ICON_URL / VITE_BRAND_LOGO_URL); no Garden manifest.
+  const hubIconLinks = brand.iconUrl
+    ? [
+        { rel: "icon", href: brand.iconUrl },
+        { rel: "shortcut icon", href: brand.iconUrl },
+        { rel: "apple-touch-icon", href: brand.iconUrl },
+      ]
+    : [];
+  const iconLinks = brand.isHub
+    ? hubIconLinks
+    : gardenMode
     ? [
         { rel: "icon", type: "image/svg+xml", href: gardenMark },
         { rel: "shortcut icon", href: gardenMark },
@@ -113,11 +124,16 @@ export function Layout({ children }: { children: ReactNode }) {
   const isSessionRecorderEnabled = parseInt(process.env.VITE_ENABLE_SESSION_RECORDER || "0");
 
   return (
-    <html lang="en" suppressHydrationWarning data-garden-work={gardenMode ? "true" : undefined}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      data-garden-work={gardenMode ? "true" : undefined}
+      data-brand-theme={brand.theme}
+    >
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content={gardenMode ? "#40562E" : "#fff"} />
+        <meta name="theme-color" content={brand.isHub ? "#ffffff" : gardenMode ? "#40562E" : "#fff"} />
         <meta name="application-name" content={gardenMode ? gardenAppName : "Plane"} />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -130,10 +146,11 @@ export function Layout({ children }: { children: ReactNode }) {
       <body suppressHydrationWarning>
         <div id="context-menu-portal" />
         <div id="editor-portal" />
+        {/* The Garden look is light only. The hub theme has light and dark, like Plane. */}
         <ThemeProvider
-          themes={gardenMode ? ["light"] : ["light", "dark", "light-contrast", "dark-contrast", "custom"]}
-          defaultTheme={gardenMode ? "light" : "system"}
-          forcedTheme={gardenMode ? "light" : undefined}
+          themes={gardenMode && !brand.isHub ? ["light"] : ["light", "dark", "light-contrast", "dark-contrast", "custom"]}
+          defaultTheme={gardenMode && !brand.isHub ? "light" : "system"}
+          forcedTheme={gardenMode && !brand.isHub ? "light" : undefined}
         >
           {children}
         </ThemeProvider>
@@ -163,7 +180,11 @@ export const meta: Route.MetaFunction = () => {
   if (gardenMode) {
     if (gardenWorkUrl) metadata.push({ property: "og:url", content: gardenWorkUrl });
     metadata.push(
-      { property: "og:image", content: gardenMark },
+      ...(brand.isHub
+        ? brand.logoUrl
+          ? [{ property: "og:image", content: brand.logoUrl }]
+          : []
+        : [{ property: "og:image", content: gardenMark }]),
       { property: "og:image:alt", content: gardenAppName },
       { name: "keywords", content: `${gardenOrgName}, staff operations, projects, tasks, planning, work management` },
     );

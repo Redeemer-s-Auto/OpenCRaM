@@ -197,6 +197,21 @@ Application-only rollback:
 
 Never solve an application regression by deleting the PostgreSQL or uploads volumes.
 
+## Brand theme (web build)
+
+The web app's look is chosen when the `web` image is built (`apps/web/core/lib/brand-config.ts`):
+
+| Build arg             | Default  | Meaning                                                                                                                                                                     |
+| --------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_BRAND_THEME`    | `garden` | `garden` keeps The Garden look. `hub` is a neutral look with a red accent, Inter, light and dark mode (`packages/tailwind-config/hub.css`). Any other value means `garden`. |
+| `VITE_BRAND_NAME`     | empty    | Name beside the logo in the top bar. Hub theme only.                                                                                                                        |
+| `VITE_BRAND_LOGO_URL` | empty    | Logo image (`https://...` or a same-site `/path`). Hub theme only. Logos are deployment assets: serve them from the deployment, do not commit them.                         |
+| `VITE_BRAND_ICON_URL` | logo URL | Browser-tab icon. Hub theme only.                                                                                                                                           |
+
+`docker-compose.notes.yml` passes them from `NOTES_BRAND_THEME`, `NOTES_BRAND_NAME`, `NOTES_BRAND_LOGO_URL` and `NOTES_BRAND_ICON_URL`. A Garden build ignores the name, logo and icon values. Change them, then rebuild `web`.
+
+Use a single-colour dark logo on a transparent background: in dark mode the hub theme shows it inverted (white).
+
 ## Manual browser release QA
 
 Before declaring a deployment production-ready, verify at minimum:

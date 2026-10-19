@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./variables.css";
 @import "./garden.css";
+@import "./hub.css";
 @import "./animations.css";
 @source "../**/*.{ts,tsx}";
 

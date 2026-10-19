@@ -12,7 +12,8 @@ import { Button, getButtonStyling } from "@plane/propel/button";
 import { PlaneLogo } from "@plane/propel/icons";
 import type { IWorkspace } from "@plane/types";
 import WorkspaceCreationDisabled from "@/app/assets/workspace/workspace-creation-disabled.png?url";
-import gardenMark from "@/app/assets/garden-mark.svg?url";
+import { AppMark } from "@/components/common/app-mark";
+import { brand } from "@/lib/brand-config";
 import { CreateWorkspaceForm } from "@/components/workspace/create-workspace-form";
 import { useUser, useUserProfile } from "@/hooks/store/user";
 import { useInstance } from "@/hooks/store/use-instance";
@@ -58,8 +59,8 @@ const CreateWorkspacePage = observer(function CreateWorkspacePage() {
             className="absolute top-1/2 left-5 grid -translate-y-1/2 place-items-center px-3 sm:top-12 sm:left-1/2 sm:-translate-x-[15px] sm:translate-y-0 sm:px-0 sm:py-5 md:left-1/3"
             href="/"
           >
-            {gardenMode ? (
-              <img src={gardenMark} className="h-9 w-9 object-contain" alt={gardenAppName} />
+            {gardenMode || brand.isHub ? (
+              <AppMark gardenClassName="h-9 w-9" hubClassName="h-9" />
             ) : (
               <PlaneLogo className="h-9 w-auto text-primary" />
             )}
@@ -77,7 +78,9 @@ const CreateWorkspacePage = observer(function CreateWorkspacePage() {
                 alt="Workspace creation disabled"
               />
               <div className="text-center text-16 font-medium">
-                {gardenMode ? `Workspaces are managed by ${gardenOrgName}` : t("workspace_creation.errors.creation_disabled.title")}
+                {gardenMode
+                  ? `Workspaces are managed by ${gardenOrgName}`
+                  : t("workspace_creation.errors.creation_disabled.title")}
               </div>
               <p className="text-center text-13 break-words text-tertiary">
                 {gardenMode

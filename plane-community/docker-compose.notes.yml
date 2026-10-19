@@ -21,11 +21,21 @@ services:
     environment:
       NOTES_API_HEALTH_PATH: ${NOTES_API_HEALTH_PATH:-/auth/firebase/health/}
 
+  # Look of the web app, baked in at build time (rebuild web after a change):
+  #   NOTES_BRAND_THEME     garden (default, The Garden look) or hub (neutral, red accent, light + dark)
+  #   NOTES_BRAND_NAME      name beside the logo in the top bar, e.g. "Shop Notes" (hub theme only)
+  #   NOTES_BRAND_LOGO_URL  logo image URL (hub theme only). Served by the deployment, never committed:
+  #                         a public URL, or a same-site path such as /brand/logo.png.
+  #   NOTES_BRAND_ICON_URL  browser-tab icon URL (hub theme only); defaults to the logo URL.
   web:
     build:
       args:
         VITE_GARDEN_AUTH_ENABLED: ${GARDEN_AUTH_ENABLED:-1}
         VITE_WEBSITE_URL: ${NOTES_WEBSITE_URL:-https://redeemersauto.com}
+        VITE_BRAND_THEME: ${NOTES_BRAND_THEME:-garden}
+        VITE_BRAND_NAME: ${NOTES_BRAND_NAME:-}
+        VITE_BRAND_LOGO_URL: ${NOTES_BRAND_LOGO_URL:-}
+        VITE_BRAND_ICON_URL: ${NOTES_BRAND_ICON_URL:-}
 
   proxy:
     environment:

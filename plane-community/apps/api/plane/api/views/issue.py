@@ -38,7 +38,9 @@ from drf_spectacular.utils import (
     OpenApiResponse,
     OpenApiExample,
     OpenApiRequest,
+    OpenApiParameter,
 )
+from drf_spectacular.types import OpenApiTypes
 
 # Module imports
 from plane.api.serializers import (
@@ -184,6 +186,15 @@ def user_has_issue_permission(user_id, project_id, issue=None, allowed_roles=Non
     return qs.exists()
 
 
+PARENT_FILTER_PARAMETER = OpenApiParameter(
+    name="parent",
+    type=OpenApiTypes.STR,
+    location=OpenApiParameter.QUERY,
+    description="Only sub-items of this work item id. Use 'null' for top-level work items only.",
+    required=False,
+)
+
+
 class WorkspaceIssueAPIEndpoint(BaseAPIView):
     """
     This viewset provides `retrieveByIssueId` on workspace level
@@ -305,6 +316,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             PER_PAGE_PARAMETER,
             EXTERNAL_ID_PARAMETER,
             EXTERNAL_SOURCE_PARAMETER,
+            PARENT_FILTER_PARAMETER,
             ORDER_BY_PARAMETER,
             FIELDS_PARAMETER,
             EXPAND_PARAMETER,
@@ -398,6 +410,23 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
         total_issue_queryset = visible_issues(
             Issue.issue_objects.filter(project_id=project_id, workspace__slug=slug), request.user
         )
+
+        # parent=<work item id>: only that card's sub-cards. parent=null: top-level cards only.
+        parent = request.GET.get("parent")
+        if parent:
+            if parent.lower() == "null":
+                issue_queryset = issue_queryset.filter(parent__isnull=True)
+                total_issue_queryset = total_issue_queryset.filter(parent__isnull=True)
+            else:
+                try:
+                    parent_id = uuid.UUID(parent)
+                except ValueError:
+                    return Response(
+                        {"parent": "Must be a work item id or 'null'"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                issue_queryset = issue_queryset.filter(parent_id=parent_id)
+                total_issue_queryset = total_issue_queryset.filter(parent_id=parent_id)
 
         # custom_field_filters={"customfield_<id>__<lookup>": value, ...} (all must match)
         custom_field_filters = request.GET.get("custom_field_filters")

@@ -20,6 +20,7 @@ import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
+import { PLANE_PAGES_HIDDEN } from "@/components/one-unit/flags";
 
 export type TNavigationItem = {
   name: string;
@@ -117,7 +118,7 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
         href: `/${workspaceSlug}/projects/${projectId}/pages`,
         icon: PageIcon,
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
-        shouldRender: project?.page_view ?? false,
+        shouldRender: !PLANE_PAGES_HIDDEN && (project?.page_view ?? false),
         sortOrder: 5,
       },
       {

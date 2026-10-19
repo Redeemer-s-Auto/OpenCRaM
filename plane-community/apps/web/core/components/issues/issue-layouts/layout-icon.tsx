@@ -13,6 +13,7 @@ import {
 } from "@plane/propel/icons";
 import { LayoutGrid } from "lucide-react";
 import type { ISvgIcons } from "@plane/propel/icons";
+import { FileText } from "lucide-react";
 import { EIssueLayoutTypes } from "@plane/types";
 
 export function IssueLayoutIcon({
@@ -28,6 +29,8 @@ export function IssueLayoutIcon({
   switch (layout) {
     case EIssueLayoutTypes.LIST:
       return <ListLayoutIcon {...iconProps} />;
+    case EIssueLayoutTypes.PAGE_LIST:
+      return <FileText width={size ?? 16} height={size ?? 16} className={props.className} />;
     case EIssueLayoutTypes.KANBAN:
       return <BoardLayoutIcon {...iconProps} />;
     case EIssueLayoutTypes.CALENDAR:

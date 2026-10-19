@@ -71,6 +71,7 @@
     "layouts": {
       "ordered_by_label": "This layout is ordered by",
       "list": "List",
+      "page_list": "Page list",
       "kanban": "Board",
       "calendar": "Calendar",
       "spreadsheet": "Table",
@@ -78,6 +79,7 @@
       "gallery": "Gallery",
       "title": {
         "list": "List Layout",
+        "page_list": "Page List Layout",
         "kanban": "Board Layout",
         "calendar": "Calendar Layout",
         "spreadsheet": "Table Layout",

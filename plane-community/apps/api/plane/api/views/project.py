@@ -233,7 +233,10 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
         try:
             workspace = Workspace.objects.get(slug=slug)
 
-            serializer = ProjectCreateSerializer(data={**request.data}, context={"workspace_id": workspace.id})
+            # Plane Pages are retired in this fork (cards are the pages): new projects start with Pages off.
+            serializer = ProjectCreateSerializer(
+                data={"page_view": False, **request.data}, context={"workspace_id": workspace.id}
+            )
 
             if serializer.is_valid():
                 with transaction.atomic():

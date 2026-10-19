@@ -29,7 +29,7 @@ from collections import defaultdict
 from plane.utils.host import base_host
 from plane.utils.order_queryset import order_issue_queryset
 from plane.sharing.models import AccessLevel
-from plane.sharing.visibility import visible_issues
+from plane.one_unit.reach import ancestor_ids, reachable_issues
 
 
 class SubIssuesEndpoint(BaseAPIView):
@@ -38,7 +38,7 @@ class SubIssuesEndpoint(BaseAPIView):
     @method_decorator(gzip_page)
     def get(self, request, slug, project_id, issue_id):
         sub_issues = (
-            visible_issues(Issue.issue_objects.filter(parent_id=issue_id, workspace__slug=slug), request.user)
+            reachable_issues(Issue.issue_objects.filter(parent_id=issue_id, workspace__slug=slug), request.user)
             .annotate(
                 cycle_id=Subquery(
                     CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
@@ -76,7 +76,7 @@ class SubIssuesEndpoint(BaseAPIView):
             .annotate(
                 sub_issues_count=Coalesce(
                     Subquery(
-                        visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
+                        reachable_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                         .order_by()
                         .values("parent")
                         .annotate(count=Count("id"))
@@ -216,8 +216,13 @@ class SubIssuesEndpoint(BaseAPIView):
         # Scope to workspace to prevent cross-tenant IDOR
         sub_issues = Issue.issue_objects.filter(id__in=sub_issue_ids, workspace__slug=slug)
         # Attaching changes the child, so items the user may not edit are skipped.
-        sub_issues = visible_issues(sub_issues, request.user, min_level=AccessLevel.EDIT)
-        sub_issue_ids = [str(sub_issue_id) for sub_issue_id in sub_issues.values_list("id", flat=True)]
+        # Cards may come from any project the user reaches (one-unit screens), never the parent
+        # itself or a card above it (that would make a loop).
+        sub_issues = reachable_issues(sub_issues, request.user, min_level=AccessLevel.EDIT).exclude(
+            pk__in=[issue_id, *ancestor_ids(issue_id)]
+        )
+        sub_issue_projects = {str(row[0]): str(row[1]) for row in sub_issues.values_list("id", "project_id")}
+        sub_issue_ids = list(sub_issue_projects)
 
         for sub_issue in sub_issues:
             sub_issue.parent = parent_issue
@@ -233,7 +238,7 @@ class SubIssuesEndpoint(BaseAPIView):
                 requested_data=json.dumps({"parent": str(issue_id)}),
                 actor_id=str(request.user.id),
                 issue_id=str(sub_issue_id),
-                project_id=str(project_id),
+                project_id=sub_issue_projects[sub_issue_id],
                 current_instance=json.dumps({"parent": str(sub_issue_id)}),
                 epoch=int(timezone.now().timestamp()),
                 notification=True,

@@ -20,6 +20,7 @@ from plane.app.serializers import IssueActivitySerializer, IssueCommentSerialize
 from plane.app.permissions import ProjectEntityPermission, allow_permission, ROLE
 from plane.db.models import IssueActivity, IssueComment, CommentReaction, IntakeIssue
 from plane.sharing.visibility import visible_issues
+from plane.one_unit.reach import unreachable_issue_ids
 
 
 class IssueActivityEndpoint(BaseAPIView):
@@ -48,6 +49,15 @@ class IssueActivityEndpoint(BaseAPIView):
         # Drop entries that name a hidden work item (parent and relation changes).
         issue_activities = visible_issues(issue_activities, request.user, field="old_identifier")
         issue_activities = visible_issues(issue_activities, request.user, field="new_identifier")
+        # A parent may sit in another project: drop parent changes that name a card the user cannot reach.
+        named = set()
+        for old_id, new_id in issue_activities.filter(field="parent").values_list("old_identifier", "new_identifier"):
+            named.update(str(i) for i in (old_id, new_id) if i)
+        unreachable = unreachable_issue_ids(request.user, named)
+        if unreachable:
+            issue_activities = issue_activities.exclude(
+                Q(field="parent") & (Q(old_identifier__in=unreachable) | Q(new_identifier__in=unreachable))
+            )
         issue_comments = (
             IssueComment.objects.filter(issue_id=issue_id)
             .filter(

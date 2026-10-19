@@ -264,7 +264,10 @@ class ProjectViewSet(BaseViewSet):
     def create(self, request, slug):
         workspace = Workspace.objects.get(slug=slug)
 
-        serializer = ProjectSerializer(data={**request.data}, context={"workspace_id": workspace.id})
+        # Plane Pages are retired in this fork (cards are the pages): new projects start with Pages off.
+        serializer = ProjectSerializer(
+            data={"page_view": False, **request.data}, context={"workspace_id": workspace.id}
+        )
         if serializer.is_valid():
             serializer.save()
 

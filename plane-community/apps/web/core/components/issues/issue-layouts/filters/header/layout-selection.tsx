@@ -5,7 +5,8 @@
  */
 
 // plane imports
-import { ISSUE_LAYOUTS } from "@plane/constants";
+// Every layout, the page list included (the plain layout list leaves it out for cycle/module screens).
+import { ISSUE_LAYOUT_MAP } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { Tooltip } from "@plane/propel/tooltip";
 import type { EIssueLayoutTypes } from "@plane/types";
@@ -33,7 +34,7 @@ export function LayoutSelection(props: Props) {
 
   return (
     <div className="flex items-center gap-1 rounded-md bg-layer-3 p-1">
-      {ISSUE_LAYOUTS.filter((l) => layouts.includes(l.key)).map((layout) => (
+      {Object.values(ISSUE_LAYOUT_MAP).filter((l) => layouts.includes(l.key)).map((layout) => (
         <Tooltip key={layout.key} tooltipContent={t(layout.i18n_title)} isMobile={isMobile}>
           <button
             type="button"

@@ -9,7 +9,7 @@ import type { TIssue } from "./issues/issue";
 import type { LOGICAL_OPERATOR, TSupportedOperators } from "./rich-filters";
 import type { CompleteOrEmpty } from "./utils";
 
-export type TIssueLayouts = "list" | "kanban" | "calendar" | "spreadsheet" | "gantt_chart" | "gallery";
+export type TIssueLayouts = "list" | "page_list" | "kanban" | "calendar" | "spreadsheet" | "gantt_chart" | "gallery";
 
 export type TIssueGroupByOptions =
   | "state"

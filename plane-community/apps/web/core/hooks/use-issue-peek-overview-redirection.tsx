@@ -10,6 +10,8 @@ import type { TIssue } from "@plane/types";
 import { EIssueServiceType } from "@plane/types";
 // helpers
 import { generateWorkItemLink } from "@plane/utils";
+// one-unit screens: a card opens as a full page unless the person chose the side peek
+import { getCardOpenMode } from "@/components/one-unit/card-open-mode";
 // hooks
 import { useIssueDetail } from "./store/use-issue-detail";
 import { useProject } from "./store/use-project";
@@ -43,7 +45,7 @@ const useIssuePeekOverviewRedirection = (isEpic: boolean = false) => {
       isArchived: !!archived_at,
     });
     if (workspaceSlug && project_id && id && !getIsIssuePeeked(id) && !tempId) {
-      if (isMobile) {
+      if (isMobile || getCardOpenMode() === "page") {
         router.push(workItemLink);
       } else {
         setPeekIssue({ workspaceSlug, projectId: project_id, issueId: id, nestingLevel, isArchived: !!archived_at });

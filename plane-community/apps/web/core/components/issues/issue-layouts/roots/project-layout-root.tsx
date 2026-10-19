@@ -24,12 +24,15 @@ import { BaseGanttRoot } from "../gantt";
 import { KanBanLayout } from "../kanban/roots/project-root";
 import { ListLayout } from "../list/roots/project-root";
 import { ProjectGalleryLayout } from "../gallery/roots/project-root";
+import { PageListLayout } from "@/components/one-unit/page-list-layout";
 import { ProjectSpreadsheetLayout } from "../spreadsheet/roots/project-root";
 
 function ProjectIssueLayout(props: { activeLayout: EIssueLayoutTypes | undefined }) {
   switch (props.activeLayout) {
     case EIssueLayoutTypes.LIST:
       return <ListLayout />;
+    case EIssueLayoutTypes.PAGE_LIST:
+      return <PageListLayout />;
     case EIssueLayoutTypes.KANBAN:
       return <KanBanLayout />;
     case EIssueLayoutTypes.CALENDAR:

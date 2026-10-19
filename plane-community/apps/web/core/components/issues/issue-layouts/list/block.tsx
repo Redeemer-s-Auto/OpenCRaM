@@ -28,6 +28,7 @@ import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useProject } from "@/hooks/store/use-project";
 import type { TSelectionHelper } from "@/hooks/use-multiple-select";
+import useIssuePeekOverviewRedirection from "@/hooks/use-issue-peek-overview-redirection";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 import { calculateIdentifierWidth } from "../utils";
 import type { TRenderQuickActions } from "./list-view-types";
@@ -82,23 +83,13 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
   const {
     getIsIssuePeeked,
     peekIssue,
-    setPeekIssue,
     subIssues: subIssuesStore,
   } = useIssueDetail(isEpic ? EIssueServiceType.EPICS : EIssueServiceType.ISSUES);
 
+  // One-unit screens: opens the full page, or the side peek when the person chose it.
+  const { handleRedirection } = useIssuePeekOverviewRedirection(isEpic);
   const handleIssuePeekOverview = (issue: TIssue) =>
-    workspaceSlug &&
-    issue &&
-    issue.project_id &&
-    issue.id &&
-    !getIsIssuePeeked(issue.id) &&
-    setPeekIssue({
-      workspaceSlug,
-      projectId: issue.project_id,
-      issueId: issue.id,
-      nestingLevel: nestingLevel,
-      isArchived: !!issue.archived_at,
-    });
+    workspaceSlug && issue && handleRedirection(workspaceSlug, issue, false, nestingLevel);
 
   // derived values
   const issue = issuesMap[issueId];

@@ -24,6 +24,7 @@ function ActiveLoader(props: { layout: EIssueLayoutTypes }) {
   const { layout } = props;
   switch (layout) {
     case EIssueLayoutTypes.LIST:
+    case EIssueLayoutTypes.PAGE_LIST:
       return <ListLayoutLoader />;
     case EIssueLayoutTypes.KANBAN:
       return <KanbanLayoutLoader />;

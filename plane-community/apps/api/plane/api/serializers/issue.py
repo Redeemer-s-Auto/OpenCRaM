@@ -34,6 +34,8 @@ from plane.utils.content_validator import (
     validate_binary_data,
 )
 from plane.sharing.visibility import hidden_issue_ids
+from plane.sharing.models import AccessLevel
+from plane.one_unit.reach import creates_cycle, is_reachable
 
 from .base import BaseSerializer
 from .cycle import CycleLiteSerializer, CycleSerializer
@@ -130,16 +132,25 @@ class IssueSerializer(BaseSerializer):
         ):
             raise serializers.ValidationError("State is not valid please pass a valid state_id")
 
-        # Check parent issue is from workspace as it can be cross workspace
-        if data.get("parent") and (
-            not Issue.objects.filter(
+        # Parent: a card of this project, or (one-unit screens) a card in another project of the
+        # same workspace that the user reaches and may edit. Never the card itself or one below it.
+        if data.get("parent"):
+            parent_id = data.get("parent").id
+            same_project = Issue.objects.filter(
                 workspace_id=self.context.get("workspace_id"),
                 project_id=self.context.get("project_id"),
-                pk=data.get("parent").id,
+                pk=parent_id,
             ).exists()
-            or str(data.get("parent").id) in self._hidden_issue_ids()
-        ):
-            raise serializers.ValidationError("Parent is not valid issue_id please pass a valid issue_id")
+            user = self.context.get("user")
+            other_project_ok = (
+                user is not None
+                and Issue.objects.filter(workspace_id=self.context.get("workspace_id"), pk=parent_id).exists()
+                and is_reachable(user, parent_id, AccessLevel.EDIT)
+            )
+            if not (same_project or other_project_ok) or str(parent_id) in self._hidden_issue_ids():
+                raise serializers.ValidationError("Parent is not valid issue_id please pass a valid issue_id")
+            if self.instance and creates_cycle(self.instance.id, parent_id):
+                raise serializers.ValidationError("A card cannot be placed inside itself or one of its sub-cards")
 
         if (
             data.get("estimate_point")
@@ -318,10 +329,23 @@ class IssueSerializer(BaseSerializer):
             self.context["_hidden_issue_ids"] = {str(row["issue_id"]) for row in hidden_issue_ids(self.context["user"])}
         return self.context["_hidden_issue_ids"]
 
+    def _parent_reachable(self, parent_id):
+        """A parent in a project the context ``user`` is not a member of stays hidden (cached per serializer run)."""
+        if "user" not in self.context:
+            return True
+        cache = self.context.setdefault("_reachable_parents", {})
+        key = str(parent_id)
+        if key not in cache:
+            cache[key] = is_reachable(self.context["user"], parent_id)
+        return cache[key]
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         # A visible child must not reveal a hidden parent.
-        if data.get("parent") and str(instance.parent_id) in self._hidden_issue_ids():
+        if data.get("parent") and (
+            str(instance.parent_id) in self._hidden_issue_ids()
+            or not self._parent_reachable(instance.parent_id)
+        ):
             data["parent"] = None
         if "assignees" in self.fields:
             if "assignees" in self.expand:

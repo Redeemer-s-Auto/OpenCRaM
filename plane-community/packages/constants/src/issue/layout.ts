@@ -40,6 +40,11 @@ export const ISSUE_LAYOUT_MAP: TIssueLayoutMap = {
     i18n_title: "issue.layouts.title.list",
     i18n_label: "issue.layouts.list",
   },
+  [EIssueLayoutTypes.PAGE_LIST]: {
+    key: EIssueLayoutTypes.PAGE_LIST,
+    i18n_title: "issue.layouts.title.page_list",
+    i18n_label: "issue.layouts.page_list",
+  },
   [EIssueLayoutTypes.KANBAN]: {
     key: EIssueLayoutTypes.KANBAN,
     i18n_title: "issue.layouts.title.kanban",
@@ -72,4 +77,7 @@ export const ISSUE_LAYOUTS: {
   key: EIssueLayoutTypes;
   i18n_title: string;
   i18n_label: string;
-}[] = Object.values(ISSUE_LAYOUT_MAP);
+}[] = Object.values(ISSUE_LAYOUT_MAP).filter(
+  // The page list exists only on a project's own board; mobile and cycle/module switchers skip it.
+  (layout) => layout.key !== EIssueLayoutTypes.PAGE_LIST
+);

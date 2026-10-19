@@ -14,6 +14,7 @@ import { ARCHIVABLE_STATE_GROUPS, EUserPermissions, EUserPermissionsLevel } from
 import type { TIssue } from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
 import { ContextMenu, CustomMenu } from "@plane/ui";
+import type { TContextMenuItem } from "@plane/ui";
 import { cn } from "@plane/utils";
 // hooks
 import { useIssues } from "@/hooks/store/use-issues";
@@ -101,7 +102,7 @@ export const ProjectIssueQuickActions = observer(function ProjectIssueQuickActio
     storeType: EIssuesStoreType.PROJECT,
   };
 
-  const MENU_ITEMS = [
+  const MENU_ITEMS: TContextMenuItem[] = [
     ...useProjectIssueMenuItems(menuItemProps),
     {
       key: "save-as-template",

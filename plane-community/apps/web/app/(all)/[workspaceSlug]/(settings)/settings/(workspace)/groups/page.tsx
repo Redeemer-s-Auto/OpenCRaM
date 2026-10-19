@@ -108,7 +108,7 @@ const WorkspaceGroupsSettingsPage = observer(function WorkspaceGroupsSettingsPag
             <div>
               <h4 className="flex items-center gap-2 text-h5-medium text-primary">
                 {t("sharing.groups_title")}
-                {groups && <CountChip count={groups.length} className="h-5 m-auto" />}
+                {groups && <CountChip count={groups.length} className="h-5" />}
               </h4>
               <p className="mt-1 max-w-xl text-body-xs-regular text-tertiary">{t("sharing.groups_description")}</p>
             </div>

@@ -149,9 +149,9 @@ export const SharingPanel = observer(function SharingPanel(props: Props) {
           <ul className="flex flex-col divide-y divide-subtle-1 rounded-md border border-subtle">
             {shares.length === 0 && <li className="p-2.5 text-caption-md-regular text-tertiary">{t("sharing.nobody_yet")}</li>}
             {shares.map((share) => (
-              <li key={shareKey(share)} className="flex items-center gap-2.5 p-2.5">
+              <li key={shareKey(share)} className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 p-2.5">
                 <TargetBadge share={share} />
-                <span className="flex min-w-0 flex-grow flex-col">
+                <span className="flex min-w-0 flex-grow basis-28 flex-col">
                   <span className="truncate text-body-xs-medium text-primary">
                     {share.target_type === "workspace" ? t("sharing.everybody") : share.name}
                   </span>

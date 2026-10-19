@@ -25,7 +25,13 @@ from plane.app.views.base import BaseAPIView
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.db.models import Issue, IssueComment, Page, ProjectMember
 from plane.sharing.models import AccessLevel, ItemShare
-from plane.sharing.visibility import issue_access_level, page_access_level, share_matches_user
+from plane.sharing.visibility import (
+    issue_access_level,
+    page_access_level,
+    share_matches_user,
+    visible_issues,
+    visible_pages,
+)
 from plane.utils.host import base_host
 
 NOT_FOUND = {"error": "The required object does not exist."}
@@ -69,8 +75,9 @@ class SharedWithMeListEndpoint(BaseAPIView):
         issue_levels = dict(
             shares.filter(issue__isnull=False).values("issue_id").annotate(level=Max("level")).values_list("issue_id", "level")
         )
+        # visible_issues applies every other rule (private projects included) on top of the share.
         issues = (
-            Issue.issue_objects.filter(id__in=issue_levels.keys(), workspace__slug=slug)
+            visible_issues(Issue.issue_objects.filter(id__in=issue_levels.keys(), workspace__slug=slug), user)
             .exclude(created_by=user)
             .select_related("project", "state", "created_by")
         )
@@ -95,7 +102,7 @@ class SharedWithMeListEndpoint(BaseAPIView):
             shares.filter(page__isnull=False).values("page_id").annotate(level=Max("level")).values_list("page_id", "level")
         )
         pages = (
-            Page.objects.filter(id__in=page_levels.keys(), workspace__slug=slug, archived_at__isnull=True)
+            visible_pages(Page.objects.filter(id__in=page_levels.keys(), workspace__slug=slug, archived_at__isnull=True), user)
             .exclude(owned_by=user)
             .select_related("owned_by")
             .prefetch_related("project_pages__project")

@@ -56,6 +56,9 @@ x-api-environment: &api-environment
   GARDEN_ROLES_APP_ID: ${GARDEN_ROLES_APP_ID:-}
   GARDEN_ROLES_ADMIN_ROLES: ${GARDEN_ROLES_ADMIN_ROLES:-}
   GARDEN_ROLES_MEMBER_ROLES: ${GARDEN_ROLES_MEMBER_ROLES:-}
+  # Roles mode through a hub access endpoint (no credential file); see firebase_identity.py.
+  GARDEN_HUB_ACCESS_URL: ${GARDEN_HUB_ACCESS_URL:-}
+  GARDEN_HUB_ACCESS_SECRET: ${GARDEN_HUB_ACCESS_SECRET:-}
   # Optional HTTPS page that launches Work; top-level launch errors return there as ?error=<code>.
   GARDEN_LAUNCH_URL: ${GARDEN_LAUNCH_URL:-}
   GARDEN_WORKSPACE_NAME: ${GARDEN_WORKSPACE_NAME:-The Garden}

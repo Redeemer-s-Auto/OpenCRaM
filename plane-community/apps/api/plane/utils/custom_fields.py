@@ -100,6 +100,10 @@ def clean_settings(field_type, settings):
     settings = settings or {}
     if not isinstance(settings, dict):
         raise ValidationError({"settings": "Settings must be an object."})
+    if field_type in CustomField.LINKED_TYPES:
+        # Relation and rollup settings need the board and the user; the field serializer
+        # checks them with plane.relations.service.
+        return dict(settings)
     cleaned = {}
     if field_type == FT.DATE:
         cleaned["include_time"] = bool(settings.get("include_time", False))
@@ -166,6 +170,11 @@ def check_formula_references(project_id, field_name, settings, field_id=None):
     for name in formula.referenced_names(tree):
         if name == field_name:
             raise ValidationError({"settings": "Formula: a formula cannot use itself."})
+        if name in fields and fields[name].field_type in CustomField.LINKED_TYPES:
+            # Formula results are stored for everyone; linked cards differ per viewer.
+            raise ValidationError(
+                {"settings": f'Formula: "{name}" is a relation or rollup, which formulas cannot use.'}
+            )
         if name not in known:
             raise ValidationError({"settings": f'Formula: there is no field called "{name}" on this project.'})
 
@@ -413,10 +422,16 @@ def validate_values(project_id, data, current=None):
         if field is None:
             errors[str(key)] = "This field does not exist on this project or is archived."
             continue
-        if field.field_type == FT.FORMULA:
-            # Formulas are worked out by the server. A client sending one back is ignored.
+        if field.field_type in (FT.FORMULA, CustomField.ROLLUP):
+            # Formulas and rollups are worked out by the server. A client sending one back is ignored.
             continue
         try:
+            if field.field_type == CustomField.RELATION:
+                from plane.relations.service import clean_relation_value
+
+                now = (current or {}).get(str(field.id))
+                cleaned.append((field, clean_relation_value(field, raw, current=now), None))
+                continue
             value, columns = clean_value(field, raw, new_label_options)
         except ValidationError as e:
             errors.update(e.detail if isinstance(e.detail, dict) else {str(field.id): e.detail})
@@ -443,6 +458,17 @@ def set_values(issue, cleaned):
     changes = {}
     if not cleaned:
         return changes
+    linked = [(f, v) for f, v, _ in cleaned if f.field_type == CustomField.RELATION]
+    if linked:
+        from plane.relations.service import set_links
+
+        for field, ids in linked:
+            old_ids, new_ids = set_links(issue, field, ids)
+            if set(old_ids) != set(new_ids):
+                changes[str(field.id)] = (old_ids, new_ids)
+        cleaned = [(f, v, c) for f, v, c in cleaned if f.field_type != CustomField.RELATION]
+        if not cleaned:
+            return changes
     existing = {
         v.field_id: v
         for v in CustomFieldValue.objects.select_for_update().filter(
@@ -704,8 +730,13 @@ def display_value(field, value):
     return str(value)
 
 
-def values_for_issues(issue_ids):
-    """Return ``{issue_id: {field_id: value}}`` for live (not archived) fields."""
+def values_for_issues(issue_ids, user=None):
+    """Return ``{issue_id: {field_id: value}}`` for live (not archived) fields.
+
+    Relation and rollup values depend on who is looking (``plane.relations``): they
+    are worked out for ``user``, or the request's user when not given, and left out
+    when there is no user (background jobs, webhooks, exports).
+    """
     issue_ids = [i for i in issue_ids if i]
     if not issue_ids:
         return {}
@@ -715,26 +746,31 @@ def values_for_issues(issue_ids):
     ).values_list("issue_id", "field_id", "value")
     for issue_id, field_id, value in rows:
         result.setdefault(str(issue_id), {})[str(field_id)] = value
+
+    from plane.relations.service import linked_values
+
+    for issue_id, values in linked_values(issue_ids, user).items():
+        result.setdefault(issue_id, {}).update(values)
     return result
 
 
-def prefetch_onto(issues):
+def prefetch_onto(issues, user=None):
     """Load values for many work items in one query. Returns a list of the items.
 
     Serializers read ``issue._custom_field_values`` when it is set.
     """
     issues = list(issues)
-    values = values_for_issues([i.id for i in issues])
+    values = values_for_issues([i.id for i in issues], user)
     for issue in issues:
         issue._custom_field_values = values.get(str(issue.id), {})
     return issues
 
 
-def attach_to_rows(rows, key="id"):
+def attach_to_rows(rows, key="id", user=None):
     """Add ``custom_fields`` to a list of work-item dicts, in place. Returns rows."""
     if not rows:
         return rows
-    values = values_for_issues([row.get(key) for row in rows])
+    values = values_for_issues([row.get(key) for row in rows], user)
     for row in rows:
         row["custom_fields"] = values.get(str(row.get(key)), {})
     return rows
@@ -923,7 +959,7 @@ def order_queryset(issue_queryset, order_by):
     except ValueError:
         return None, None
     field = CustomField.objects.filter(id=field_id, archived_at__isnull=True).first()
-    if field is None:
+    if field is None or field.field_type in CustomField.LINKED_TYPES:
         return None, None
 
     values = CustomFieldValue.objects.filter(issue_id=OuterRef("pk"), field_id=field.id)

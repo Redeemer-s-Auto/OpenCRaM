@@ -17,7 +17,14 @@ class CustomFieldSerializer(BaseSerializer):
 
     ``field_type`` is fixed after create: changing it would make stored values
     meaningless. Make a new field instead.
+
+    Relation fields: after saving, call ``plane.relations.service.sync_mirror(field,
+    serializer.mirror_name)`` so a two-way relation gets (or loses) its mirror field.
     """
+
+    mirror_name = None
+    # Includes relation and rollup, which are not in the model's choices (see CustomField).
+    field_type = serializers.ChoiceField(choices=CustomField.ALL_TYPE_CHOICES)
 
     class Meta:
         model = CustomField
@@ -50,6 +57,14 @@ class CustomFieldSerializer(BaseSerializer):
             "updated_by",
         ]
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.field_type == CustomField.RELATION:
+            from plane.relations.service import hide_target_board
+
+            data["settings"] = hide_target_board(data.get("settings") or {})
+        return data
+
     def validate_name(self, value):
         value = " ".join(str(value).split())
         if not value:
@@ -73,6 +88,16 @@ class CustomFieldSerializer(BaseSerializer):
             attrs["options"] = clean_options(field_type, attrs.get("options"), existing)
         if "settings" in attrs or self.instance is None:
             attrs["settings"] = clean_settings(field_type, attrs.get("settings"))
+        if field_type in CustomField.LINKED_TYPES and ("settings" in attrs or self.instance is None):
+            from plane.relations.service import clean_relation_settings, clean_rollup_settings
+
+            project_id = self.context.get("project_id") or self.instance.project_id
+            if field_type == CustomField.RELATION:
+                attrs["settings"], self.mirror_name = clean_relation_settings(
+                    project_id, attrs.get("settings"), self.instance
+                )
+            else:
+                attrs["settings"] = clean_rollup_settings(project_id, attrs.get("settings"))
         if field_type == CustomField.FieldType.FORMULA and ("settings" in attrs or "name" in attrs):
             project_id = self.context.get("project_id") or self.instance.project_id
             settings = attrs.get("settings") or self.instance.settings

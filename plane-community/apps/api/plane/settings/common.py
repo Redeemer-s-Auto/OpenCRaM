@@ -114,6 +114,7 @@ INSTALLED_APPS = [
     "plane.authentication",
     "plane.sharing",
     "plane.recurrence",
+    "plane.relations",
     # Third-party things
     "rest_framework",
     "corsheaders",

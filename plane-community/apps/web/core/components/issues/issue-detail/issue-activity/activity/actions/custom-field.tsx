@@ -25,7 +25,11 @@ export const IssueCustomFieldActivity = observer(function IssueCustomFieldActivi
   const activity = getActivityById(activityId);
   if (!activity) return <></>;
 
+  const field = activity.new_identifier ? getFieldById(activity.new_identifier) : undefined;
+  // Relation changes name no cards (who is linked differs per viewer).
+  const isRelation = field?.field_type === "relation" || !!activity.comment?.startsWith("updated the linked cards in ");
   const fieldName =
+    (isRelation && (field?.name || activity.comment?.replace(/^updated the linked cards in /, ""))) ||
     (activity.new_identifier && getFieldById(activity.new_identifier)?.name) ||
     activity.comment?.replace(/^updated /, "").replace(/ to$/, "") ||
     "a field";
@@ -37,9 +41,9 @@ export const IssueCustomFieldActivity = observer(function IssueCustomFieldActivi
       ends={ends}
     >
       <>
-        {activity.new_value ? `set ${fieldName} to ` : `cleared ${fieldName}`}
-        {activity.new_value && <span className="font-medium text-primary">{activity.new_value}</span>}
-        {showIssue && (activity.new_value ? ` for ` : ` on `)}
+        {isRelation ? `changed the linked cards in ${fieldName}` : activity.new_value ? `set ${fieldName} to ` : `cleared ${fieldName}`}
+        {!isRelation && activity.new_value && <span className="font-medium text-primary">{activity.new_value}</span>}
+        {showIssue && (activity.new_value && !isRelation ? ` for ` : ` on `)}
         {showIssue && <IssueLink activityId={activityId} />}.
       </>
     </IssueActivityBlockComponent>

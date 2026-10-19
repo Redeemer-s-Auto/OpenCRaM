@@ -16,6 +16,8 @@ from plane.app.views.custom_field import (
     CustomFieldReorderEndpoint,
 )
 
+from plane.relations.views import LinkCandidatesEndpoint
+
 from .base import BaseAPIView
 
 
@@ -37,3 +39,7 @@ class CustomFieldArchiveAPIEndpoint(BaseAPIView):
 
 class CustomFieldReorderAPIEndpoint(BaseAPIView):
     post = CustomFieldReorderEndpoint.post
+
+
+class LinkCandidatesAPIEndpoint(BaseAPIView):
+    get = LinkCandidatesEndpoint.get

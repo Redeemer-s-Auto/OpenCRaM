@@ -9,13 +9,25 @@ import { observer } from "mobx-react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import type { TCustomField, TCustomFieldOption, TCustomFieldType } from "@plane/types";
+import { EIssuesStoreType } from "@plane/types";
+import type { TCustomField, TCustomFieldOption, TCustomFieldRollupFunction, TCustomFieldType } from "@plane/types";
 import { Checkbox, EModalPosition, EModalWidth, Input, ModalCore } from "@plane/ui";
 import { cn } from "@plane/utils";
 // hooks
 import { useCustomField } from "@/hooks/store/use-custom-field";
+import { useIssues } from "@/hooks/store/use-issues";
+import { useProject } from "@/hooks/store/use-project";
 // local
-import { CUSTOM_FIELD_TYPES, DEFAULT_OPTION_COLORS, FORMULA_RESULT_TYPES, OPTION_FIELD_TYPES } from "../helpers";
+import {
+  CUSTOM_FIELD_TYPES,
+  DEFAULT_OPTION_COLORS,
+  FORMULA_RESULT_TYPES,
+  OPTION_FIELD_TYPES,
+  ROLLUP_BUILT_INS,
+  ROLLUP_FUNCTIONS,
+  fitsRollup,
+  isLinkedField,
+} from "../helpers";
 
 const BUILT_IN_PROPS = ["Title", "State", "Priority", "Start date", "Due date", "Created"];
 const FORMULA_EXAMPLES = [
@@ -45,7 +57,11 @@ const errorMessage = (error: unknown) => {
 
 export const CustomFieldFormModal = observer(function CustomFieldFormModal(props: Props) {
   const { isOpen, onClose, workspaceSlug, projectId, field } = props;
-  const { createField, updateField, getProjectFields } = useCustomField();
+  const { createField, updateField, getProjectFields, fetchProjectFields } = useCustomField();
+  const { joinedProjectIds, getProjectById } = useProject();
+  const {
+    issues: { fetchIssuesWithExistingPagination },
+  } = useIssues(EIssuesStoreType.PROJECT);
   const otherFields = (getProjectFields(projectId) ?? []).filter((f) => f.id !== field?.id);
   const isEdit = !!field;
 
@@ -58,6 +74,14 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
   const [expression, setExpression] = useState("");
   const [resultType, setResultType] = useState<NonNullable<TCustomField["settings"]["result_type"]>>("number");
   const [saving, setSaving] = useState(false);
+  // relation
+  const [targetProjectId, setTargetProjectId] = useState("");
+  const [twoWay, setTwoWay] = useState(false);
+  const [mirrorName, setMirrorName] = useState("");
+  // rollup
+  const [relationFieldId, setRelationFieldId] = useState("");
+  const [rollupFunction, setRollupFunction] = useState<TCustomFieldRollupFunction>("count");
+  const [targetFieldId, setTargetFieldId] = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -69,7 +93,33 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
     setMultiple(!!field?.settings?.multiple);
     setExpression(field?.settings?.expression ?? "");
     setResultType(field?.settings?.result_type ?? "number");
+    setTargetProjectId(field?.settings?.target_project_id ?? "");
+    setTwoWay(!!field?.settings?.two_way);
+    setMirrorName("");
+    setRelationFieldId(field?.settings?.relation_field_id ?? "");
+    setRollupFunction(field?.settings?.function ?? "count");
+    setTargetFieldId(field?.settings?.target_field_id ?? "");
   }, [isOpen, field]);
+
+  const isMirror = !!field?.settings?.is_mirror;
+  const relationFields = otherFields.filter((f) => f.field_type === "relation");
+  const rollupRelation = relationFields.find((f) => f.id === relationFieldId);
+  const rollupBoardId = rollupRelation?.settings?.target_project_id;
+  const rollupNeeds = ROLLUP_FUNCTIONS.find((f) => f.value === rollupFunction)?.needs ?? "none";
+  const rollupBoardFields = rollupBoardId ? getProjectFields(rollupBoardId) : undefined;
+  // Fields on the linked board, for the rollup property picker.
+  useEffect(() => {
+    if (isOpen && fieldType === "rollup" && rollupBoardId && !rollupBoardFields)
+      void fetchProjectFields(workspaceSlug, rollupBoardId).catch(() => undefined);
+  }, [isOpen, fieldType, rollupBoardId, rollupBoardFields, workspaceSlug, fetchProjectFields]);
+  const rollupTargets = [
+    ...ROLLUP_BUILT_INS.filter((b) => rollupNeeds === "any" || (rollupNeeds === "date" && b.kind === "date")).map(
+      (b) => ({ value: b.value, label: b.label })
+    ),
+    ...(rollupBoardFields ?? [])
+      .filter((f) => fitsRollup(f, rollupNeeds))
+      .map((f) => ({ value: f.id, label: f.name })),
+  ];
 
   const hasOptions = OPTION_FIELD_TYPES.includes(fieldType);
   const removedOptions = isEdit ? (field?.options ?? []).filter((o) => !options.some((d) => d.id === o.id)) : [];
@@ -104,6 +154,28 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
       settings.expression = expression.trim();
       settings.result_type = resultType;
     }
+    if (fieldType === "relation") {
+      if (!targetProjectId) {
+        setToast({ type: TOAST_TYPE.ERROR, title: "Board needed", message: "Pick the board to link to." });
+        return;
+      }
+      if (!isEdit) settings.target_project_id = targetProjectId;
+      settings.two_way = isMirror ? true : twoWay;
+      if (twoWay && mirrorName.trim()) settings.mirror_name = mirrorName.trim();
+    }
+    if (fieldType === "rollup") {
+      if (!relationFieldId) {
+        setToast({ type: TOAST_TYPE.ERROR, title: "Relation needed", message: "Pick a relation field." });
+        return;
+      }
+      if (rollupNeeds !== "none" && !targetFieldId) {
+        setToast({ type: TOAST_TYPE.ERROR, title: "Property needed", message: "Pick what to roll up." });
+        return;
+      }
+      settings.relation_field_id = relationFieldId;
+      settings.function = rollupFunction;
+      settings.target_field_id = rollupNeeds === "none" ? null : targetFieldId;
+    }
     const payload: Partial<TCustomField> = {
       name: name.trim(),
       description: description.trim(),
@@ -116,6 +188,12 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
     try {
       if (isEdit && field) await updateField(workspaceSlug, projectId, field.id, payload);
       else await createField(workspaceSlug, projectId, { ...payload, field_type: fieldType });
+      // A two-way relation adds (or removes) a field on the other board, or on this one for a same-board relation.
+      if (fieldType === "relation" && targetProjectId)
+        await fetchProjectFields(workspaceSlug, targetProjectId).catch(() => undefined);
+      // Rollup values are worked out by the server: reload the cards so a new or changed rollup shows at once.
+      if (fieldType === "rollup" || fieldType === "relation")
+        void fetchIssuesWithExistingPagination(workspaceSlug, projectId, "mutation")?.catch(() => undefined);
       setToast({ type: TOAST_TYPE.SUCCESS, title: isEdit ? "Field saved" : "Field added", message: name.trim() });
       onClose();
     } catch (error) {
@@ -206,7 +284,7 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
             />
             <div className="flex flex-wrap items-center gap-1 text-caption-md-regular">
               <span className="text-tertiary">Insert:</span>
-              {[...otherFields.map((f) => f.name), ...BUILT_IN_PROPS].map((name) => (
+              {[...otherFields.filter((f) => !isLinkedField(f)).map((f) => f.name), ...BUILT_IN_PROPS].map((name) => (
                 <button
                   key={name}
                   type="button"
@@ -248,6 +326,123 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
                 year, month, day (units: days, weeks, months, years, hours, minutes). Money fields count in dollars.
               </p>
             </details>
+          </div>
+        )}
+
+        {fieldType === "relation" && (
+          <div className="flex flex-col gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-body-xs-medium text-secondary">Links to cards on</span>
+              {isEdit ? (
+                <p className="text-body-xs-regular text-tertiary">
+                  {getProjectById(targetProjectId)?.name ?? "A board you are not on"}. The board cannot change after a
+                  relation is made.
+                </p>
+              ) : (
+                <select
+                  value={targetProjectId}
+                  onChange={(e) => setTargetProjectId(e.target.value)}
+                  className="rounded-md border border-subtle bg-transparent px-2 py-1.5 text-body-xs-regular"
+                >
+                  <option value="">Pick a board</option>
+                  {joinedProjectIds.map((id) => (
+                    <option key={id} value={id}>
+                      {getProjectById(id)?.name}
+                      {id === projectId ? " (this board)" : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </label>
+            {isMirror ? (
+              <p className="text-caption-md-regular text-tertiary">
+                This is the other side of a two-way relation. Links made here show on the other board too.
+              </p>
+            ) : (
+              <label className="flex items-center gap-2 text-body-xs-regular text-secondary">
+                <Checkbox checked={twoWay} onChange={(e) => setTwoWay(e.target.checked)} />
+                Two-way: also show the links on the other board
+              </label>
+            )}
+            {twoWay && !isMirror && !field?.settings?.mirror_field_id && (
+              <label className="flex flex-col gap-1">
+                <span className="text-body-xs-medium text-secondary">
+                  Name of the field on the other board (optional)
+                </span>
+                <Input
+                  value={mirrorName}
+                  onChange={(e) => setMirrorName(e.target.value)}
+                  placeholder="Uses this board's name"
+                  maxLength={255}
+                />
+              </label>
+            )}
+            {isEdit && !isMirror && field?.settings?.two_way && !twoWay && (
+              <p className="rounded-md bg-danger-subtle px-2 py-1.5 text-caption-md-regular text-danger-secondary">
+                Saving removes the field on the other board. The links stay on this side.
+              </p>
+            )}
+          </div>
+        )}
+
+        {fieldType === "rollup" && (
+          <div className="flex flex-col gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-body-xs-medium text-secondary">Relation</span>
+              <select
+                value={relationFieldId}
+                onChange={(e) => {
+                  setRelationFieldId(e.target.value);
+                  setTargetFieldId("");
+                }}
+                className="rounded-md border border-subtle bg-transparent px-2 py-1.5 text-body-xs-regular"
+              >
+                <option value="">{relationFields.length ? "Pick a relation field" : "Add a relation field first"}</option>
+                {relationFields.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-body-xs-medium text-secondary">Calculate</span>
+              <select
+                value={rollupFunction}
+                onChange={(e) => {
+                  setRollupFunction(e.target.value as TCustomFieldRollupFunction);
+                  setTargetFieldId("");
+                }}
+                className="rounded-md border border-subtle bg-transparent px-2 py-1.5 text-body-xs-regular"
+              >
+                {ROLLUP_FUNCTIONS.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {rollupNeeds !== "none" && (
+              <label className="flex flex-col gap-1">
+                <span className="text-body-xs-medium text-secondary">Of this property on the linked cards</span>
+                <select
+                  value={targetFieldId}
+                  onChange={(e) => setTargetFieldId(e.target.value)}
+                  disabled={!rollupRelation}
+                  className="rounded-md border border-subtle bg-transparent px-2 py-1.5 text-body-xs-regular"
+                >
+                  <option value="">{rollupTargets.length ? "Pick a property" : "No property fits"}</option>
+                  {rollupTargets.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <p className="text-caption-md-regular text-tertiary">
+              Worked out for each person from the linked cards they can see.
+            </p>
           </div>
         )}
 

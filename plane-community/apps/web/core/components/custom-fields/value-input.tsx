@@ -15,6 +15,7 @@ import { DateDropdown } from "@/components/dropdowns/date";
 import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
 // local
 import { formatCustomFieldValue, formatMoney, parseMoney, parseNumber, toLocalDateTimeInput } from "./helpers";
+import { RelationInput } from "./relation-input";
 
 /** A new label typed on a card. The server turns it into an option. */
 export type TNewLabel = { name: string };
@@ -23,7 +24,7 @@ export type TCustomFieldInputValue = TCustomFieldValue | (string | TNewLabel)[];
 type Props = {
   field: TCustomField;
   value: TCustomFieldValue | undefined;
-  onChange: (value: TCustomFieldInputValue) => void;
+  onChange: (value: TCustomFieldInputValue) => void | Promise<void>;
   projectId: string;
   disabled?: boolean;
   /** "sidebar" for the card panel, "cell" for the table */
@@ -82,13 +83,26 @@ export const CustomFieldValueInput = observer(function CustomFieldValueInput(pro
   const buttonContainerClassName = variant === "cell" ? "w-full h-full text-left" : "w-full text-left h-7.5";
   const [newLabel, setNewLabel] = useState("");
 
-  // Formulas are worked out by the server: show the result, no editing.
-  if (field.field_type === "formula") {
+  if (field.field_type === "relation") {
+    return (
+      <RelationInput
+        field={field}
+        value={value}
+        onChange={(cards) => onChange(cards)}
+        projectId={projectId}
+        disabled={disabled}
+        variant={variant}
+      />
+    );
+  }
+
+  // Formulas and rollups are worked out by the server: show the result, no editing.
+  if (field.field_type === "formula" || field.field_type === "rollup") {
     const text = formatCustomFieldValue(field, value);
     return (
       <span
         className={cn("block w-full truncate px-2 py-1", textClass, !text && "text-placeholder")}
-        title={field.settings?.expression}
+        title={field.field_type === "formula" ? field.settings?.expression : text}
       >
         {text || (variant === "cell" ? "" : "Empty")}
       </span>

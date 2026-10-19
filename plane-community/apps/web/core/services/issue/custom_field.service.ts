@@ -5,7 +5,7 @@
  */
 
 import { API_BASE_URL } from "@plane/constants";
-import type { TCustomField } from "@plane/types";
+import type { TCustomField, TCustomFieldLinkedCard } from "@plane/types";
 // services
 import { APIService } from "@/services/api.service";
 
@@ -78,6 +78,20 @@ export class CustomFieldService extends APIService {
 
   async reorder(workspaceSlug: string, projectId: string, fieldIds: string[]): Promise<TCustomField[]> {
     return this.post(`${this.url(workspaceSlug, projectId)}reorder/`, { field_ids: fieldIds })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  /** Cards this person could link in a relation field (target board, ones they can see). */
+  async linkCandidates(
+    workspaceSlug: string,
+    projectId: string,
+    fieldId: string,
+    search: string
+  ): Promise<TCustomFieldLinkedCard[]> {
+    return this.get(`${this.url(workspaceSlug, projectId)}${fieldId}/link-candidates/`, { params: { search } })
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

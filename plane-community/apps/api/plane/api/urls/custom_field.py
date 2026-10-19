@@ -9,6 +9,7 @@ from plane.api.views.custom_field import (
     CustomFieldDetailAPIEndpoint,
     CustomFieldListCreateAPIEndpoint,
     CustomFieldReorderAPIEndpoint,
+    LinkCandidatesAPIEndpoint,
 )
 
 urlpatterns = [
@@ -31,5 +32,10 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/custom-fields/<uuid:pk>/archive/",
         CustomFieldArchiveAPIEndpoint.as_view(http_method_names=["post", "delete"]),
         name="custom-field-archive",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/custom-fields/<uuid:field_id>/link-candidates/",
+        LinkCandidatesAPIEndpoint.as_view(http_method_names=["get"]),
+        name="custom-field-link-candidates",
     ),
 ]

@@ -280,6 +280,33 @@ def track_custom_fields(
         field = fields.get(str(field_id))
         if field is None:
             continue
+        if field.field_type == CustomField.ROLLUP:
+            continue
+        if field.field_type == CustomField.RELATION:
+            # Who is linked differs per viewer, so the log names no cards; it only says the field changed.
+            def _ids(value):
+                items = value if isinstance(value, list) else ([] if value in (None, "") else [value])
+                return sorted(str(i.get("id") if isinstance(i, dict) else i) for i in items)
+
+            if _ids(before.get(str(field.id))) == _ids(requested.get(field_id)):
+                continue
+            old, new = "", ""
+            issue_activities.append(
+                IssueActivity(
+                    issue_id=issue_id,
+                    actor_id=actor_id,
+                    verb="updated",
+                    old_value=old,
+                    new_value=new,
+                    field="custom_field",
+                    project_id=project_id,
+                    workspace_id=workspace_id,
+                    comment=f"updated the linked cards in {field.name}",
+                    new_identifier=field.id,
+                    epoch=epoch,
+                )
+            )
+            continue
         old, new = before.get(str(field.id)), after.get(str(field.id))
         if old == new:
             continue

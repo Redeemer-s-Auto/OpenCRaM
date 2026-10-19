@@ -18,13 +18,13 @@ import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { IWorkspaceMemberInvitation } from "@plane/types";
 import { truncateText } from "@plane/utils";
 import emptyInvitation from "@/app/assets/empty-state/invitation.svg?url";
-import gardenMark from "@/app/assets/garden-mark.svg?url";
+import { AppMark } from "@/components/common/app-mark";
 import { EmptyState } from "@/components/common/empty-state";
 import { WorkspaceLogo } from "@/components/workspace/logo";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 import { useUser, useUserProfile } from "@/hooks/store/user";
 import { useAppRouter } from "@/hooks/use-app-router";
-import { gardenAppName } from "@/lib/garden-config";
+import { brand } from "@/lib/brand-config";
 import { AuthenticationWrapper } from "@/lib/wrappers/authentication-wrapper";
 import { WorkspaceService } from "@/services/workspace.service";
 
@@ -104,8 +104,8 @@ function UserInvitationsPage() {
             href="/"
             className="absolute top-1/2 left-5 z-10 grid -translate-y-1/2 place-items-center px-3 sm:top-12 sm:left-1/2 sm:-translate-x-[15px] sm:translate-y-0 sm:px-0 sm:py-5 md:left-1/3"
           >
-            {gardenMode ? (
-              <img src={gardenMark} className="h-9 w-9 object-contain" alt={gardenAppName} />
+            {gardenMode || brand.isHub ? (
+              <AppMark gardenClassName="h-9 w-9" hubClassName="h-9" />
             ) : (
               <PlaneLogo className="h-9 w-auto text-primary" />
             )}

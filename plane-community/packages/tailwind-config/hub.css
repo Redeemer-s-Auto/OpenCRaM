@@ -1,0 +1,371 @@
+/*
+ * Hub theme: a plain, neutral look with a red accent, light and dark mode.
+ * Chosen at build time with VITE_BRAND_THEME=hub (see apps/web/core/lib/brand-config.ts),
+ * which sets <html data-brand-theme="hub">. The default (garden) never matches any rule here,
+ * so a Garden build looks exactly as before.
+ *
+ * Values mirror the Redeemer's Auto hub design tokens (hub-design css/tokens.css,
+ * 2026-10-18 refresh: Inter, soft colours, light shadows, 8px controls, 10px cards),
+ * mapped onto Plane's semantic variables (variables.css). The soft shadows and raised
+ * panels of the Garden theme are kept, in neutral colours.
+ *
+ * Specificity: every selector starts with html[data-brand-theme="hub"], so it outranks
+ * garden.css's [data-garden-work="true"] ... rules and, at equal weight, wins by order
+ * (index.css imports this file after garden.css).
+ */
+
+/* ---------- hub tokens: light ---------- */
+html[data-brand-theme="hub"] {
+  --hub-font: "Inter Variable", Inter, Arial, Helvetica, sans-serif;
+  --hub-bg: #f5f5f3;
+  --hub-surface: #ffffff;
+  --hub-surface-2: #fafaf8;
+  --hub-sunken: #ebebe7;
+  --hub-sunken-2: #e3e3de;
+  --hub-ink: #18181b;
+  --hub-ink-2: #3f3f45;
+  --hub-muted: #6b6b72;
+  --hub-placeholder: #8b8b91;
+  --hub-faint: #b4b4ae;
+  --hub-line: #e8e8e4;
+  --hub-line-2: #e0e0db;
+  --hub-line-strong: #dcdcd6;
+  --hub-line-strong-2: #c9c9c2;
+  --hub-accent: #ee0000;
+  --hub-accent-hover: #d60000;
+  --hub-accent-active: #c40000;
+  --hub-accent-ink: #c40000;
+  --hub-accent-soft: #fdecec;
+  --hub-accent-soft-2: #fbdcdc;
+  --hub-accent-soft-3: #f8cccc;
+  --hub-accent-line: #f5b8b8;
+  --hub-on-accent: #ffffff;
+  --hub-green: #1e7a3c;
+  --hub-amber: #9a6a00;
+  --hub-hover: rgba(16, 16, 20, 0.04);
+  --hub-press: rgba(16, 16, 20, 0.07);
+  --hub-chosen: rgba(16, 16, 20, 0.06);
+  /* Soft depth, kept from the Garden theme in neutral colours. */
+  --hub-shadow-sm: 0 1px 2px rgba(16, 16, 20, 0.05), 0 1px 3px rgba(16, 16, 20, 0.06);
+  --hub-shadow-card: 0 1px 2px rgba(16, 16, 20, 0.04), 0 4px 12px rgba(16, 16, 20, 0.05);
+  --hub-shadow-card-hover: 0 6px 20px rgba(16, 16, 20, 0.1);
+  --hub-shadow-md: 0 4px 14px rgba(16, 16, 20, 0.08);
+  --hub-shadow: 0 8px 28px rgba(16, 16, 20, 0.14);
+  --hub-scrim: rgba(0, 0, 0, 0.3);
+  --hub-logo-filter: none;
+  /* shape and size */
+  --hub-radius: 8px;
+  --hub-radius-lg: 10px;
+  --hub-control-h: 32px;
+  --hub-bar-h: 52px;
+  --hub-mark: 3px;
+}
+
+/* ---------- hub tokens: dark (Plane's own Light / Dark / System setting) ---------- */
+html[data-brand-theme="hub"][data-theme*="dark"] {
+  --hub-bg: #161615;
+  --hub-surface: #20201e;
+  --hub-surface-2: #262624;
+  --hub-sunken: #2c2c29;
+  --hub-sunken-2: #33332f;
+  --hub-ink: #f1f1ed;
+  --hub-ink-2: #d6d6cf;
+  --hub-muted: #a3a39c;
+  --hub-placeholder: #8a8a83;
+  --hub-faint: #6e6e68;
+  --hub-line: #34342f;
+  --hub-line-2: #3c3c37;
+  --hub-line-strong: #45453f;
+  --hub-line-strong-2: #55554e;
+  --hub-accent-hover: #ff1f1f;
+  --hub-accent-active: #d60000;
+  --hub-accent-ink: #ff8a8a;
+  --hub-accent-soft: #3d1f1f;
+  --hub-accent-soft-2: #4a2424;
+  --hub-accent-soft-3: #572929;
+  --hub-accent-line: #7a3030;
+  --hub-green: #5ccf86;
+  --hub-amber: #e3b341;
+  --hub-hover: rgba(255, 255, 255, 0.05);
+  --hub-press: rgba(255, 255, 255, 0.09);
+  --hub-chosen: rgba(255, 255, 255, 0.08);
+  --hub-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --hub-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.25);
+  --hub-shadow-card-hover: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --hub-shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --hub-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  --hub-scrim: rgba(0, 0, 0, 0.5);
+  --hub-logo-filter: invert(1);
+}
+
+/* ---------- map the hub tokens onto Plane's (and Garden's) variables ---------- */
+html[data-brand-theme="hub"],
+html[data-brand-theme="hub"][data-theme*="dark"] {
+  /* Garden's own variables too, so any Garden rule not overridden below still follows the hub colours. */
+  --garden-bg: var(--hub-bg);
+  --garden-surface: var(--hub-surface);
+  --garden-text: var(--hub-ink);
+  --garden-muted-text: var(--hub-muted);
+  --garden-primary: var(--hub-accent);
+  --garden-primary-hover: var(--hub-accent-hover);
+  --garden-primary-active: var(--hub-accent-active);
+  --garden-primary-text: var(--hub-on-accent);
+  --garden-border: var(--hub-line);
+  --garden-border-strong: var(--hub-line-strong);
+
+  --font-heading: var(--hub-font);
+  --font-body: var(--hub-font);
+  --tg-font-body: var(--hub-font);
+  --tg-font-display: var(--hub-font);
+
+  --radius-md: var(--hub-radius);
+  --radius-lg: var(--hub-radius-lg);
+  --radius-xl: 12px;
+
+  --shadow-raised-100: var(--hub-shadow-sm);
+  --shadow-raised-200: var(--hub-shadow-sm);
+  --shadow-raised-300: var(--hub-shadow-md);
+  --shadow-overlay-100: var(--hub-shadow-md);
+  --shadow-overlay-200: var(--hub-shadow);
+
+  --bg-canvas: var(--hub-bg);
+  --bg-surface-1: var(--hub-surface);
+  --bg-surface-2: var(--hub-surface-2);
+  --bg-layer-1: var(--hub-bg);
+  --bg-layer-1-hover: var(--hub-sunken);
+  --bg-layer-1-active: var(--hub-sunken-2);
+  --bg-layer-1-selected: var(--hub-sunken-2);
+  --bg-layer-2: var(--hub-surface);
+  --bg-layer-2-hover: var(--hub-surface-2);
+  --bg-layer-2-active: var(--hub-sunken);
+  --bg-layer-2-selected: var(--hub-sunken);
+  --bg-layer-3: var(--hub-sunken);
+  --bg-layer-3-hover: var(--hub-sunken-2);
+  --bg-layer-3-active: var(--hub-sunken-2);
+  --bg-layer-3-selected: var(--hub-sunken-2);
+  --bg-layer-transparent: transparent;
+  --bg-layer-transparent-hover: var(--hub-hover);
+  --bg-layer-transparent-active: var(--hub-press);
+  --bg-layer-transparent-selected: var(--hub-chosen);
+  --bg-layer-disabled: var(--hub-sunken);
+  --bg-backdrop: var(--hub-scrim);
+
+  --brand-default: var(--hub-accent);
+  --brand-100: var(--hub-accent-soft);
+  --brand-200: var(--hub-accent-soft-2);
+  --brand-300: var(--hub-accent-soft-3);
+  --brand-400: var(--hub-accent-line);
+  --brand-900: var(--hub-accent-active);
+  --bg-accent-primary: var(--hub-accent);
+  --bg-accent-primary-hover: var(--hub-accent-hover);
+  --bg-accent-primary-active: var(--hub-accent-active);
+  --bg-accent-subtle: var(--hub-accent-soft);
+  --bg-accent-subtle-hover: var(--hub-accent-soft-2);
+  --bg-accent-subtle-active: var(--hub-accent-soft-3);
+
+  --border-subtle: var(--hub-line);
+  --border-subtle-1: var(--hub-line-2);
+  --border-strong: var(--hub-line-strong);
+  --border-strong-1: var(--hub-line-strong-2);
+  --border-disabled: var(--hub-line);
+  --border-accent-strong: var(--hub-accent);
+  --border-accent-subtle: var(--hub-accent-line);
+
+  --txt-primary: var(--hub-ink);
+  --txt-secondary: var(--hub-ink-2);
+  --txt-tertiary: var(--hub-muted);
+  --txt-placeholder: var(--hub-placeholder);
+  --txt-disabled: var(--hub-faint);
+  --txt-accent-primary: var(--hub-accent-ink);
+  --txt-accent-secondary: var(--hub-accent-ink);
+  --txt-on-color: var(--hub-on-accent);
+  --txt-link-primary: var(--hub-accent-ink);
+  --txt-link-primary-hover: var(--hub-accent);
+  --txt-link-secondary: var(--hub-muted);
+
+  --txt-icon-primary: var(--hub-ink);
+  --txt-icon-secondary: var(--hub-ink-2);
+  --txt-icon-tertiary: var(--hub-muted);
+  --txt-icon-placeholder: var(--hub-placeholder);
+  --txt-icon-disabled: var(--hub-faint);
+  --txt-icon-accent-primary: var(--hub-accent);
+  --txt-icon-accent-subtle: var(--hub-accent-line);
+  --txt-icon-on-color: var(--hub-on-accent);
+
+  --scrollbar-thumb: color-mix(in srgb, var(--hub-muted) 18%, transparent);
+  --scrollbar-thumb-surface-hover: color-mix(in srgb, var(--hub-muted) 24%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--hub-muted) 32%, transparent);
+  --scrollbar-thumb-active: color-mix(in srgb, var(--hub-muted) 45%, transparent);
+}
+
+/* ---------- page ---------- */
+html[data-brand-theme="hub"],
+html[data-brand-theme="hub"] body,
+html[data-brand-theme="hub"] #root {
+  background: var(--hub-bg);
+  color: var(--hub-ink);
+  font-family: var(--hub-font);
+}
+html[data-brand-theme="hub"] .ProseMirror {
+  --font-style: var(--hub-font);
+}
+html[data-brand-theme="hub"] .ProseMirror :is(pre, code) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ---------- controls ---------- */
+html[data-brand-theme="hub"] :is(button, a, input, textarea, select, [role="button"]) {
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+/* Garden makes every button 40px tall; the hub keeps Plane's own compact sizes and 32px fields. */
+html[data-brand-theme="hub"] :is(button, [role="button"]) {
+  min-height: 0;
+}
+html[data-brand-theme="hub"] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select) {
+  min-height: 0;
+  border-radius: var(--hub-radius);
+}
+html[data-brand-theme="hub"] textarea {
+  border-radius: var(--hub-radius);
+}
+html[data-brand-theme="hub"] :is(button, a, input, textarea, select, [role="button"]):focus-visible {
+  outline: 2px solid var(--hub-accent);
+  outline-offset: 1px;
+}
+
+/* ---------- top bar ---------- */
+html[data-brand-theme="hub"] [data-garden-surface="topbar"] {
+  min-height: var(--hub-bar-h);
+  gap: 12px;
+  background: var(--hub-surface);
+  border-bottom: 1px solid var(--hub-line);
+  box-shadow: var(--hub-shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-brand-theme="hub"] .brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 12px;
+  border-right: 1px solid var(--hub-line);
+  color: var(--hub-ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+  text-decoration: none;
+}
+html[data-brand-theme="hub"] .brand-mark > img {
+  display: block;
+  height: 42px;
+  width: auto;
+  max-width: 120px;
+  object-fit: contain;
+  filter: var(--hub-logo-filter);
+}
+html[data-brand-theme="hub"] .brand-mark > .brand-initial {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--hub-accent);
+  color: var(--hub-on-accent);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 700;
+}
+html[data-brand-theme="hub"] .brand-logo-dark-safe {
+  filter: var(--hub-logo-filter);
+}
+
+/* ---------- side menus ---------- */
+html[data-brand-theme="hub"] [data-garden-surface="rail"] {
+  background: var(--hub-bg);
+  border-right: 1px solid var(--hub-line);
+}
+html[data-brand-theme="hub"] [data-garden-surface="sidebar"] {
+  background: var(--hub-surface);
+  box-shadow: inset -1px 0 0 var(--hub-line);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-brand-theme="hub"] [data-garden-surface="sidebar"] > div:first-child > div:first-child > span {
+  font-family: var(--hub-font);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hub-ink);
+}
+/* The chosen item has a red bar on its left (hub rule). */
+html[data-brand-theme="hub"] [data-sidebar-active="true"] {
+  font-weight: 600;
+}
+html[data-brand-theme="hub"] [data-sidebar-active="true"]::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: var(--hub-mark);
+  border-radius: var(--hub-mark);
+  background: var(--hub-accent);
+}
+
+/* ---------- cards, menus, dialogs: soft raised panels ---------- */
+html[data-brand-theme="hub"] [data-garden-surface="task"] {
+  border-radius: var(--hub-radius-lg);
+  padding: 12px;
+  border-color: var(--hub-line);
+  background: var(--hub-surface);
+  box-shadow: var(--hub-shadow-card);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+html[data-brand-theme="hub"] [data-garden-surface="task"]:hover {
+  border-color: var(--hub-line-strong);
+  box-shadow: var(--hub-shadow-card-hover);
+}
+html[data-brand-theme="hub"] :is([role="dialog"], [role="menu"], [role="listbox"]) {
+  border-color: var(--hub-line);
+  border-radius: var(--hub-radius-lg);
+  background-color: var(--hub-surface);
+}
+html[data-brand-theme="hub"] :is([role="menu"], [role="listbox"]) {
+  box-shadow: var(--hub-shadow);
+}
+
+/* ---------- phones ---------- */
+html[data-brand-theme="hub"] .garden-mobile-sidebar-scrim {
+  background: var(--hub-scrim);
+}
+html[data-brand-theme="hub"] [data-garden-sidebar="primary"][data-mobile="true"][data-collapsed="false"] {
+  box-shadow: 18px 0 52px rgba(16, 16, 20, 0.2);
+}
+@media (max-width: 767px) {
+  /* Hub rule: 44px fields and 16px text in fields on a phone. Buttons keep Plane's sizes:
+     44px on every button (Garden's phone rule) swells the property chips on cards and clips them. */
+  html[data-brand-theme="hub"] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select) {
+    min-height: 44px;
+  }
+  html[data-brand-theme="hub"] :is(input, textarea, select) {
+    font-size: 16px;
+  }
+  html[data-brand-theme="hub"] [data-garden-sidebar="primary"][data-mobile="true"] > aside {
+    background: var(--hub-surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+@media (max-width: 900px) {
+  html[data-brand-theme="hub"] .brand-mark > span {
+    display: none;
+  }
+  html[data-brand-theme="hub"] [data-garden-surface="topbar"] {
+    min-height: 52px;
+    gap: 4px;
+    padding-inline: 8px;
+  }
+}

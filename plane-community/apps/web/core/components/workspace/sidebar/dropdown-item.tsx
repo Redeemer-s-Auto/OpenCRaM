@@ -16,6 +16,7 @@ import { CheckIcon } from "@plane/propel/icons";
 import type { IWorkspace } from "@plane/types";
 import { cn, getFileURL, getUserRole } from "@plane/utils";
 
+import { isHubTheme } from "@/lib/brand-config";
 import { gardenAccessUrl, gardenAdminConfigured, gardenMode } from "@/lib/garden-config";
 
 type TProps = {
@@ -114,7 +115,9 @@ const SidebarDropdownItem = observer(function SidebarDropdownItem(props: TProps)
                     className="flex gap-1.5 rounded-md border border-strong bg-layer-2 px-2.5 py-1.5 text-secondary transition-colors hover:border-strong hover:text-secondary hover:shadow-raised-100"
                   >
                     <UserPlus className="my-auto h-4 w-4 flex-shrink-0" />
-                    <span className="my-auto text-13 font-medium whitespace-nowrap">Manage staff access</span>
+                    <span className="my-auto text-13 font-medium whitespace-nowrap">
+                      {isHubTheme ? "Manage team member access" : "Manage staff access"}
+                    </span>
                   </a>
                 ) : (
                   <Link

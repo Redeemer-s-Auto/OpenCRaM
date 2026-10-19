@@ -8,7 +8,8 @@ import { useTheme } from "next-themes";
 import { Button } from "@plane/propel/button";
 import maintenanceModeDarkModeImage from "@/app/assets/instance/maintenance-mode-dark.svg?url";
 import maintenanceModeLightModeImage from "@/app/assets/instance/maintenance-mode-light.svg?url";
-import gardenMark from "@/app/assets/garden-mark.svg?url";
+import { AppMark } from "@/components/common/app-mark";
+import { brand } from "@/lib/brand-config";
 import DefaultLayout from "@/layouts/default-layout";
 
 import { gardenAdminName, gardenAppName, gardenMode } from "@/lib/garden-config";
@@ -43,7 +44,7 @@ export function ProdErrorComponent({ onGoHome }: ProdErrorComponentProps) {
     return (
       <DefaultLayout>
         <div className="relative container mx-auto flex h-full w-full max-w-xl flex-col items-center justify-center gap-6 bg-surface-1 px-6 text-center">
-          <img src={gardenMark} className="h-20 w-20 object-contain" alt={gardenAppName} />
+          <AppMark gardenClassName="h-20 w-20" hubClassName="h-16" />
           <div className="flex flex-col gap-2">
             <h1 className="text-18 font-semibold text-primary">{gardenAppName} hit a snag</h1>
             <p className="text-14 font-medium text-secondary">
@@ -51,7 +52,7 @@ export function ProdErrorComponent({ onGoHome }: ProdErrorComponentProps) {
             </p>
           </div>
           <Button variant="primary" size="lg" onClick={onGoHome}>
-            Go to Work home
+            {brand.isHub ? "Go to home" : "Go to Work home"}
           </Button>
         </div>
       </DefaultLayout>

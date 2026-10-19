@@ -9,7 +9,9 @@ import React from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import { PlaneNewIcon } from "@plane/propel/icons";
-import { GardenWorkIcon, isGardenWork } from "@/components/common/garden-work-icon";
+import { LayoutGrid } from "lucide-react";
+import { GardenWorkIcon, showGardenIcons } from "@/components/common/garden-work-icon";
+import { isHubTheme } from "@/lib/brand-config";
 import type { AppSidebarItemData } from "@/components/sidebar/sidebar-item";
 import { useWorkspacePaths } from "@/hooks/use-workspace-paths";
 
@@ -25,7 +27,13 @@ export function withDockItems<P extends WithDockItemsProps>(WrappedComponent: Re
     const dockItems: (AppSidebarItemData & { shouldRender: boolean })[] = [
       {
         label: "Projects",
-        icon: isGardenWork ? <GardenWorkIcon className="size-5" /> : <PlaneNewIcon className="size-5" />,
+        icon: showGardenIcons ? (
+          <GardenWorkIcon className="size-5" />
+        ) : isHubTheme ? (
+          <LayoutGrid className="size-5" />
+        ) : (
+          <PlaneNewIcon className="size-5" />
+        ),
         href: `/${workspaceSlug}/`,
         isActive: isProjectsPath && !isNotificationsPath,
         shouldRender: true,

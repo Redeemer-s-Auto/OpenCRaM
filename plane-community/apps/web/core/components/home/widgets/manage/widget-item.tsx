@@ -27,6 +27,7 @@ import { DropIndicator, ToggleSwitch } from "@plane/ui";
 import { cn } from "@plane/utils";
 // hooks
 import { useHome } from "@/hooks/store/use-home";
+import { brand } from "@/lib/brand-config";
 import { HOME_WIDGETS_LIST } from "../../home-dashboard-widgets";
 import { WidgetItemDragHandle } from "./widget-item-drag-handle";
 import { getCanDrop, getInstructionFromPayload } from "./widget.helpers";
@@ -134,7 +135,7 @@ export const WidgetItem = observer(function WidgetItem(props: Props) {
       >
         <div className="flex items-center">
           <WidgetItemDragHandle sort_order={widget.sort_order} isDragging={isDragging} />
-          <div>{t(widgetTitle, { count: 1 })}</div>
+          <div>{t(widgetTitle, { count: 1, appName: brand.productName })}</div>
         </div>
         <ToggleSwitch
           value={widget.is_enabled}

@@ -9,11 +9,13 @@ import { observer } from "mobx-react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { EIssuesStoreType } from "@plane/types";
 import type { TCustomField, TCustomFieldOption, TCustomFieldRollupFunction, TCustomFieldType } from "@plane/types";
 import { Checkbox, EModalPosition, EModalWidth, Input, ModalCore } from "@plane/ui";
 import { cn } from "@plane/utils";
 // hooks
 import { useCustomField } from "@/hooks/store/use-custom-field";
+import { useIssues } from "@/hooks/store/use-issues";
 import { useProject } from "@/hooks/store/use-project";
 // local
 import {
@@ -57,6 +59,9 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
   const { isOpen, onClose, workspaceSlug, projectId, field } = props;
   const { createField, updateField, getProjectFields, fetchProjectFields } = useCustomField();
   const { joinedProjectIds, getProjectById } = useProject();
+  const {
+    issues: { fetchIssuesWithExistingPagination },
+  } = useIssues(EIssuesStoreType.PROJECT);
   const otherFields = (getProjectFields(projectId) ?? []).filter((f) => f.id !== field?.id);
   const isEdit = !!field;
 
@@ -186,6 +191,9 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
       // A two-way relation adds (or removes) a field on the other board, or on this one for a same-board relation.
       if (fieldType === "relation" && targetProjectId)
         await fetchProjectFields(workspaceSlug, targetProjectId).catch(() => undefined);
+      // Rollup values are worked out by the server: reload the cards so a new or changed rollup shows at once.
+      if (fieldType === "rollup" || fieldType === "relation")
+        void fetchIssuesWithExistingPagination(workspaceSlug, projectId, "mutation")?.catch(() => undefined);
       setToast({ type: TOAST_TYPE.SUCCESS, title: isEdit ? "Field saved" : "Field added", message: name.trim() });
       onClose();
     } catch (error) {

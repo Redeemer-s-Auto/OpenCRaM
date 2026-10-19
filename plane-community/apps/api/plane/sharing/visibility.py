@@ -14,16 +14,49 @@ An item is hidden from a user when all of these hold:
 - the user is not an admin or owner of its workspace,
 - no ``ItemShare`` row on it matches the user at the needed level.
 
+Private projects (``Project.is_private``, added by the custom-fields work) are
+stricter: a restricted item there is hidden from everyone who is not an active
+member of that project, whatever their workspace role or share. Only members
+see anything in a private project. The rule switches on by itself once the
+field exists.
+
 Anonymous callers and background jobs acting for nobody (``user=None``) see no
 restricted item.
 """
 
 from django.db.models import Q, QuerySet
 
-from plane.db.models import Issue, Page, ProjectMember, Workspace, WorkspaceMember
+from plane.db.models import Issue, Page, Project, ProjectMember, ProjectPage, Workspace, WorkspaceMember
 from plane.sharing.models import AccessGroupMember, AccessLevel, ItemRestriction, ItemShare, ShareTarget
 
 ADMIN_ROLE = 20
+
+
+def _private_projects_supported():
+    return any(field.name == "is_private" for field in Project._meta.get_fields())
+
+
+def _member_project_ids(user):
+    return ProjectMember.objects.filter(member=user, is_active=True, deleted_at__isnull=True).values("project_id")
+
+
+def _private_blocked_issue_q(user):
+    """Q on ItemRestriction: the work item sits in a private project ``user`` is not a member of."""
+    if not _private_projects_supported():
+        return Q(pk__in=[])
+    return Q(issue__project__is_private=True) & ~Q(issue__project_id__in=_member_project_ids(user))
+
+
+def _private_blocked_page_q(user):
+    """Q on ItemRestriction: the page belongs to a private project ``user`` is not a member of."""
+    if not _private_projects_supported():
+        return Q(pk__in=[])
+    blocked_pages = (
+        ProjectPage.objects.filter(project__is_private=True, deleted_at__isnull=True)
+        .exclude(project_id__in=_member_project_ids(user))
+        .values("page_id")
+    )
+    return Q(page_id__in=blocked_pages)
 
 
 def _real_user(user):
@@ -66,12 +99,10 @@ def hidden_issue_ids(user, min_level=AccessLevel.VIEW):
     if user is None:
         return restrictions.values("issue_id")
     reachable = ItemShare.objects.filter(share_matches_user(user, min_level), issue__isnull=False).values("issue_id")
-    return (
-        restrictions.exclude(issue__created_by=user)
-        .exclude(_admin_workspace_q(user))
-        .exclude(issue_id__in=reachable)
-        .values("issue_id")
+    not_reached = (
+        restrictions.exclude(issue__created_by=user).exclude(_admin_workspace_q(user)).exclude(issue_id__in=reachable)
     )
+    return restrictions.filter(Q(pk__in=not_reached.values("pk")) | _private_blocked_issue_q(user)).values("issue_id")
 
 
 def hidden_page_ids(user, min_level=AccessLevel.VIEW):
@@ -81,12 +112,10 @@ def hidden_page_ids(user, min_level=AccessLevel.VIEW):
     if user is None:
         return restrictions.values("page_id")
     reachable = ItemShare.objects.filter(share_matches_user(user, min_level), page__isnull=False).values("page_id")
-    return (
-        restrictions.exclude(page__owned_by=user)
-        .exclude(_admin_workspace_q(user))
-        .exclude(page_id__in=reachable)
-        .values("page_id")
+    not_reached = (
+        restrictions.exclude(page__owned_by=user).exclude(_admin_workspace_q(user)).exclude(page_id__in=reachable)
     )
+    return restrictions.filter(Q(pk__in=not_reached.values("pk")) | _private_blocked_page_q(user)).values("page_id")
 
 
 def visible_issues(queryset: QuerySet, user, field="pk", min_level=AccessLevel.VIEW) -> QuerySet:
@@ -120,6 +149,10 @@ def _level_for(user, restriction, owner_id, shares):
         return None  # not restricted: normal project rules apply
     user = _real_user(user)
     if user is None:
+        return 0
+    if ItemRestriction.objects.filter(
+        Q(pk=restriction.pk) & (_private_blocked_issue_q(user) | _private_blocked_page_q(user))
+    ).exists():
         return 0
     if owner_id == user.id:
         return AccessLevel.EDIT

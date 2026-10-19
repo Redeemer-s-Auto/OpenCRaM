@@ -4,7 +4,8 @@
  * See the LICENSE file for details.
  */
 
-import { ISSUE_LAYOUTS } from "@plane/constants";
+// Every layout, the page list included (the plain layout list leaves it out for cycle/module screens).
+import { ISSUE_LAYOUT_MAP } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/propel/button";
 import { ChevronDownIcon } from "@plane/propel/icons";
@@ -39,7 +40,7 @@ export function MobileLayoutSelection({
       customButtonClassName="flex flex-grow justify-center text-secondary text-13"
       closeOnSelect
     >
-      {ISSUE_LAYOUTS.filter((l) => layouts.includes(l.key)).map((layout, index) => (
+      {Object.values(ISSUE_LAYOUT_MAP).filter((l) => layouts.includes(l.key)).map((layout, index) => (
         <CustomMenu.MenuItem
           key={index}
           onClick={() => {

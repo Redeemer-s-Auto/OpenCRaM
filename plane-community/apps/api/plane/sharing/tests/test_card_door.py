@@ -42,7 +42,7 @@ class TestCardDoor:
             format="json",
         )
         assert card.status_code == 201, card.content
-        card_id = card.data["id"]
+        card_id = str(card.data["id"])
 
         again = api.post(url(cast), {"name": "dup", "external_source": "hub", "external_id": "call-1"}, format="json")
         assert again.status_code == 409
@@ -64,7 +64,7 @@ class TestCardDoor:
 
         children = api.get(url(cast) + f"?parent={card_id}")
         assert children.status_code == 200
-        assert ids(children.data["results"]) == {sub.data["id"]}
+        assert ids(children.data["results"]) == {str(sub.data["id"])}
         assert children.data["total_count"] == 1
 
         top = api.get(url(cast) + "?parent=null")

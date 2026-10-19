@@ -79,7 +79,8 @@ export function ParentIssuesListModal({
         search: debouncedSearchTerm,
         parent: searchEpic ? undefined : true,
         issue_id: issueId,
-        workspace_search: false,
+        // one-unit screens: a parent may come from any project the person can see
+        workspace_search: !searchEpic,
         epic: searchEpic ? true : undefined,
       })
       .then((res) => setIssues(res))

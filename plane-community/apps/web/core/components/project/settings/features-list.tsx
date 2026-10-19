@@ -20,6 +20,7 @@ import { useProject } from "@/hooks/store/use-project";
 import { UpgradeBadge } from "@/components/workspace/upgrade-badge";
 // local imports
 import { ProjectFeatureToggle } from "./helper";
+import { PLANE_PAGES_HIDDEN } from "@/components/one-unit/flags";
 
 type Props = {
   workspaceSlug: string;
@@ -113,7 +114,9 @@ export const ProjectFeaturesList = observer(function ProjectFeaturesList(props: 
       <div>
         <SettingsHeading title={t("projects_and_issues")} description={t("projects_and_issues_description")} />
         <div className="mt-6 flex flex-col gap-y-4">
-          {Object.entries(PROJECT_FEATURES_LIST).map(([featureItemKey, featureItem]) => (
+          {Object.entries(PROJECT_FEATURES_LIST)
+            .filter(([featureItemKey]) => !(PLANE_PAGES_HIDDEN && featureItemKey === "pages"))
+            .map(([featureItemKey, featureItem]) => (
             <div key={featureItemKey}>
               <SettingsBoxedControlItem
                 title={

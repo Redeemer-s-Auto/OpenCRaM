@@ -16,6 +16,7 @@ import { useCommandPalette } from "@/hooks/store/use-command-palette";
 import { useProject } from "@/hooks/store/use-project";
 import { useUser } from "@/hooks/store/user";
 import { useInstance } from "@/hooks/store/use-instance";
+import { PLANE_PAGES_HIDDEN } from "@/components/one-unit/flags";
 
 export type TPowerKCreationCommandKeys =
   | "create_work_item"
@@ -84,8 +85,10 @@ export const usePowerKCreationCommandsRecord = (): Record<TPowerKCreationCommand
       icon: FileText,
       keySequence: "nd",
       action: () => toggleCreatePageModal({ isOpen: true }),
-      isEnabled: (ctx) => Boolean(getProjectDetails(ctx)?.page_view && hasProjectMemberLevelPermissions(ctx)),
+      isEnabled: (ctx) =>
+        !PLANE_PAGES_HIDDEN && Boolean(getProjectDetails(ctx)?.page_view && hasProjectMemberLevelPermissions(ctx)),
       isVisible: (ctx) =>
+        !PLANE_PAGES_HIDDEN &&
         Boolean(ctx.params.projectId && getProjectDetails(ctx)?.page_view && hasProjectMemberLevelPermissions(ctx)),
       closeOnSelect: true,
     },

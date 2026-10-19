@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from .base import BaseAPIView
 from plane.db.models import Issue, ProjectMember, IssueRelation
 from plane.utils.issue_search import search_issues
-from plane.sharing.visibility import visible_issues
+from plane.one_unit.reach import descendant_ids, reachable_issues
 
 
 class IssueSearchEndpoint(BaseAPIView):
@@ -43,6 +43,8 @@ class IssueSearchEndpoint(BaseAPIView):
         issue = Issue.issue_objects.filter(pk=issue_id).first()
         if issue:
             issues = issues.filter(~Q(pk=issue_id), ~Q(pk=issue.parent_id), ~Q(parent_id=issue_id))
+            # A parent may come from another project now; never offer a card below this one (a loop).
+            issues = issues.exclude(pk__in=descendant_ids(issue_id))
         return issues
 
     def filter_issues_excluding_related_issues(self, issue_id: str, issues: QuerySet) -> QuerySet:
@@ -108,13 +110,10 @@ class IssueSearchEndpoint(BaseAPIView):
         target_date = request.query_params.get("target_date", True)
         issue_id = request.query_params.get("issue_id", False)
 
-        issues = Issue.issue_objects.filter(
-            workspace__slug=slug,
-            project__project_projectmember__member=self.request.user,
-            project__project_projectmember__is_active=True,
-            project__archived_at__isnull=True,
+        # Membership (with guest limits), sharing rules and private projects, across all projects.
+        issues = reachable_issues(
+            Issue.issue_objects.filter(workspace__slug=slug, project__archived_at__isnull=True), request.user
         )
-        issues = visible_issues(issues, request.user)
 
         if workspace_search == "false":
             issues = self.filter_issues_by_project(project_id, issues)

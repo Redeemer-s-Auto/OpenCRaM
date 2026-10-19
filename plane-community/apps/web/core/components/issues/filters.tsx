@@ -36,6 +36,7 @@ type Props = {
 };
 const LAYOUTS = [
   EIssueLayoutTypes.LIST,
+  EIssueLayoutTypes.PAGE_LIST,
   EIssueLayoutTypes.KANBAN,
   EIssueLayoutTypes.CALENDAR,
   EIssueLayoutTypes.SPREADSHEET,

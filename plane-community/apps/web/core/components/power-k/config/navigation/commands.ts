@@ -16,6 +16,7 @@ import { handlePowerKNavigate } from "@/components/power-k/utils/navigation";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
 import { useUser } from "@/hooks/store/user";
+import { PLANE_PAGES_HIDDEN } from "@/components/one-unit/flags";
 
 export type TPowerKNavigationCommandKeys =
   | "open_workspace"
@@ -440,8 +441,8 @@ export const usePowerKNavigationCommandsRecord = (): Record<TPowerKNavigationCom
           ctx.params.projectId?.toString(),
           "pages",
         ]),
-      isEnabled: (ctx) => baseProjectConditions(ctx) && !!getContextProject(ctx)?.page_view,
-      isVisible: (ctx) => baseProjectConditions(ctx) && !!getContextProject(ctx)?.page_view,
+      isEnabled: (ctx) => !PLANE_PAGES_HIDDEN && baseProjectConditions(ctx) && !!getContextProject(ctx)?.page_view,
+      isVisible: (ctx) => !PLANE_PAGES_HIDDEN && baseProjectConditions(ctx) && !!getContextProject(ctx)?.page_view,
       closeOnSelect: true,
     },
     nav_project_intake: {

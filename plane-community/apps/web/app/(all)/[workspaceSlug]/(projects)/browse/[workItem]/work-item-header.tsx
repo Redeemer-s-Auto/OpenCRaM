@@ -19,6 +19,9 @@ import { useProject } from "@/hooks/store/use-project";
 import { useAppRouter } from "@/hooks/use-app-router";
 // plane web imports
 import { CommonProjectBreadcrumbs } from "@/components/breadcrumbs/common";
+// one-unit screens: parent chain (may cross projects) and the open-as-page/peek choice
+import { cardAncestorCrumbs, useCardAncestors } from "@/components/one-unit/card-breadcrumb";
+import { CardOpenModeToggle } from "@/components/one-unit/open-mode-toggle";
 
 export const WorkItemDetailsHeader = observer(function WorkItemDetailsHeader() {
   // router
@@ -34,6 +37,7 @@ export const WorkItemDetailsHeader = observer(function WorkItemDetailsHeader() {
   const issueDetails = issueId ? getIssueById(issueId.toString()) : undefined;
   const projectId = issueDetails ? issueDetails?.project_id : undefined;
   const projectDetails = projectId ? getProjectById(projectId?.toString()) : undefined;
+  const ancestors = useCardAncestors(workspaceSlug?.toString(), issueId?.toString(), issueDetails?.parent_id);
 
   if (!workspaceSlug || !projectId || !issueId) return null;
   return (
@@ -50,6 +54,7 @@ export const WorkItemDetailsHeader = observer(function WorkItemDetailsHeader() {
               />
             }
           />
+          {cardAncestorCrumbs(workspaceSlug.toString(), ancestors)}
           <Breadcrumbs.Item
             component={
               <BreadcrumbLink
@@ -60,6 +65,7 @@ export const WorkItemDetailsHeader = observer(function WorkItemDetailsHeader() {
         </Breadcrumbs>
       </Header.LeftItem>
       <Header.RightItem>
+        <CardOpenModeToggle className="hidden md:flex" />
         {projectId && issueId && (
           <IssueDetailQuickActions
             workspaceSlug={workspaceSlug?.toString()}

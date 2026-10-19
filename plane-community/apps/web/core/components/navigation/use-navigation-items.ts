@@ -10,6 +10,7 @@ import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { CycleIcon, IntakeIcon, ModuleIcon, PageIcon, ViewsIcon, WorkItemsIcon } from "@plane/propel/icons";
 import type { EUserProjectRoles, IPartialProject } from "@plane/types";
 import type { TNavigationItem } from "@/components/navigation/tab-navigation-root";
+import { PLANE_PAGES_HIDDEN } from "@/components/one-unit/flags";
 
 type UseNavigationItemsProps = {
   workspaceSlug: string;
@@ -80,7 +81,7 @@ export const useNavigationItems = ({
         href: `/${workspaceSlug}/projects/${projectId}/pages`,
         icon: PageIcon,
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
-        shouldRender: !!project?.page_view,
+        shouldRender: !PLANE_PAGES_HIDDEN && !!project?.page_view,
         sortOrder: 5,
       },
       {

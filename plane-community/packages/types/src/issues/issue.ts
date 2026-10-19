@@ -15,6 +15,8 @@ import type { TIssueRelationTypes } from "./issue_relation";
 
 export enum EIssueLayoutTypes {
   LIST = "list",
+  /** Notion-style list of cards as documents, nested by parent (one-unit screens). */
+  PAGE_LIST = "page_list",
   KANBAN = "kanban",
   CALENDAR = "calendar",
   GANTT = "gantt_chart",

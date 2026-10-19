@@ -27,6 +27,9 @@ import { useAppRouter } from "@/hooks/use-app-router";
 // plane web hooks
 import { EPageStoreType } from "@/hooks/store";
 import type { Route } from "./+types/page";
+// one-unit screens: Plane Pages are retired (a card is the page); old links open the page list.
+import { PLANE_PAGES_HIDDEN } from "@/components/one-unit/flags";
+import { PagesRedirect } from "@/components/one-unit/pages-redirect";
 
 const getPageType = (pageType?: string | null): TPageNavigationTabs => {
   if (pageType === "private") return "private";
@@ -87,4 +90,4 @@ function ProjectPagesPage({ params }: Route.ComponentProps) {
   );
 }
 
-export default observer(ProjectPagesPage);
+export default PLANE_PAGES_HIDDEN ? PagesRedirect : observer(ProjectPagesPage);

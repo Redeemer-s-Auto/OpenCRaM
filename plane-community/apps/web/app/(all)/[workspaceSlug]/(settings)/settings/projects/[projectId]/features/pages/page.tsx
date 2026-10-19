@@ -19,6 +19,9 @@ import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
 // local imports
 import type { Route } from "./+types/page";
+// one-unit screens: Plane Pages are retired, so this setting is hidden.
+import { PLANE_PAGES_HIDDEN } from "@/components/one-unit/flags";
+import { PagesSettingsRedirect } from "@/components/one-unit/pages-redirect";
 import { FeaturesPagesProjectSettingsHeader } from "./header";
 
 function FeaturesPagesSettingsPage({ params }: Route.ComponentProps) {
@@ -61,4 +64,4 @@ function FeaturesPagesSettingsPage({ params }: Route.ComponentProps) {
   );
 }
 
-export default observer(FeaturesPagesSettingsPage);
+export default PLANE_PAGES_HIDDEN ? PagesSettingsRedirect : observer(FeaturesPagesSettingsPage);

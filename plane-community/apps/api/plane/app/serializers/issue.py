@@ -49,6 +49,8 @@ from plane.utils.content_validator import (
     validate_binary_data,
 )
 from plane.sharing.visibility import hidden_issue_ids
+from plane.one_unit.reach import creates_cycle, is_reachable, unreachable_issue_ids
+from plane.sharing.models import AccessLevel
 
 # Keys in serialized work item data that point at one other work item.
 ISSUE_REF_FIELDS = ("parent_id", "parent", "duplicate_to", "duplicate_issue_detail")
@@ -66,7 +68,8 @@ def hide_issue_refs(data, user):
     ``data`` is one dict or a list of dicts (a nested ``issue`` dict is handled too).
     A visible item whose parent is hidden shows ``parent_id: None`` (and ``parent: None``
     when expanded), exactly like an item with no parent. Hidden entries in relation and
-    sub-item lists are dropped. Changes ``data`` in place and returns it.
+    sub-item lists are dropped. Items in a project the user is not a member of count as
+    hidden too (a parent may sit in another project). Changes ``data`` in place and returns it.
     """
     rows = [data] if isinstance(data, dict) else list(data)
     rows += [row["issue"] for row in rows if isinstance(row.get("issue"), dict)]
@@ -81,6 +84,8 @@ def hide_issue_refs(data, user):
         str(issue_id)
         for issue_id in hidden_issue_ids(user).filter(issue_id__in=ids).values_list("issue_id", flat=True)
     }
+    # A parent or sub-item may live in another project: hide it unless the user reaches that project too.
+    hidden |= unreachable_issue_ids(user, ids - hidden)
     if not hidden:
         return data
     for row in rows:
@@ -222,15 +227,22 @@ class IssueCreateSerializer(BaseSerializer):
         ):
             raise serializers.ValidationError("State is not valid please pass a valid state_id")
 
-        # Check parent issue is from workspace as it can be cross workspace
-        if (
-            attrs.get("parent")
-            and not Issue.objects.filter(
-                project_id=self.context.get("project_id"),
-                pk=attrs.get("parent").id,
-            ).exists()
-        ):
-            raise serializers.ValidationError("Parent is not valid issue_id please pass a valid issue_id")
+        # Parent: same project as before, or (one-unit screens) a card in another project of the
+        # same workspace that the user reaches and may edit. Never the card itself or one below it.
+        if attrs.get("parent"):
+            parent = attrs["parent"]
+            project_id = self.context.get("project_id") or (self.instance and self.instance.project_id)
+            user = self.context.get("user")
+            same_project = Issue.objects.filter(project_id=project_id, pk=parent.id).exists()
+            other_project_ok = (
+                user is not None
+                and Issue.objects.filter(pk=parent.id, workspace__workspace_project__id=project_id).exists()
+                and is_reachable(user, parent.id, AccessLevel.EDIT)
+            )
+            if not (same_project or other_project_ok):
+                raise serializers.ValidationError("Parent is not valid issue_id please pass a valid issue_id")
+            if self.instance and creates_cycle(self.instance.id, parent.id):
+                raise serializers.ValidationError("A card cannot be placed inside itself or one of its sub-cards")
 
         if (
             attrs.get("estimate_point")

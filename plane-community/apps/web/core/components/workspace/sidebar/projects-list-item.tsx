@@ -41,6 +41,7 @@ import { usePlatformOS } from "@/hooks/use-platform-os";
 // local imports
 import { HIGHLIGHT_CLASS, highlightIssueOnDrop } from "../../issues/issue-layouts/utils";
 import { ProjectNavigation } from "./project-navigation";
+import { SidebarCardTree } from "@/components/one-unit/sidebar-card-tree";
 import { useNavigationItems } from "@/components/navigation/use-navigation-items";
 
 type Props = {
@@ -481,6 +482,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
                 <Disclosure.Panel as="div" className="relative mt-1 mb-1.5 flex flex-col gap-0.5 pl-6">
                   <div className="absolute top-0 bottom-1 left-[15px] w-[1px] bg-layer-3" />
                   <ProjectNavigation workspaceSlug={workspaceSlug.toString()} projectId={projectId.toString()} />
+                  <SidebarCardTree workspaceSlug={workspaceSlug.toString()} projectId={projectId.toString()} />
                 </Disclosure.Panel>
               )}
             </Transition>

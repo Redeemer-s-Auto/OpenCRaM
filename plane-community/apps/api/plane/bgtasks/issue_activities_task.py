@@ -18,6 +18,7 @@ from django.utils import timezone
 from plane.app.serializers import IssueActivitySerializer
 from plane.bgtasks.notification_task import notifications
 from plane.db.models import (
+    CustomField,
     CommentReaction,
     Cycle,
     Issue,
@@ -33,6 +34,7 @@ from plane.db.models import (
     EstimatePoint,
 )
 from plane.settings.redis import redis_instance
+from plane.utils.custom_fields import display_value as custom_field_display_value, values_for_issues
 from plane.utils.exception_logger import log_exception
 from plane.utils.issue_relation_mapper import get_inverse_relation
 from plane.utils.uuid import is_valid_uuid
@@ -251,6 +253,48 @@ def track_target_date(
                 project_id=project_id,
                 workspace_id=workspace_id,
                 comment="updated the target date to",
+                epoch=epoch,
+            )
+        )
+
+
+# Track changes in custom field values
+def track_custom_fields(
+    requested_data,
+    current_instance,
+    issue_id,
+    project_id,
+    workspace_id,
+    actor_id,
+    issue_activities,
+    epoch,
+):
+    requested = requested_data.get("custom_fields")
+    if not isinstance(requested, dict) or not requested:
+        return
+    before = (current_instance or {}).get("custom_fields") or {}
+    # The values are saved before this task runs, so the database holds the new ones.
+    after = values_for_issues([issue_id]).get(str(issue_id), {})
+    fields = {str(f.id): f for f in CustomField.objects.filter(project_id=project_id, id__in=list(requested.keys()))}
+    for field_id in requested.keys():
+        field = fields.get(str(field_id))
+        if field is None:
+            continue
+        old, new = before.get(str(field.id)), after.get(str(field.id))
+        if old == new:
+            continue
+        issue_activities.append(
+            IssueActivity(
+                issue_id=issue_id,
+                actor_id=actor_id,
+                verb="updated",
+                old_value=custom_field_display_value(field, old),
+                new_value=custom_field_display_value(field, new),
+                field="custom_field",
+                project_id=project_id,
+                workspace_id=workspace_id,
+                comment=f"updated {field.name} to",
+                new_identifier=field.id,
                 epoch=epoch,
             )
         )
@@ -614,6 +658,7 @@ def update_issue_activity(
         "estimate_point": track_estimate_points,
         "archived_at": track_archive_at,
         "closed_to": track_closed_to,
+        "custom_fields": track_custom_fields,
         # External endpoint keys
         "parent": track_parent,
         "state": track_state,

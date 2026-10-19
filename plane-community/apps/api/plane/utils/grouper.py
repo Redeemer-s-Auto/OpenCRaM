@@ -22,6 +22,7 @@ from plane.db.models import (
     ModuleIssue,
     IssueLabel,
 )
+from plane.utils.custom_fields import attach_to_rows as attach_custom_fields
 from typing import Optional, Dict, Tuple, Any, Union, List
 
 
@@ -138,7 +139,8 @@ def issue_on_results(
         original_list.append(sub_group_by)
 
     required_fields.extend(original_list)
-    return list(issues.values(*required_fields))
+    # Custom field values are read only for the work items in this result.
+    return attach_custom_fields(list(issues.values(*required_fields)))
 
 
 def issue_group_values(

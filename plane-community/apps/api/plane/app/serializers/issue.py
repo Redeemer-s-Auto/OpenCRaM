@@ -43,6 +43,7 @@ from plane.db.models import (
     ProjectMember,
     EstimatePoint,
 )
+from plane.utils.custom_fields import set_values, validate_values, values_for_issues
 from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
@@ -99,6 +100,8 @@ class IssueCreateSerializer(BaseSerializer):
     )
     project_id = serializers.UUIDField(source="project.id", read_only=True)
     workspace_id = serializers.UUIDField(source="workspace.id", read_only=True)
+    # {field_id: value}; see plane.utils.custom_fields
+    custom_fields = serializers.DictField(write_only=True, required=False)
 
     class Meta:
         model = Issue
@@ -119,6 +122,7 @@ class IssueCreateSerializer(BaseSerializer):
         data["assignee_ids"] = assignee_ids if assignee_ids else []
         label_ids = self.initial_data.get("label_ids")
         data["label_ids"] = label_ids if label_ids else []
+        data["custom_fields"] = values_for_issues([instance.id]).get(str(instance.id), {})
         return data
 
     def validate(self, attrs):
@@ -194,11 +198,16 @@ class IssueCreateSerializer(BaseSerializer):
         ):
             raise serializers.ValidationError("Estimate point is not valid please pass a valid estimate_point_id")
 
+        if "custom_fields" in attrs:
+            project_id = self.context.get("project_id") or (self.instance and self.instance.project_id)
+            attrs["custom_fields"] = validate_values(project_id, attrs["custom_fields"])
+
         return attrs
 
     def create(self, validated_data):
         assignees = validated_data.pop("assignee_ids", None)
         labels = validated_data.pop("label_ids", None)
+        custom_fields = validated_data.pop("custom_fields", None)
 
         project_id = self.context["project_id"]
         workspace_id = self.context["workspace_id"]
@@ -271,11 +280,18 @@ class IssueCreateSerializer(BaseSerializer):
             except IntegrityError:
                 pass
 
+        if custom_fields:
+            set_values(issue, custom_fields)
+
         return issue
 
     def update(self, instance, validated_data):
         assignees = validated_data.pop("assignee_ids", None)
         labels = validated_data.pop("label_ids", None)
+        custom_fields = validated_data.pop("custom_fields", None)
+
+        if custom_fields:
+            set_values(instance, custom_fields)
 
         # Related models
         project_id = instance.project_id
@@ -781,6 +797,15 @@ class IssueSerializer(DynamicBaseSerializer):
     attachment_count = serializers.IntegerField(read_only=True)
     link_count = serializers.IntegerField(read_only=True)
 
+    # {field_id: value} for the project's live custom fields
+    custom_fields = serializers.SerializerMethodField()
+
+    def get_custom_fields(self, obj):
+        prefetched = getattr(obj, "_custom_field_values", None)
+        if prefetched is not None:
+            return prefetched
+        return values_for_issues([obj.id]).get(str(obj.id), {})
+
     class Meta:
         model = Issue
         fields = [
@@ -809,6 +834,7 @@ class IssueSerializer(DynamicBaseSerializer):
             "link_count",
             "is_draft",
             "archived_at",
+            "custom_fields",
         ]
         read_only_fields = fields
 

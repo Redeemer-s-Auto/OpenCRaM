@@ -14,7 +14,20 @@ from django_filters.utils import translate_validation
 from rest_framework import filters
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
+from plane.utils.custom_fields import (
+    build_filter_q as build_custom_field_filter_q,
+    fields_for_filter_keys as custom_fields_for_filter_keys,
+    is_filter_key as is_custom_field_filter_key,
+    parse_filter_key as parse_custom_field_filter_key,
+)
 from plane.utils.exception_logger import log_exception
+
+
+def _filters_issues(filterset_class):
+    from plane.db.models import Issue
+
+    model = getattr(getattr(filterset_class, "_meta", None), "model", None)
+    return model is Issue
 
 
 class ComplexFilterBackend(filters.BaseFilterBackend):
@@ -115,6 +128,17 @@ class ComplexFilterBackend(filters.BaseFilterBackend):
 
         # Check if all fields are allowed
         for field in fields:
+            # Custom field keys (customfield_<id>__<lookup>) are checked when the Q is built.
+            if is_custom_field_filter_key(field):
+                if not _filters_issues(filterset_class):
+                    raise DRFValidationError(
+                        {
+                            "message": f"Filtering on field '{field}' is not allowed",
+                            "code": "invalid_filter_field",
+                        }
+                    )
+                parse_custom_field_filter_key(field)
+                continue
             # Field keys must match FilterSet filter names (including any lookups)
             # Example: 'sequence_id__gte' should be declared in base_filters
             # Special-case __range: require the '<base>__range' filter itself
@@ -253,6 +277,18 @@ class ComplexFilterBackend(filters.BaseFilterBackend):
                     "code": "filterset_missing",
                 }
             )
+
+        # Custom field conditions are built here; the rest go through the FilterSet.
+        custom_conditions = {k: v for k, v in leaf_conditions.items() if is_custom_field_filter_key(k)}
+        if custom_conditions:
+            custom_q = Q()
+            fields_by_id = custom_fields_for_filter_keys(custom_conditions.keys())
+            for key, value in custom_conditions.items():
+                custom_q &= build_custom_field_filter_q(key, value, fields_by_id)
+            leaf_conditions = {k: v for k, v in leaf_conditions.items() if k not in custom_conditions}
+            if not leaf_conditions:
+                return custom_q
+            return custom_q & self._build_leaf_q(leaf_conditions, view, queryset)
 
         # Apply preprocessing hook
         processed_conditions = self._preprocess_leaf_conditions(leaf_conditions, view, queryset)

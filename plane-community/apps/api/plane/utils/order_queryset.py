@@ -143,6 +143,15 @@ def sanitize_order_by(value, allowed_fields, default="-created_at"):
 
 
 def order_issue_queryset(issue_queryset, order_by_param="-created_at"):
+    # Custom fields: order_by=custom_field__<field_id> (or with a leading '-').
+    # The field id is checked against live fields, never passed to the ORM raw.
+    from plane.utils.custom_fields import is_order_key, order_queryset
+
+    if is_order_key(order_by_param):
+        ordered, key = order_queryset(issue_queryset, order_by_param)
+        if ordered is not None:
+            return ordered, key
+        order_by_param = "-created_at"
     # Reject any field that is not in the allowlist before building the queryset.
     # An unrecognised value is silently replaced with the safe default so callers
     # receive consistent output rather than an ORM error or data leak.

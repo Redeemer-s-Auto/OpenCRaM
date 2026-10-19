@@ -74,9 +74,11 @@ const IssueLink = observer(function IssueLink(props: { workspaceSlug: string; is
 export const IssueRepeatSection = observer(function IssueRepeatSection(props: Props) {
   const { workspaceSlug, projectId, issueId, disabled } = props;
   const swrKey = `ISSUE_REPEAT_${issueId}`;
-  const { data, mutate } = useSWR<TIssueRepeat>(swrKey, () => repeatService.getRepeat(workspaceSlug, projectId, issueId), {
-    revalidateOnFocus: false,
-  });
+  const { data, error, mutate } = useSWR<TIssueRepeat>(
+    swrKey,
+    () => repeatService.getRepeat(workspaceSlug, projectId, issueId),
+    { revalidateOnFocus: false, shouldRetryOnError: false }
+  );
   const [draft, setDraft] = useState<TRepeatDraft | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -121,6 +123,9 @@ export const IssueRepeatSection = observer(function IssueRepeatSection(props: Pr
     else days.add(day);
     if (days.size) set({ weekdays: [...days].sort((a, b) => a - b) });
   };
+
+  // Guests (and anyone the server turns away) see no Repeat section.
+  if (error) return null;
 
   return (
     <section className="mt-5 border-t border-subtle-1 pt-4" aria-label="Repeat">

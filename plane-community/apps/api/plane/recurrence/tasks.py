@@ -12,6 +12,7 @@ Safe to run twice, in parallel, or after a restart:
   on to its first future slot.
 """
 
+import datetime
 import logging
 
 from celery import shared_task
@@ -22,11 +23,14 @@ from plane.db.models import ProjectMember
 from plane.recurrence import schedule
 from plane.recurrence.copier import make_copy
 from plane.recurrence.models import RepeatOccurrence, RepeatRule
+from plane.sharing.models import AccessLevel
+from plane.sharing.visibility import can_reach, issue_access_level
 from plane.utils.exception_logger import log_exception
 
 logger = logging.getLogger("plane.recurrence")
 
 BATCH = 200
+RETRY_AFTER = datetime.timedelta(hours=1)  # a run that failed is tried again this much later
 
 
 def _stop(rule, reason):
@@ -52,6 +56,8 @@ def _blocker(rule):
         project_id=rule.project_id, member=actor, role__gte=15, is_active=True, deleted_at__isnull=True
     ).exists():
         return "The person who set the repeat is no longer a member of this project."
+    if not can_reach(issue_access_level(actor, template.id), AccessLevel.EDIT):
+        return "The person who set the repeat can no longer edit the card."
     return None
 
 
@@ -106,6 +112,9 @@ def run_due_repeats():
                 made += 1
         except Exception as e:  # one broken rule must not stop the others
             log_exception(e)
+            # Nothing was saved for this slot (the transaction rolled back). Try again
+            # later rather than every few minutes; the catch-up rule still makes one copy.
+            RepeatRule.objects.filter(pk=rule_id, is_active=True).update(next_run_at=now + RETRY_AFTER)
     if due:
         logger.info("repeat job: %s due rules, %s copies made", len(due), made)
     return made

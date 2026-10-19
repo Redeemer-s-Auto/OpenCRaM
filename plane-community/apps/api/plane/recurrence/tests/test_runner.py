@@ -141,6 +141,20 @@ class TestCopyContents:
 
         assert IssueActivity.objects.filter(issue=copy, verb="created", actor=cast.author).exists()
 
+    def test_linked_card_fields_are_not_copied(self, cast, template):
+        from plane.db.models import CustomFieldValue
+
+        relation = CustomField.objects.create(
+            name="Linked", field_type="relation", project=cast.alpha, workspace=cast.workspace
+        )
+        note = CustomField.objects.create(name="Note", field_type="text", project=cast.alpha, workspace=cast.workspace)
+        CustomFieldValue.objects.create(
+            issue=template, field=relation, project=cast.alpha, workspace=cast.workspace, value=[str(template.id)]
+        )
+        set_values(template, validate_values(cast.alpha.id, {str(note.id): "keep"}))
+        copy = tasks.run_rule(make_rule(cast, template).id, NOW)
+        assert values_for_issues([copy.id])[str(copy.id)] == {str(note.id): "keep"}
+
     def test_editing_the_template_changes_future_copies_only(self, cast, template):
         rule = make_rule(cast, template)
         first = tasks.run_rule(rule.id, NOW)
@@ -182,6 +196,13 @@ class TestStops:
         assert rule.is_active is False and "no longer" in rule.stop_reason
         assert copies_of(rule).count() == 0
 
+    def test_owner_lost_edit_access_to_a_restricted_card(self, cast, template):
+        rule = make_rule(cast, template, created_by=cast.friend)
+        restrict(cast, issue=template, shares=[(ShareTarget.MEMBER, cast.friend, AccessLevel.VIEW)])
+        assert tasks.run_rule(rule.id, NOW) is None
+        rule.refresh_from_db()
+        assert rule.is_active is False and "can no longer edit" in rule.stop_reason
+
     def test_deleted_template(self, cast, template):
         rule = make_rule(cast, template)
         template.delete()
@@ -205,7 +226,7 @@ class TestStops:
         assert tasks.run_due_repeats() == 1
         assert copies_of(good).count() == 1
         assert RepeatOccurrence.objects.filter(rule=bad).count() == 0  # rolled back, retried next run
-        assert RepeatRule.objects.get(pk=bad.pk).next_run_at == bad.next_run_at
+        assert RepeatRule.objects.get(pk=bad.pk).next_run_at == NOW + tasks.RETRY_AFTER  # tried again in an hour
 
 
 @pytest.mark.unit

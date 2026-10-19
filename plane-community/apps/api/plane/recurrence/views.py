@@ -35,7 +35,9 @@ class IssueRepeatEndpoint(BaseAPIView):
             "copy_of": describe_copy_of(issue, lambda issue_id: can_view_issue(request.user, issue_id)),
         }
 
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    # Guests are left out: Plane may limit them to their own cards, and a rule
+    # lists recent copies.
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def get(self, request, slug, project_id, issue_id):
         issue = self._issue(slug, project_id, issue_id)
         if issue is None:
@@ -65,7 +67,7 @@ class IssueRepeatEndpoint(BaseAPIView):
 class ProjectRepeatRulesEndpoint(BaseAPIView):
     """Ids of the cards in a project that repeat (for the small repeat icon on cards)."""
 
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def get(self, request, slug, project_id):
         rules = RepeatRule.objects.filter(
             workspace__slug=slug,

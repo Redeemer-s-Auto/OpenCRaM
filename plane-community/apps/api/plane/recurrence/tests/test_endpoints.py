@@ -71,12 +71,14 @@ class TestPermissions:
         stranger = client_for(make_user("stranger"))
         assert stranger.put(repeat_url(cast, template), WEEKLY, format="json").status_code in (403, 404)
 
-    def test_guest_can_read_but_not_set(self, cast, template):
+    def test_guest_can_neither_read_nor_set(self, cast, template):
         guest = make_user("guest")
         WorkspaceMember.objects.create(workspace=cast.workspace, member=guest, role=5)
         ProjectMember.objects.create(project=cast.alpha, member=guest, workspace=cast.workspace, role=5)
         client = client_for(guest)
         assert client.put(repeat_url(cast, template), WEEKLY, format="json").status_code == status.HTTP_403_FORBIDDEN
+        assert client.get(repeat_url(cast, template)).status_code == status.HTTP_403_FORBIDDEN
+        assert client.get(list_url(cast)).status_code == status.HTTP_403_FORBIDDEN
 
     def test_hidden_card_answers_404(self, cast, template):
         restrict(cast, issue=template, shares=[(ShareTarget.MEMBER, cast.friend, AccessLevel.VIEW)])

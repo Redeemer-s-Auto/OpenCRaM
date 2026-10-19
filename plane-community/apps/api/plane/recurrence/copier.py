@@ -22,7 +22,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from plane.app.serializers import IssueCreateSerializer
-from plane.db.models import Issue, IssueAssignee, IssueLabel
+from plane.db.models import CustomField, Issue, IssueAssignee, IssueLabel
 from plane.sharing.models import ItemRestriction, ItemShare
 from plane.sharing.visibility import hidden_issue_ids
 from plane.utils.custom_fields import validate_values, values_for_issues
@@ -31,6 +31,8 @@ logger = logging.getLogger("plane.recurrence")
 
 MAX_SUB_ITEMS = 200  # safety cap on how many sub-items one run copies
 MAX_DEPTH = 5
+# Same rule as card templates (plane/utils/issue_templates.py), matched by type name.
+NOT_COPIED_TYPES = ["formula", "relation", "rollup"]
 
 
 class CopyBudget:
@@ -47,10 +49,22 @@ def _shift(value, delta):
 
 
 def _clean_custom_fields(source):
-    """The template's custom field values that still pass validation (one bad field never blocks the copy)."""
+    """The template's custom field values that still pass validation (one bad field never blocks the copy).
+
+    Like card templates, linked-card fields (relation, rollup) are not copied: they
+    point at specific cards. Formulas are worked out again by the server.
+    """
     stored = values_for_issues([source.id]).get(str(source.id), {})
+    skipped = {
+        str(i)
+        for i in CustomField.objects.filter(id__in=list(stored), field_type__in=NOT_COPIED_TYPES).values_list(
+            "id", flat=True
+        )
+    }
     kept = {}
     for field_id, value in stored.items():
+        if field_id in skipped:
+            continue
         try:
             validate_values(source.project_id, {field_id: value})
         except ValidationError:

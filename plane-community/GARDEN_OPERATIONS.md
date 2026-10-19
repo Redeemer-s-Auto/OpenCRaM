@@ -210,6 +210,8 @@ The web app's look is chosen when the `web` image is built (`apps/web/core/lib/b
 
 `docker-compose.notes.yml` passes them from `NOTES_BRAND_THEME`, `NOTES_BRAND_NAME`, `NOTES_BRAND_LOGO_URL` and `NOTES_BRAND_ICON_URL`. A Garden build ignores the name, logo and icon values. Change them, then rebuild `web`.
 
+Use a single-colour dark logo on a transparent background: in dark mode the hub theme shows it inverted (white).
+
 ## Manual browser release QA
 
 Before declaring a deployment production-ready, verify at minimum:

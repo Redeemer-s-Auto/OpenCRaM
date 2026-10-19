@@ -214,20 +214,20 @@ html[data-brand-theme="hub"] .ProseMirror :is(pre, code) {
 }
 
 /* ---------- controls ---------- */
+/*
+ * Garden sets slow transitions, 40px buttons and 10px fields with unlayered rules, which beat
+ * Plane's (layered) Tailwind utilities. `revert-layer` drops those Garden values and gives the
+ * control back to Plane's own classes, whose radius tokens this theme already sets to 8 / 10px.
+ */
 html[data-brand-theme="hub"] :is(button, a, input, textarea, select, [role="button"]) {
-  transition-duration: 150ms;
-  transition-timing-function: ease;
+  transition-duration: revert-layer;
+  transition-timing-function: revert-layer;
 }
-/* Garden makes every button 40px tall; the hub keeps Plane's own compact sizes and 32px fields. */
-html[data-brand-theme="hub"] :is(button, [role="button"]) {
-  min-height: 0;
+html[data-brand-theme="hub"] :is(button, [role="button"], input, select) {
+  min-height: revert-layer;
 }
-html[data-brand-theme="hub"] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select) {
-  min-height: 0;
-  border-radius: var(--hub-radius);
-}
-html[data-brand-theme="hub"] textarea {
-  border-radius: var(--hub-radius);
+html[data-brand-theme="hub"] :is(input, textarea, select) {
+  border-radius: revert-layer;
 }
 html[data-brand-theme="hub"] :is(button, a, input, textarea, select, [role="button"]):focus-visible {
   outline: 2px solid var(--hub-accent);

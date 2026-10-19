@@ -110,6 +110,9 @@ ATTRIBUTES = {
         "data-emoji-url",
         "data-logo-in-use",
         "data-block-type",
+        # toggle and column blocks (OpenCRaM)
+        "data-open",
+        "data-columns",
     },
     "a": {"href", "target"},
     # editor node/tag attributes

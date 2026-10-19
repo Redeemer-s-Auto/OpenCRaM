@@ -12,6 +12,8 @@ export enum CORE_EXTENSIONS {
   CHARACTER_COUNT = "characterCount",
   CODE_BLOCK = "codeBlock",
   CODE_INLINE = "code",
+  COLUMN = "columnComponent",
+  COLUMN_LIST = "columnListComponent",
   CUSTOM_COLOR = "customColor",
   CUSTOM_IMAGE = "imageComponent",
   CUSTOM_LINK = "link",
@@ -43,6 +45,9 @@ export enum CORE_EXTENSIONS {
   TASK_LIST = "taskList",
   TEXT_ALIGN = "textAlign",
   TEXT_STYLE = "textStyle",
+  TOGGLE = "toggleComponent",
+  TOGGLE_CONTENT = "toggleContent",
+  TOGGLE_TITLE = "toggleTitle",
   TYPOGRAPHY = "typography",
   UNDERLINE = "underline",
   UTILITY = "utility",
@@ -74,4 +79,8 @@ export const BLOCK_NODE_TYPES = [
   CORE_EXTENSIONS.CUSTOM_IMAGE,
   CORE_EXTENSIONS.CALLOUT,
   CORE_EXTENSIONS.WORK_ITEM_EMBED,
+
+  // Layout nodes
+  CORE_EXTENSIONS.TOGGLE,
+  CORE_EXTENSIONS.COLUMN_LIST,
 ];

@@ -122,6 +122,8 @@ class TestCustomFieldDefinitions:
             data = {"name": f"Field {field_type}", "field_type": field_type}
             if field_type in ("select", "multi_select", "label"):
                 data["options"] = [{"name": "One"}, {"name": "Two", "color": "#EE0000"}]
+            if field_type == "formula":
+                data["settings"] = {"expression": "1 + 1", "result_type": "number"}
             field = _create_field(session_client, workspace, project, **data)
             assert field["field_type"] == field_type
             if field_type in ("select", "multi_select", "label"):

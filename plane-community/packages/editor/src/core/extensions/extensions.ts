@@ -14,6 +14,8 @@ import { Underline } from "@tiptap/extension-underline";
 import { Markdown } from "tiptap-markdown";
 // extensions
 import {
+  ColumnExtension,
+  ColumnListExtension,
   CustomCalloutExtension,
   CustomCodeBlockExtension,
   CustomCodeInlineExtension,
@@ -31,6 +33,9 @@ import {
   TableCell,
   TableHeader,
   TableRow,
+  ToggleContentExtension,
+  ToggleExtension,
+  ToggleTitleExtension,
   UtilityExtension,
 } from "@/extensions";
 // plane editor extensions
@@ -121,6 +126,11 @@ export const CoreEditorExtensions = (args: TArguments): Extensions => {
     CustomColorExtension,
     CustomTextAlignExtension,
     CustomCalloutExtension,
+    ToggleExtension,
+    ToggleTitleExtension,
+    ToggleContentExtension,
+    ColumnListExtension,
+    ColumnExtension,
     UtilityExtension({
       disabledExtensions,
       flaggedExtensions,

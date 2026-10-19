@@ -14,6 +14,7 @@ import {
   Hash,
   Link2,
   ListChecks,
+  Sigma,
   Tag,
   Type,
   User,
@@ -32,6 +33,7 @@ export const CUSTOM_FIELD_TYPES: { type: TCustomFieldType; label: string; icon: 
   { type: "label", label: "Label", icon: Tag, hint: "Colored tags; anyone can add a new tag on a card" },
   { type: "person", label: "Person", icon: User, hint: "A member of this workspace" },
   { type: "url", label: "Link", icon: Link2, hint: "A web address" },
+  { type: "formula", label: "Formula", icon: Sigma, hint: "Worked out from other fields, like Notion formulas" },
 ];
 
 export const OPTION_FIELD_TYPES: TCustomFieldType[] = ["select", "multi_select", "label"];
@@ -78,6 +80,18 @@ export const parseNumber = (text: string): number | null | undefined => {
   return Number(cleaned);
 };
 
+/** The type a value behaves as. A formula behaves as its result type. */
+export const effectiveFieldType = (field: TCustomField): TCustomFieldType =>
+  field.field_type === "formula" ? (field.settings?.result_type ?? "number") : field.field_type;
+
+export const FORMULA_RESULT_TYPES: { value: NonNullable<TCustomField["settings"]["result_type"]>; label: string }[] = [
+  { value: "number", label: "Number" },
+  { value: "money", label: "Money" },
+  { value: "text", label: "Text" },
+  { value: "date", label: "Date" },
+  { value: "checkbox", label: "Checkbox" },
+];
+
 export const isEmptyValue = (value: TCustomFieldValue | undefined) =>
   value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
 
@@ -88,7 +102,7 @@ export const formatCustomFieldValue = (
   getPersonName?: (userId: string) => string | undefined
 ): string => {
   if (isEmptyValue(value)) return "";
-  switch (field.field_type) {
+  switch (effectiveFieldType(field)) {
     case "money":
       return formatMoney(value as number);
     case "number":
@@ -97,7 +111,7 @@ export const formatCustomFieldValue = (
       return value ? "Yes" : "No";
     case "date": {
       const raw = value as string;
-      if (field.settings?.include_time) {
+      if (field.settings?.include_time || raw.includes("T")) {
         const date = new Date(raw);
         return Number.isNaN(date.getTime())
           ? raw

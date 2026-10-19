@@ -82,6 +82,19 @@ export const CustomFieldValueInput = observer(function CustomFieldValueInput(pro
   const buttonContainerClassName = variant === "cell" ? "w-full h-full text-left" : "w-full text-left h-7.5";
   const [newLabel, setNewLabel] = useState("");
 
+  // Formulas are worked out by the server: show the result, no editing.
+  if (field.field_type === "formula") {
+    const text = formatCustomFieldValue(field, value);
+    return (
+      <span
+        className={cn("block w-full truncate px-2 py-1", textClass, !text && "text-placeholder")}
+        title={field.settings?.expression}
+      >
+        {text || (variant === "cell" ? "" : "Empty")}
+      </span>
+    );
+  }
+
   switch (field.field_type) {
     case "text":
       return (

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-from plane.utils.custom_fields import set_values, validate_values, values_for_issues
+from plane.utils.custom_fields import compute_formulas, set_values, validate_values, values_for_issues
 
 # Django imports
 from django.utils import timezone
@@ -242,6 +242,8 @@ class IssueSerializer(BaseSerializer):
 
         if custom_fields:
             set_values(issue, custom_fields)
+        else:
+            compute_formulas(issue)
 
         return issue
 
@@ -303,7 +305,10 @@ class IssueSerializer(BaseSerializer):
 
         # Time updation occues even when other related models are updated
         instance.updated_at = timezone.now()
-        return super().update(instance, validated_data)
+        updated = super().update(instance, validated_data)
+        # Formulas can read the title, dates, priority and state.
+        compute_formulas(updated)
+        return updated
 
     def _hidden_issue_ids(self):
         """Ids of work items hidden from the context ``user`` (empty when no user is given)."""

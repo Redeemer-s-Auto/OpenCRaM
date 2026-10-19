@@ -15,7 +15,15 @@ import { cn } from "@plane/utils";
 // hooks
 import { useCustomField } from "@/hooks/store/use-custom-field";
 // local
-import { CUSTOM_FIELD_TYPES, DEFAULT_OPTION_COLORS, OPTION_FIELD_TYPES } from "../helpers";
+import { CUSTOM_FIELD_TYPES, DEFAULT_OPTION_COLORS, FORMULA_RESULT_TYPES, OPTION_FIELD_TYPES } from "../helpers";
+
+const BUILT_IN_PROPS = ["Title", "State", "Priority", "Start date", "Due date", "Created"];
+const FORMULA_EXAMPLES = [
+  'prop("Amount") * 1.0825',
+  'if(prop("Approved"), "Yes", "No")',
+  'dateAdd(prop("Call-back"), 7, "days")',
+  'concat(prop("Year"), " ", prop("Make"), " ", prop("Model"))',
+];
 
 type Props = {
   isOpen: boolean;
@@ -37,7 +45,8 @@ const errorMessage = (error: unknown) => {
 
 export const CustomFieldFormModal = observer(function CustomFieldFormModal(props: Props) {
   const { isOpen, onClose, workspaceSlug, projectId, field } = props;
-  const { createField, updateField } = useCustomField();
+  const { createField, updateField, getProjectFields } = useCustomField();
+  const otherFields = (getProjectFields(projectId) ?? []).filter((f) => f.id !== field?.id);
   const isEdit = !!field;
 
   const [name, setName] = useState("");
@@ -46,6 +55,8 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
   const [options, setOptions] = useState<TDraftOption[]>([]);
   const [includeTime, setIncludeTime] = useState(false);
   const [multiple, setMultiple] = useState(false);
+  const [expression, setExpression] = useState("");
+  const [resultType, setResultType] = useState<NonNullable<TCustomField["settings"]["result_type"]>>("number");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -56,6 +67,8 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
     setOptions(field?.options ?? []);
     setIncludeTime(!!field?.settings?.include_time);
     setMultiple(!!field?.settings?.multiple);
+    setExpression(field?.settings?.expression ?? "");
+    setResultType(field?.settings?.result_type ?? "number");
   }, [isOpen, field]);
 
   const hasOptions = OPTION_FIELD_TYPES.includes(fieldType);
@@ -83,6 +96,14 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
     const settings: TCustomField["settings"] = {};
     if (fieldType === "date") settings.include_time = includeTime;
     if (fieldType === "person") settings.multiple = multiple;
+    if (fieldType === "formula") {
+      if (!expression.trim()) {
+        setToast({ type: TOAST_TYPE.ERROR, title: "Formula needed", message: "Type a formula." });
+        return;
+      }
+      settings.expression = expression.trim();
+      settings.result_type = resultType;
+    }
     const payload: Partial<TCustomField> = {
       name: name.trim(),
       description: description.trim(),
@@ -170,6 +191,64 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
             <Checkbox checked={multiple} onChange={(e) => setMultiple(e.target.checked)} />
             Allow more than one person
           </label>
+        )}
+
+        {fieldType === "formula" && (
+          <div className="flex flex-col gap-2">
+            <span className="text-body-xs-medium text-secondary">Formula</span>
+            <textarea
+              value={expression}
+              onChange={(e) => setExpression(e.target.value)}
+              rows={3}
+              spellCheck={false}
+              placeholder='prop("Amount") * 1.0825'
+              className="w-full rounded-md border border-subtle bg-transparent px-2 py-1.5 font-mono text-body-xs-regular"
+            />
+            <div className="flex flex-wrap items-center gap-1 text-caption-md-regular">
+              <span className="text-tertiary">Insert:</span>
+              {[...otherFields.map((f) => f.name), ...BUILT_IN_PROPS].map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => setExpression((prev) => `${prev}prop("${name}")`)}
+                  className="rounded-sm border border-subtle px-1.5 py-0.5 text-secondary hover:bg-layer-1"
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+            <label className="flex items-center gap-2 text-body-xs-regular text-secondary">
+              Result shows as
+              <select
+                value={resultType}
+                onChange={(e) => setResultType(e.target.value as typeof resultType)}
+                className="rounded-md border border-subtle bg-transparent px-2 py-1 text-body-xs-regular"
+              >
+                {FORMULA_RESULT_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <details className="text-caption-md-regular text-tertiary">
+              <summary className="cursor-pointer">Examples and functions</summary>
+              <ul className="mt-1 list-disc pl-4 font-mono">
+                {FORMULA_EXAMPLES.map((example) => (
+                  <li key={example}>
+                    <button type="button" className="text-left hover:text-primary" onClick={() => setExpression(example)}>
+                      {example}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1">
+                Math: + - * / %, round, floor, ceil, abs, min, max, sum. Logic: if, and, or, not, empty, ==, !=, &gt;,
+                &lt;. Text: concat, contains, length, upper, lower, format. Dates: dateAdd, dateSubtract, dateBetween,
+                year, month, day (units: days, weeks, months, years, hours, minutes). Money fields count in dollars.
+              </p>
+            </details>
+          </div>
         )}
 
         {hasOptions && (

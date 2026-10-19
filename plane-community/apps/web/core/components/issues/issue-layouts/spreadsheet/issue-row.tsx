@@ -34,6 +34,7 @@ import { usePlatformOS } from "@/hooks/use-platform-os";
 // local components
 import type { TRenderQuickActions } from "../list/list-view-types";
 import { isIssueNew } from "../utils";
+import { CustomFieldCells } from "@/components/custom-fields/spreadsheet-columns";
 import { IssueColumn } from "./issue-column";
 
 interface Props {
@@ -396,6 +397,14 @@ const IssueRowDetails = observer(function IssueRowDetails(props: IssueRowDetails
           isEstimateEnabled={isEstimateEnabled}
         />
       ))}
+      {!isEpic && (
+        <CustomFieldCells
+          displayProperties={displayProperties}
+          issueDetail={issueDetail}
+          disableUserActions={disableUserActions}
+          updateIssue={updateIssue}
+        />
+      )}
     </>
   );
 });

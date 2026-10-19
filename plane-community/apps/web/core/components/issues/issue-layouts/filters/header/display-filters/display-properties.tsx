@@ -13,6 +13,11 @@ import { useTranslation } from "@plane/i18n";
 // types
 import type { IIssueDisplayProperties } from "@plane/types";
 // components
+import {
+  customFieldDisplayKey,
+  isCustomFieldColumnShown,
+  useSpreadsheetCustomFields,
+} from "@/components/custom-fields/spreadsheet-columns";
 import { FilterHeader } from "../helpers/filter-header";
 
 type Props = {
@@ -35,6 +40,7 @@ export const FilterDisplayProperties = observer(function FilterDisplayProperties
   } = props;
   // hooks
   const { t } = useTranslation();
+  const customFields = useSpreadsheetCustomFields();
   // states
   const [previewEnabled, setPreviewEnabled] = React.useState(true);
 
@@ -86,6 +92,22 @@ export const FilterDisplayProperties = observer(function FilterDisplayProperties
               </button>
             </>
           ))}
+          {!isEpic &&
+            customFields.map((field) => {
+              const shown = isCustomFieldColumnShown(displayProperties ?? {}, field.id);
+              return (
+                <button
+                  key={field.id}
+                  type="button"
+                  className={`rounded-sm border px-2 py-0.5 text-11 transition-all ${
+                    shown ? "border-accent-strong bg-accent-primary text-on-color" : "border-subtle hover:bg-layer-1"
+                  }`}
+                  onClick={() => handleUpdate({ [customFieldDisplayKey(field.id)]: !shown })}
+                >
+                  {field.name}
+                </button>
+              );
+            })}
         </div>
       )}
     </>

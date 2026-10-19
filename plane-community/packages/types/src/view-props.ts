@@ -54,7 +54,10 @@ export type TIssueOrderByOptions =
   | "attachment_count"
   | "-attachment_count"
   | "sub_issues_count"
-  | "-sub_issues_count";
+  | "-sub_issues_count"
+  // custom fields: custom_field__<field id>
+  | `custom_field__${string}`
+  | `-custom_field__${string}`;
 
 export type TIssueGroupingFilters = "active" | "backlog";
 
@@ -110,7 +113,10 @@ export const WORK_ITEM_FILTER_PROPERTY_KEYS = [
   "created_at",
   "updated_at",
 ] as const;
-export type TWorkItemFilterProperty = (typeof WORK_ITEM_FILTER_PROPERTY_KEYS)[number];
+/** Custom field filter property: customfield_<field id> */
+export type TCustomFieldFilterProperty = `customfield_${string}`;
+export const CUSTOM_FIELD_FILTER_PREFIX = "customfield_";
+export type TWorkItemFilterProperty = (typeof WORK_ITEM_FILTER_PROPERTY_KEYS)[number] | TCustomFieldFilterProperty;
 
 export type TWorkItemFilterConditionKey = `${TWorkItemFilterProperty}__${TSupportedOperators}`;
 
@@ -175,6 +181,8 @@ export interface IIssueDisplayProperties {
   modules?: boolean;
   cycle?: boolean;
   issue_type?: boolean;
+  /** Custom field columns. A missing key means the column shows. */
+  [customField: `customfield_${string}`]: boolean | undefined;
 }
 
 export type TIssueKanbanFilters = {

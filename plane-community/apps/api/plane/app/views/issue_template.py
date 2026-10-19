@@ -26,12 +26,34 @@ from .base import BaseAPIView
 
 
 def _visible_filter(request):
-    """The sharing filter, when the sharing-rules app is installed. Otherwise no extra filter."""
+    """Sub-cards a template may copy: ones the saver can see AND that are not restricted.
+
+    A template is visible to the whole board, so a restricted card's title, page or
+    fields must never end up in one, even when the saver is allowed to see it.
+    """
     try:
-        from plane.sharing.visibility import visible_issues  # noqa: WPS433
+        from plane.sharing.visibility import restricted_issue_ids, visible_issues  # noqa: WPS433
     except ImportError:  # pragma: no cover - only on branches without sharing rules
         return None
+    return lambda queryset: visible_issues(queryset, request.user).exclude(pk__in=restricted_issue_ids())
+
+
+def _can_see_filter(request):
+    """Cards the person can see (sharing rules), restricted or not."""
+    try:
+        from plane.sharing.visibility import visible_issues  # noqa: WPS433
+    except ImportError:  # pragma: no cover
+        return None
     return lambda queryset: visible_issues(queryset, request.user)
+
+
+def _is_restricted(issue_id):
+    """True when sharing rules hide this card from some people on its board."""
+    try:
+        from plane.sharing.visibility import restricted_issue_ids  # noqa: WPS433
+    except ImportError:  # pragma: no cover
+        return False
+    return Issue.all_objects.filter(pk=issue_id, pk__in=restricted_issue_ids()).exists()
 
 
 class IssueTemplateSerializer(BaseSerializer):
@@ -147,12 +169,23 @@ class IssueSaveAsTemplateEndpoint(BaseAPIView):
     @allow_permission(MEMBERS)
     def post(self, request, slug, project_id, issue_id):
         issue = Issue.issue_objects.filter(pk=issue_id, project_id=project_id, workspace__slug=slug)
-        visible = _visible_filter(request)
-        if visible is not None:
-            issue = visible(issue)
+        can_see = _can_see_filter(request)
+        if can_see is not None:
+            issue = can_see(issue)
         issue = issue.first()
+        # Sub-cards: only ones the saver can see that are not restricted.
+        visible = _visible_filter(request)
         if issue is None:
             return Response({"error": "Card not found."}, status=status.HTTP_404_NOT_FOUND)
+        if _is_restricted(issue.id):
+            return Response(
+                {
+                    "error": "This card is hidden from some people on the board. "
+                    "Share it with the whole board first, then save it as a template.",
+                    "code": "restricted_card",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         body = request.data or {}
         data = snapshot_issue(issue, include_sub_items=bool(body.get("include_sub_items", True)), visible=visible)
         name = body.get("name") or new_template_name(project_id, issue.name)

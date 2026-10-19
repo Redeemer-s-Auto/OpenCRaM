@@ -42,6 +42,13 @@ class CustomField(ProjectBaseModel):
     OPTION_TYPES = {FieldType.SELECT, FieldType.MULTI_SELECT, FieldType.LABEL}
     # What a formula's result is stored and shown as (settings["result_type"]).
     FORMULA_RESULT_TYPES = {"number", "money", "text", "date", "checkbox"}
+    # Relation and rollup (plane.relations): worked out per viewer from linked cards, never
+    # stored in CustomFieldValue. Kept out of FieldType.choices on purpose so they need no db
+    # migration (choices are not enforced by the database); CustomFieldSerializer accepts them.
+    RELATION = "relation"
+    ROLLUP = "rollup"
+    LINKED_TYPES = {RELATION, ROLLUP}
+    ALL_TYPE_CHOICES = [*FieldType.choices, (RELATION, "Relation"), (ROLLUP, "Rollup")]
 
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
@@ -50,7 +57,9 @@ class CustomField(ProjectBaseModel):
     options = models.JSONField(default=list, blank=True)
     # Per-type settings, for example {"include_time": true} for dates,
     # {"multiple": true} for people, {"decimals": 2} for numbers,
-    # {"expression": "...", "result_type": "money"} for formulas.
+    # {"expression": "...", "result_type": "money"} for formulas,
+    # {"target_project_id", "two_way", "mirror_field_id", "is_mirror"} for relations,
+    # {"relation_field_id", "target_field_id", "function", "result_type"} for rollups.
     settings = models.JSONField(default=dict, blank=True)
     sort_order = models.FloatField(default=65535)
     archived_at = models.DateTimeField(null=True, blank=True)

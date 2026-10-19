@@ -60,6 +60,9 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
     if (hasNewLabels(value)) {
       // New tags became options on the server; load their ids.
       await Promise.all([fetchProjectFields(workspaceSlug, projectId), fetchIssue(workspaceSlug, projectId, issueId)]);
+    } else if (field.field_type === "relation") {
+      // Rollups on this card follow the new links; the server works them out.
+      await fetchIssue(workspaceSlug, projectId, issueId);
     }
   };
 

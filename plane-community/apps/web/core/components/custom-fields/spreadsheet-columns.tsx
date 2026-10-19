@@ -17,9 +17,10 @@ import type {
 import { CustomMenu, Row } from "@plane/ui";
 // hooks
 import { useCustomField } from "@/hooks/store/use-custom-field";
+import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // local
 import { AddCustomFieldButton } from "./add-field-button";
-import { getFieldTypeDetails } from "./helpers";
+import { getFieldTypeDetails, isLinkedField } from "./helpers";
 import { buildCustomFieldsPayload } from "./issue-properties";
 import { CustomFieldValueInput } from "./value-input";
 
@@ -86,6 +87,13 @@ export const CustomFieldHeaderColumns = observer(function CustomFieldHeaderColum
                 placement="bottom-start"
                 closeOnSelect
               >
+                {isLinkedField(field) && (
+                  <CustomMenu.MenuItem disabled>
+                    <span className="px-1 text-tertiary">Linked values cannot be sorted</span>
+                  </CustomMenu.MenuItem>
+                )}
+                {!isLinkedField(field) && (
+                  <>
                 <CustomMenu.MenuItem onClick={() => handleDisplayFilterUpdate({ order_by: ascending })}>
                   <div className="flex items-center gap-2 px-1">
                     <ArrowDownWideNarrow className="h-3 w-3 stroke-[1.5]" />
@@ -98,6 +106,8 @@ export const CustomFieldHeaderColumns = observer(function CustomFieldHeaderColum
                     <span>Sort descending</span>
                   </div>
                 </CustomMenu.MenuItem>
+                  </>
+                )}
                 {active && (
                   <CustomMenu.MenuItem onClick={() => handleDisplayFilterUpdate({ order_by: "-created_at" })}>
                     <div className="flex items-center gap-2 px-1">
@@ -132,8 +142,9 @@ type TCellProps = {
 
 export const CustomFieldCells = observer(function CustomFieldCells(props: TCellProps) {
   const { displayProperties, issueDetail, disableUserActions, updateIssue } = props;
-  const { projectId } = useParams();
+  const { workspaceSlug, projectId } = useParams();
   const fields = useSpreadsheetCustomFields();
+  const { fetchIssue } = useIssueDetail();
 
   return (
     <>
@@ -152,13 +163,16 @@ export const CustomFieldCells = observer(function CustomFieldCells(props: TCellP
                 projectId={issueDetail.project_id ?? ""}
                 disabled={disableUserActions || !updateIssue}
                 variant="cell"
-                onChange={(value) =>
-                  updateIssue?.(
+                onChange={async (value) => {
+                  await updateIssue?.(
                     issueDetail.project_id,
                     issueDetail.id,
                     buildCustomFieldsPayload(issueDetail.custom_fields, field.id, value)
-                  )
-                }
+                  );
+                  // New links change this card's rollups; the server works them out.
+                  if (field.field_type === "relation" && workspaceSlug && issueDetail.project_id)
+                    await fetchIssue(workspaceSlug.toString(), issueDetail.project_id, issueDetail.id);
+                }}
               />
             </div>
           </td>

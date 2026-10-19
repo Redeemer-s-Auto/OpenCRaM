@@ -7,6 +7,8 @@
 import type { LucideIcon } from "lucide-react";
 import {
   AlignLeft,
+  ArrowLeftRight,
+  Layers,
   CalendarDays,
   CheckSquare,
   CircleChevronDown,
@@ -19,7 +21,13 @@ import {
   Type,
   User,
 } from "lucide-react";
-import type { TCustomField, TCustomFieldType, TCustomFieldValue } from "@plane/types";
+import type {
+  TCustomField,
+  TCustomFieldLinkedCard,
+  TCustomFieldRollupFunction,
+  TCustomFieldType,
+  TCustomFieldValue,
+} from "@plane/types";
 
 export const CUSTOM_FIELD_TYPES: { type: TCustomFieldType; label: string; icon: LucideIcon; hint: string }[] = [
   { type: "text", label: "Text", icon: Type, hint: "One line of text" },
@@ -34,7 +42,59 @@ export const CUSTOM_FIELD_TYPES: { type: TCustomFieldType; label: string; icon: 
   { type: "person", label: "Person", icon: User, hint: "A member of this workspace" },
   { type: "url", label: "Link", icon: Link2, hint: "A web address" },
   { type: "formula", label: "Formula", icon: Sigma, hint: "Worked out from other fields, like Notion formulas" },
+  { type: "relation", label: "Relation", icon: ArrowLeftRight, hint: "Link to cards on any board, like Notion relations" },
+  { type: "rollup", label: "Rollup", icon: Layers, hint: "Count, sum or show values from linked cards" },
 ];
+
+/** Relation and rollup values depend on who is looking; they cannot be sorted or filtered. */
+export const LINKED_FIELD_TYPES: TCustomFieldType[] = ["relation", "rollup"];
+export const isLinkedField = (field: TCustomField) => LINKED_FIELD_TYPES.includes(field.field_type);
+
+export const ROLLUP_FUNCTIONS: {
+  value: TCustomFieldRollupFunction;
+  label: string;
+  /** what the rolled-up property must be: none, any, numeric, date, checkbox */
+  needs: "none" | "any" | "numeric" | "date" | "checkbox";
+}[] = [
+  { value: "count", label: "Count linked cards", needs: "none" },
+  { value: "count_not_empty", label: "Count filled in", needs: "any" },
+  { value: "count_empty", label: "Count empty", needs: "any" },
+  { value: "sum", label: "Sum", needs: "numeric" },
+  { value: "avg", label: "Average", needs: "numeric" },
+  { value: "min", label: "Smallest", needs: "numeric" },
+  { value: "max", label: "Largest", needs: "numeric" },
+  { value: "earliest", label: "Earliest date", needs: "date" },
+  { value: "latest", label: "Latest date", needs: "date" },
+  { value: "unique", label: "Show unique values", needs: "any" },
+  { value: "percent_checked", label: "Percent checked", needs: "checkbox" },
+];
+
+/** Built-in card properties a rollup can read, with what they behave as. */
+export const ROLLUP_BUILT_INS: { value: string; label: string; kind: "any" | "date" }[] = [
+  { value: "@title", label: "Title", kind: "any" },
+  { value: "@state", label: "State", kind: "any" },
+  { value: "@priority", label: "Priority", kind: "any" },
+  { value: "@start_date", label: "Start date", kind: "date" },
+  { value: "@due_date", label: "Due date", kind: "date" },
+];
+
+/** Whether a field on the linked board can be rolled up with a function that needs ``needs``. */
+export const fitsRollup = (field: TCustomField, needs: (typeof ROLLUP_FUNCTIONS)[number]["needs"]) => {
+  if (isLinkedField(field)) return false;
+  const type = effectiveFieldType(field);
+  if (needs === "any") return true;
+  if (needs === "numeric") return type === "number" || type === "money";
+  if (needs === "date") return type === "date";
+  if (needs === "checkbox") return type === "checkbox";
+  return false;
+};
+
+/** Linked cards in a relation value. Ids alone (just picked, before the server answers) have no name yet. */
+export const linkedCards = (value: TCustomFieldValue | undefined): TCustomFieldLinkedCard[] =>
+  Array.isArray(value)
+    ? (value as unknown[])
+        .filter((item): item is TCustomFieldLinkedCard => typeof item === "object" && item !== null && "id" in item)
+    : [];
 
 export const OPTION_FIELD_TYPES: TCustomFieldType[] = ["select", "multi_select", "label"];
 
@@ -81,8 +141,11 @@ export const parseNumber = (text: string): number | null | undefined => {
 };
 
 /** The type a value behaves as. A formula behaves as its result type. */
-export const effectiveFieldType = (field: TCustomField): TCustomFieldType =>
-  field.field_type === "formula" ? (field.settings?.result_type ?? "number") : field.field_type;
+export const effectiveFieldType = (field: TCustomField): TCustomFieldType => {
+  if (field.field_type !== "formula") return field.field_type;
+  const result = field.settings?.result_type ?? "number";
+  return result === "list" || result === "percent" ? "number" : result;
+};
 
 export const FORMULA_RESULT_TYPES: { value: NonNullable<TCustomField["settings"]["result_type"]>; label: string }[] = [
   { value: "number", label: "Number" },
@@ -102,6 +165,32 @@ export const formatCustomFieldValue = (
   getPersonName?: (userId: string) => string | undefined
 ): string => {
   if (isEmptyValue(value)) return "";
+  if (field.field_type === "relation") {
+    return linkedCards(value)
+      .map((card) => card.name)
+      .join(", ");
+  }
+  if (field.field_type === "rollup") {
+    switch (field.settings?.result_type) {
+      case "money":
+        return formatMoney(value as number);
+      case "percent":
+        return `${(value as number).toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
+      case "list":
+        return Array.isArray(value) ? (value as string[]).join(", ") : String(value);
+      case "date": {
+        const raw = String(value);
+        if (raw.includes("T")) {
+          const date = new Date(raw);
+          return Number.isNaN(date.getTime()) ? raw : date.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+        }
+        const [y, m, d] = raw.split("-").map(Number);
+        return new Date(y, m - 1, d).toLocaleDateString("en-US", { dateStyle: "medium" });
+      }
+      default:
+        return typeof value === "number" ? value.toLocaleString("en-US", { maximumFractionDigits: 6 }) : String(value);
+    }
+  }
   switch (effectiveFieldType(field)) {
     case "money":
       return formatMoney(value as number);

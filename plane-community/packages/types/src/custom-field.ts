@@ -16,7 +16,9 @@ export type TCustomFieldType =
   | "label"
   | "person"
   | "url"
-  | "formula";
+  | "formula"
+  | "relation"
+  | "rollup";
 
 export type TCustomFieldOption = {
   id: string;
@@ -33,8 +35,48 @@ export type TCustomFieldSettings = {
   decimals?: number;
   /** formula: the formula text, for example prop("Amount") * 1.0825 */
   expression?: string;
-  /** formula: what the result is shown and sorted as */
-  result_type?: TCustomFieldFormulaResult;
+  /** formula: what the result is shown and sorted as. rollup: set by the server. */
+  result_type?: TCustomFieldFormulaResult | TCustomFieldRollupResult;
+  /** relation: the board the linked cards are on (fixed after create) */
+  target_project_id?: string;
+  /** relation: also show the links on the target board, in a mirror field */
+  two_way?: boolean;
+  /** relation: name for the mirror field, only sent when turning two-way on */
+  mirror_name?: string;
+  /** relation (server-owned): the other field of a two-way pair */
+  mirror_field_id?: string | null;
+  /** relation (server-owned): true on the mirror side */
+  is_mirror?: boolean;
+  /** rollup: the relation field on this board whose linked cards are summed up */
+  relation_field_id?: string;
+  /** rollup: a field id on the linked board, or a built-in like "@due_date" */
+  target_field_id?: string | null;
+  /** rollup: the calculation */
+  function?: TCustomFieldRollupFunction;
+};
+
+export type TCustomFieldRollupFunction =
+  | "count"
+  | "count_empty"
+  | "count_not_empty"
+  | "sum"
+  | "avg"
+  | "min"
+  | "max"
+  | "earliest"
+  | "latest"
+  | "unique"
+  | "percent_checked";
+
+export type TCustomFieldRollupResult = "number" | "money" | "date" | "list" | "percent";
+
+/** One linked card as the server shows it (only cards the viewer may see). */
+export type TCustomFieldLinkedCard = {
+  id: string;
+  name: string;
+  sequence_id: number;
+  project_id: string;
+  project_identifier: string;
 };
 
 export type TCustomFieldFormulaResult = "number" | "money" | "text" | "date" | "checkbox";
@@ -59,7 +101,9 @@ export type TCustomField = {
  * text / long_text / url / select (option id) / date ("YYYY-MM-DD" or ISO date-time) -> string
  * number -> number, money -> whole cents, checkbox -> boolean
  * multi_select / label / person -> string[]
+ * relation -> linked cards (write: card ids or the same objects)
+ * rollup -> number, whole cents, date string, string[] or percent, per settings.result_type
  */
-export type TCustomFieldValue = string | number | boolean | string[] | null;
+export type TCustomFieldValue = string | number | boolean | string[] | TCustomFieldLinkedCard[] | null;
 
 export type TCustomFieldValues = Record<string, TCustomFieldValue>;

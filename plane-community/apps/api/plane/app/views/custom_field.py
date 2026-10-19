@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.serializers import CustomFieldSerializer
 from plane.db.models import CustomField, CustomFieldValue
+from plane.relations.service import before_field_delete, sync_mirror
 from plane.utils.custom_fields import recompute_project_formulas, refresh_display_text
 from plane.utils.formula import rename_prop
 
@@ -51,9 +52,11 @@ class CustomFieldEndpoint(BaseAPIView):
     def post(self, request, slug, project_id):
         serializer = CustomFieldSerializer(data=request.data, context={"project_id": project_id})
         serializer.is_valid(raise_exception=True)
-        serializer.save(project_id=project_id)
+        with transaction.atomic():
+            field = serializer.save(project_id=project_id)
+            sync_mirror(field, serializer.mirror_name)
         recompute_project_formulas(project_id)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(CustomFieldSerializer(field).data, status=status.HTTP_201_CREATED)
 
 
 class CustomFieldDetailEndpoint(BaseAPIView):
@@ -80,6 +83,7 @@ class CustomFieldDetailEndpoint(BaseAPIView):
         old_name = field.name
         with transaction.atomic():
             field = serializer.save()
+            sync_mirror(field, serializer.mirror_name)
             if "options" in request.data:
                 refresh_display_text(field)
             if field.name != old_name:
@@ -102,6 +106,7 @@ class CustomFieldDetailEndpoint(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         with transaction.atomic():
+            before_field_delete(field)
             CustomFieldValue.all_objects.filter(field_id=field.id).delete()
             CustomField.all_objects.filter(pk=field.id).delete()
         recompute_project_formulas(project_id)

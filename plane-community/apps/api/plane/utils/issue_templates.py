@@ -31,6 +31,10 @@ MAX_ITEMS = 50  # cards per template, the top card included
 NAME_MAX = 255
 BODY_MAX = 500_000
 PRIORITIES = {"urgent", "high", "medium", "low", "none"}
+# Field types a template never stores: formulas are worked out by the server, and
+# linked-card fields (relation, rollup) point at specific cards, which a template
+# must not copy. Matched by name so this works with or without the linked-cards code.
+NOT_COPIED_TYPES = ["formula", "relation", "rollup"]
 
 
 # ---------------------------------------------------------------------------
@@ -48,7 +52,7 @@ class _Board:
         self.fields = {
             str(f.id): f
             for f in CustomField.objects.filter(project_id=project_id, archived_at__isnull=True).exclude(
-                field_type=CustomField.FieldType.FORMULA
+                field_type__in=NOT_COPIED_TYPES
             )
         }
 

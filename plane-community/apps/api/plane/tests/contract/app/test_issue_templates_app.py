@@ -205,3 +205,25 @@ class TestIssueTemplates:
         response = session_client.post(_url(workspace, other, f"/work-item-templates/{tid}/use/"), {}, format="json")
         assert response.status_code == 404
         assert IssueTemplate.objects.count() == 1
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+def test_templates_never_copy_linked_card_fields(session_client, workspace, project):
+    """Relation and rollup fields point at specific cards; a template must not copy them."""
+    relation = CustomField.objects.create(project=project, name="Linked", field_type="relation")
+    rollup = CustomField.objects.create(project=project, name="Total", field_type="rollup")
+    text = CustomField.objects.create(project=project, name="Note", field_type="text")
+    response = session_client.post(
+        _url(workspace, project, "/work-item-templates/"),
+        {
+            "name": "T",
+            "data": {
+                "name": "Card",
+                "custom_fields": {str(relation.id): [str(uuid4())], str(rollup.id): 5, str(text.id): "keep"},
+            },
+        },
+        format="json",
+    )
+    assert response.status_code == 201, response.data
+    assert response.data["data"]["custom_fields"] == {str(text.id): "keep"}

@@ -27,7 +27,10 @@ from plane.db.models import Project, ProjectMember
 
 
 def _member_project_ids(user):
-    return ProjectMember.objects.filter(member_id=user.id, is_active=True).values("project_id")
+    # objects already skips soft-deleted rows; the explicit filter keeps that true if the manager changes.
+    return ProjectMember.objects.filter(member_id=user.id, is_active=True, deleted_at__isnull=True).values(
+        "project_id"
+    )
 
 
 def visible_projects_q(user, prefix=""):

@@ -134,6 +134,7 @@ const KanbanIssueDetailsBlock = observer(function KanbanIssueDetailsBlock(props:
         updateIssue={updateIssue}
         isReadOnly={isReadOnly}
         isEpic={isEpic}
+        showCustomFields
       />
     </>
   );

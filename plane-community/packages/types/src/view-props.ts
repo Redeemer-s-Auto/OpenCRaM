@@ -183,6 +183,8 @@ export interface IIssueDisplayProperties {
   issue_type?: boolean;
   /** Custom field columns. A missing key means the column shows. */
   [customField: `customfield_${string}`]: boolean | undefined;
+  /** Custom fields on board cards and list rows. A missing key means the field is hidden. */
+  [cardField: `cardfield_${string}`]: boolean | undefined;
 }
 
 export type TIssueKanbanFilters = {

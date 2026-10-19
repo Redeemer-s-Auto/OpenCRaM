@@ -297,8 +297,13 @@ export const getComputedDisplayFilters = (
 export const getComputedDisplayProperties = (
   displayProperties: IIssueDisplayProperties = {}
 ): IIssueDisplayProperties => ({
-  // Custom field column toggles (customfield_<id>) pass through as stored.
-  ...Object.fromEntries(Object.entries(displayProperties ?? {}).filter(([key]) => key.startsWith("customfield_"))),
+  // Custom field toggles pass through as stored: table columns (customfield_<id>)
+  // and board/list card faces (cardfield_<id>).
+  ...Object.fromEntries(
+    Object.entries(displayProperties ?? {}).filter(
+      ([key]) => key.startsWith("customfield_") || key.startsWith("cardfield_")
+    )
+  ),
   assignee: displayProperties?.assignee ?? true,
   start_date: displayProperties?.start_date ?? true,
   due_date: displayProperties?.due_date ?? true,

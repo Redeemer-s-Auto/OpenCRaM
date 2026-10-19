@@ -18,6 +18,11 @@ import {
   isCustomFieldColumnShown,
   useSpreadsheetCustomFields,
 } from "@/components/custom-fields/spreadsheet-columns";
+import {
+  CARD_FACE_LAYOUTS,
+  cardFaceDisplayKey,
+  isCustomFieldOnCardFace,
+} from "@/components/custom-fields/card-face-fields";
 import { FilterHeader } from "../helpers/filter-header";
 
 type Props = {
@@ -27,6 +32,8 @@ type Props = {
   cycleViewDisabled?: boolean;
   moduleViewDisabled?: boolean;
   isEpic?: boolean;
+  /** Current layout. On board and list, custom field toggles control the card faces. */
+  layout?: string;
 };
 
 export const FilterDisplayProperties = observer(function FilterDisplayProperties(props: Props) {
@@ -37,6 +44,7 @@ export const FilterDisplayProperties = observer(function FilterDisplayProperties
     cycleViewDisabled = false,
     moduleViewDisabled = false,
     isEpic = false,
+    layout,
   } = props;
   // hooks
   const { t } = useTranslation();
@@ -94,7 +102,12 @@ export const FilterDisplayProperties = observer(function FilterDisplayProperties
           ))}
           {!isEpic &&
             customFields.map((field) => {
-              const shown = isCustomFieldColumnShown(displayProperties ?? {}, field.id);
+              // Board and list cards keep their own toggle (off by default); other layouts toggle the column.
+              const onCardFace = !!layout && CARD_FACE_LAYOUTS.includes(layout);
+              const shown = onCardFace
+                ? isCustomFieldOnCardFace(displayProperties, field.id)
+                : isCustomFieldColumnShown(displayProperties ?? {}, field.id);
+              const key = onCardFace ? cardFaceDisplayKey(field.id) : customFieldDisplayKey(field.id);
               return (
                 <button
                   key={field.id}
@@ -102,7 +115,7 @@ export const FilterDisplayProperties = observer(function FilterDisplayProperties
                   className={`rounded-sm border px-2 py-0.5 text-11 transition-all ${
                     shown ? "border-accent-strong bg-accent-primary text-on-color" : "border-subtle hover:bg-layer-1"
                   }`}
-                  onClick={() => handleUpdate({ [customFieldDisplayKey(field.id)]: !shown })}
+                  onClick={() => handleUpdate({ [key]: !shown })}
                 >
                   {field.name}
                 </button>

@@ -32,6 +32,7 @@ import { EstimateDropdown } from "@/components/dropdowns/estimate";
 import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
 import { ModuleDropdown } from "@/components/dropdowns/module/dropdown";
 import { PriorityDropdown } from "@/components/dropdowns/priority";
+import { CustomFieldCardFaces } from "@/components/custom-fields/card-face-fields";
 import { RepeatBadge } from "@/components/repeat";
 import { StateDropdown } from "@/components/dropdowns/state/dropdown";
 // hooks
@@ -55,10 +56,20 @@ export interface IIssueProperties {
   className: string;
   activeLayout: string;
   isEpic?: boolean;
+  /** Board cards and list rows: also show the custom fields turned on in Display. */
+  showCustomFields?: boolean;
 }
 
 export const IssueProperties = observer(function IssueProperties(props: IIssueProperties) {
-  const { issue, updateIssue, displayProperties, isReadOnly, className, isEpic = false } = props;
+  const {
+    issue,
+    updateIssue,
+    displayProperties,
+    isReadOnly,
+    className,
+    isEpic = false,
+    showCustomFields = false,
+  } = props;
   // i18n
   const { t } = useTranslation();
   // store hooks
@@ -509,6 +520,16 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
           maxRender={3}
         />
       </WithDisplayPropertiesHOC>
+
+      {/* custom fields */}
+      {showCustomFields && !isEpic && (
+        <CustomFieldCardFaces
+          issue={issue}
+          displayProperties={displayProperties}
+          updateIssue={updateIssue}
+          isReadOnly={isReadOnly}
+        />
+      )}
     </div>
   );
 });

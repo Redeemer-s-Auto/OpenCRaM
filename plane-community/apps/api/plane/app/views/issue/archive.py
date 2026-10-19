@@ -24,6 +24,9 @@ from plane.app.serializers import (
     IssueDetailSerializer,
 )
 from plane.bgtasks.issue_activities_task import issue_activity
+from plane.app.serializers.issue import hide_issue_refs
+from plane.sharing.models import AccessLevel
+from plane.sharing.visibility import visible_issues
 from plane.db.models import (
     Issue,
     FileAsset,
@@ -85,7 +88,7 @@ class IssueArchiveViewSet(BaseViewSet):
             )
             .annotate(
                 sub_issues_count=Subquery(
-                    Issue.issue_objects.filter(parent=OuterRef("id"))
+                    visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                     .values("parent")
                     .annotate(count=Count("id"))
                     .values("count")
@@ -95,11 +98,12 @@ class IssueArchiveViewSet(BaseViewSet):
         )
 
     def get_queryset(self):
-        return (
+        return visible_issues(
             Issue.objects.filter(Q(type__isnull=True) | Q(type__is_epic=False))
             .filter(archived_at__isnull=False)
             .filter(project_id=self.kwargs.get("project_id"))
-            .filter(workspace__slug=self.kwargs.get("slug"))
+            .filter(workspace__slug=self.kwargs.get("slug")),
+            self.request.user,
         )
 
     @method_decorator(gzip_page)
@@ -152,8 +156,9 @@ class IssueArchiveViewSet(BaseViewSet):
                         order_by=order_by_param,
                         queryset=issue_queryset,
                         total_count_queryset=total_issue_queryset,
-                        on_results=lambda issues: issue_on_results(
-                            group_by=group_by, issues=issues, sub_group_by=sub_group_by
+                        on_results=lambda issues: hide_issue_refs(
+                            issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by),
+                            request.user,
                         ),
                         paginator_cls=SubGroupedOffsetPaginator,
                         group_by_fields=issue_group_values(
@@ -187,8 +192,9 @@ class IssueArchiveViewSet(BaseViewSet):
                     order_by=order_by_param,
                     queryset=issue_queryset,
                     total_count_queryset=total_issue_queryset,
-                    on_results=lambda issues: issue_on_results(
-                        group_by=group_by, issues=issues, sub_group_by=sub_group_by
+                    on_results=lambda issues: hide_issue_refs(
+                        issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by),
+                        request.user,
                     ),
                     paginator_cls=GroupedOffsetPaginator,
                     group_by_fields=issue_group_values(
@@ -214,7 +220,10 @@ class IssueArchiveViewSet(BaseViewSet):
                 request=request,
                 queryset=issue_queryset,
                 total_count_queryset=total_issue_queryset,
-                on_results=lambda issues: issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by),
+                on_results=lambda issues: hide_issue_refs(
+                    issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by),
+                    request.user,
+                ),
             )
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
@@ -251,7 +260,7 @@ class IssueArchiveViewSet(BaseViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
         serializer = IssueDetailSerializer(issue, expand=self.expand)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(hide_issue_refs(serializer.data, request.user), status=status.HTTP_200_OK)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def archive(self, request, slug, project_id, pk=None):
@@ -315,6 +324,8 @@ class BulkArchiveIssuesEndpoint(BaseAPIView):
         issues = Issue.objects.filter(workspace__slug=slug, project_id=project_id, pk__in=issue_ids).select_related(
             "state"
         )
+        # Items the user may not edit are skipped, as if their ids were not sent.
+        issues = visible_issues(issues, request.user, min_level=AccessLevel.EDIT)
         bulk_archive_issues = []
         for issue in issues:
             if issue.state.group not in ["completed", "cancelled"]:

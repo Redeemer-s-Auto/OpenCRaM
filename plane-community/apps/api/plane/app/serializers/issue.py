@@ -47,6 +47,49 @@ from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
 )
+from plane.sharing.visibility import hidden_issue_ids
+
+# Keys in serialized work item data that point at one other work item.
+ISSUE_REF_FIELDS = ("parent_id", "parent", "duplicate_to", "duplicate_issue_detail")
+# Keys that hold a list of other work items.
+ISSUE_REF_LISTS = ("issue_relation", "issue_related", "sub_issues")
+
+
+def _issue_ref(value):
+    return value.get("id") if isinstance(value, dict) else value
+
+
+def hide_issue_refs(data, user):
+    """Blank references to work items hidden from ``user`` in serialized work item data.
+
+    ``data`` is one dict or a list of dicts (a nested ``issue`` dict is handled too).
+    A visible item whose parent is hidden shows ``parent_id: None`` (and ``parent: None``
+    when expanded), exactly like an item with no parent. Hidden entries in relation and
+    sub-item lists are dropped. Changes ``data`` in place and returns it.
+    """
+    rows = [data] if isinstance(data, dict) else list(data)
+    rows += [row["issue"] for row in rows if isinstance(row.get("issue"), dict)]
+    ids = set()
+    for row in rows:
+        ids.update(str(_issue_ref(row.get(key))) for key in ISSUE_REF_FIELDS if _issue_ref(row.get(key)))
+        for key in ISSUE_REF_LISTS:
+            ids.update(str(_issue_ref(item)) for item in row.get(key) or [] if _issue_ref(item))
+    if not ids:
+        return data
+    hidden = {
+        str(issue_id)
+        for issue_id in hidden_issue_ids(user).filter(issue_id__in=ids).values_list("issue_id", flat=True)
+    }
+    if not hidden:
+        return data
+    for row in rows:
+        for key in ISSUE_REF_FIELDS:
+            if key in row and str(_issue_ref(row[key])) in hidden:
+                row[key] = None
+        for key in ISSUE_REF_LISTS:
+            if isinstance(row.get(key), list):
+                row[key] = [item for item in row[key] if str(_issue_ref(item)) not in hidden]
+    return data
 
 
 class IssueFlatSerializer(BaseSerializer):

@@ -22,6 +22,8 @@ from plane.license.utils.instance_value import get_email_configuration
 from plane.settings.redis import redis_instance
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
+from plane.sharing.visibility import can_view_issue
+from plane.bgtasks.notification_task import activity_names_hidden_issue
 
 
 def remove_unwanted_characters(input_text):
@@ -167,6 +169,24 @@ def send_email_notification(issue_id, notification_data, receiver_id, email_noti
             if not base_api:
                 return
 
+            # Sharing rules: the item, or one an update points at, may be hidden from the receiver by now.
+            receiver = User.objects.get(pk=receiver_id)
+            if not can_view_issue(receiver, issue_id):
+                release_lock(lock_id=lock_id)
+                return
+            notification_data = {
+                actor: [
+                    change
+                    for change in changes
+                    if not activity_names_hidden_issue(receiver_id, change.get("issue_activity") or {})
+                ]
+                for actor, changes in notification_data.items()
+            }
+            notification_data = {actor: changes for actor, changes in notification_data.items() if changes}
+            if not notification_data:
+                release_lock(lock_id=lock_id)
+                return
+
             data = create_payload(notification_data=notification_data)
 
             # Get email configurations
@@ -180,7 +200,6 @@ def send_email_notification(issue_id, notification_data, receiver_id, email_noti
                 EMAIL_FROM,
             ) = get_email_configuration()
 
-            receiver = User.objects.get(pk=receiver_id)
             issue = Issue.objects.get(pk=issue_id)
             template_data = []
             total_changes = 0

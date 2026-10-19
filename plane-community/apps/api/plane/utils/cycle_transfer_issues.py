@@ -30,6 +30,8 @@ from plane.db.models import (
 from plane.utils.analytics_plot import burndown_plot
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.utils.host import base_host
+from plane.sharing.models import AccessLevel
+from plane.sharing.visibility import hidden_issue_ids, visible_issues
 
 
 def transfer_cycle_issues(
@@ -64,13 +66,19 @@ def transfer_cycle_issues(
             "error": "The cycle where the issues are transferred is already completed",
         }
 
+    # The progress snapshot is stored once and shown to everyone, so it is built
+    # as nobody: no restricted work item counts toward it.
+    hidden = hidden_issue_ids(None)
+    issues = visible_issues(Issue.issue_objects.all(), None)
+
     # Get the old cycle with issue counts
     old_cycle = (
         Cycle.objects.filter(workspace__slug=slug, project_id=project_id, pk=cycle_id)
         .annotate(
             total_issues=Count(
                 "issue_cycle",
-                filter=Q(
+                filter=~Q(issue_cycle__issue_id__in=hidden)
+                & Q(
                     issue_cycle__issue__archived_at__isnull=True,
                     issue_cycle__issue__is_draft=False,
                     issue_cycle__deleted_at__isnull=True,
@@ -81,7 +89,8 @@ def transfer_cycle_issues(
         .annotate(
             completed_issues=Count(
                 "issue_cycle__issue__state__group",
-                filter=Q(
+                filter=~Q(issue_cycle__issue_id__in=hidden)
+                & Q(
                     issue_cycle__issue__state__group="completed",
                     issue_cycle__issue__archived_at__isnull=True,
                     issue_cycle__issue__is_draft=False,
@@ -93,7 +102,8 @@ def transfer_cycle_issues(
         .annotate(
             cancelled_issues=Count(
                 "issue_cycle__issue__state__group",
-                filter=Q(
+                filter=~Q(issue_cycle__issue_id__in=hidden)
+                & Q(
                     issue_cycle__issue__state__group="cancelled",
                     issue_cycle__issue__archived_at__isnull=True,
                     issue_cycle__issue__is_draft=False,
@@ -105,7 +115,8 @@ def transfer_cycle_issues(
         .annotate(
             started_issues=Count(
                 "issue_cycle__issue__state__group",
-                filter=Q(
+                filter=~Q(issue_cycle__issue_id__in=hidden)
+                & Q(
                     issue_cycle__issue__state__group="started",
                     issue_cycle__issue__archived_at__isnull=True,
                     issue_cycle__issue__is_draft=False,
@@ -117,7 +128,8 @@ def transfer_cycle_issues(
         .annotate(
             unstarted_issues=Count(
                 "issue_cycle__issue__state__group",
-                filter=Q(
+                filter=~Q(issue_cycle__issue_id__in=hidden)
+                & Q(
                     issue_cycle__issue__state__group="unstarted",
                     issue_cycle__issue__archived_at__isnull=True,
                     issue_cycle__issue__is_draft=False,
@@ -129,7 +141,8 @@ def transfer_cycle_issues(
         .annotate(
             backlog_issues=Count(
                 "issue_cycle__issue__state__group",
-                filter=Q(
+                filter=~Q(issue_cycle__issue_id__in=hidden)
+                & Q(
                     issue_cycle__issue__state__group="backlog",
                     issue_cycle__issue__archived_at__isnull=True,
                     issue_cycle__issue__is_draft=False,
@@ -162,7 +175,7 @@ def transfer_cycle_issues(
 
     if estimate_type:
         assignee_estimate_data = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 issue_cycle__cycle_id=cycle_id,
                 issue_cycle__deleted_at__isnull=True,
                 workspace__slug=slug,
@@ -228,7 +241,7 @@ def transfer_cycle_issues(
         ]
 
         label_distribution_data = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 issue_cycle__cycle_id=cycle_id,
                 issue_cycle__deleted_at__isnull=True,
                 workspace__slug=slug,
@@ -284,7 +297,7 @@ def transfer_cycle_issues(
 
     # Get the assignee distribution
     assignee_distribution = (
-        Issue.issue_objects.filter(
+        issues.filter(
             issue_cycle__cycle_id=cycle_id,
             issue_cycle__deleted_at__isnull=True,
             workspace__slug=slug,
@@ -348,7 +361,7 @@ def transfer_cycle_issues(
 
     # Get the label distribution
     label_distribution = (
-        Issue.issue_objects.filter(
+        issues.filter(
             issue_cycle__cycle_id=cycle_id,
             issue_cycle__deleted_at__isnull=True,
             workspace__slug=slug,
@@ -431,14 +444,20 @@ def transfer_cycle_issues(
     }
     current_cycle.save(update_fields=["progress_snapshot"])
 
-    # Get issues to transfer (only incomplete issues)
-    cycle_issues = CycleIssue.objects.filter(
-        cycle_id=cycle_id,
-        project_id=project_id,
-        workspace__slug=slug,
-        issue__archived_at__isnull=True,
-        issue__is_draft=False,
-        issue__state__group__in=["backlog", "unstarted", "started"],
+    # Get issues to transfer (only incomplete issues). Items the user cannot
+    # edit stay in the old cycle, untouched.
+    cycle_issues = visible_issues(
+        CycleIssue.objects.filter(
+            cycle_id=cycle_id,
+            project_id=project_id,
+            workspace__slug=slug,
+            issue__archived_at__isnull=True,
+            issue__is_draft=False,
+            issue__state__group__in=["backlog", "unstarted", "started"],
+        ),
+        request.user,
+        field="issue_id",
+        min_level=AccessLevel.EDIT,
     )
 
     updated_cycles = []

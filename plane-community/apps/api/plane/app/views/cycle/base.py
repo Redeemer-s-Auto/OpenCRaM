@@ -59,6 +59,7 @@ from plane.utils.cycle_transfer_issues import transfer_cycle_issues
 from .. import BaseAPIView, BaseViewSet
 from plane.bgtasks.webhook_task import model_activity
 from plane.utils.timezone_converter import convert_to_utc, user_timezone_converter
+from plane.sharing.visibility import hidden_issue_ids, visible_issues
 
 
 class CycleViewSet(BaseViewSet):
@@ -86,6 +87,9 @@ class CycleViewSet(BaseViewSet):
 
         # Convert project local time back to UTC for comparison (start_date is stored in UTC)
         current_time_in_utc = current_time_in_project_tz.astimezone(pytz.utc)
+
+        # Counts and assignees leave out work items hidden from this user.
+        hidden = hidden_issue_ids(self.request.user)
 
         return self.filter_queryset(
             super()
@@ -115,7 +119,7 @@ class CycleViewSet(BaseViewSet):
                 total_issues=Count(
                     "issue_cycle__issue__id",
                     distinct=True,
-                    filter=Q(
+                    filter=~Q(issue_cycle__issue_id__in=hidden) & Q(
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
                         issue_cycle__deleted_at__isnull=True,
@@ -127,7 +131,7 @@ class CycleViewSet(BaseViewSet):
                 completed_issues=Count(
                     "issue_cycle__issue__id",
                     distinct=True,
-                    filter=Q(
+                    filter=~Q(issue_cycle__issue_id__in=hidden) & Q(
                         issue_cycle__issue__state__group="completed",
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -140,7 +144,7 @@ class CycleViewSet(BaseViewSet):
                 cancelled_issues=Count(
                     "issue_cycle__issue__id",
                     distinct=True,
-                    filter=Q(
+                    filter=~Q(issue_cycle__issue_id__in=hidden) & Q(
                         issue_cycle__issue__state__group__in=["cancelled"],
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
@@ -171,7 +175,8 @@ class CycleViewSet(BaseViewSet):
                         "issue_cycle__issue__assignees__id",
                         distinct=True,
                         filter=~Q(issue_cycle__issue__assignees__id__isnull=True)
-                        & (Q(issue_cycle__issue__issue_assignee__deleted_at__isnull=True)),
+                        & (Q(issue_cycle__issue__issue_assignee__deleted_at__isnull=True))
+                        & ~Q(issue_cycle__issue_id__in=hidden),
                     ),
                     Value([], output_field=ArrayField(UUIDField())),
                 )
@@ -421,6 +426,7 @@ class CycleViewSet(BaseViewSet):
                     issue_cycle__cycle_id=pk,
                     issue_cycle__deleted_at__isnull=True,
                 )
+                .exclude(id__in=hidden_issue_ids(request.user))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -661,8 +667,9 @@ class CycleProgressEndpoint(BaseAPIView):
         cycle = Cycle.objects.filter(workspace__slug=slug, project_id=project_id, id=cycle_id).first()
         if not cycle:
             return Response({"error": "Cycle not found"}, status=status.HTTP_404_NOT_FOUND)
+        issues = visible_issues(Issue.issue_objects.all(), request.user)
         aggregate_estimates = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 estimate_point__estimate__type="points",
                 issue_cycle__cycle_id=cycle_id,
                 issue_cycle__deleted_at__isnull=True,
@@ -717,7 +724,7 @@ class CycleProgressEndpoint(BaseAPIView):
             completed_issues = cycle.progress_snapshot.get("completed_issues", 0)
             total_issues = cycle.progress_snapshot.get("total_issues", 0)
         else:
-            backlog_issues = Issue.issue_objects.filter(
+            backlog_issues = issues.filter(
                 issue_cycle__cycle_id=cycle_id,
                 issue_cycle__deleted_at__isnull=True,
                 workspace__slug=slug,
@@ -725,7 +732,7 @@ class CycleProgressEndpoint(BaseAPIView):
                 state__group="backlog",
             ).count()
 
-            unstarted_issues = Issue.issue_objects.filter(
+            unstarted_issues = issues.filter(
                 issue_cycle__cycle_id=cycle_id,
                 issue_cycle__deleted_at__isnull=True,
                 workspace__slug=slug,
@@ -733,7 +740,7 @@ class CycleProgressEndpoint(BaseAPIView):
                 state__group="unstarted",
             ).count()
 
-            started_issues = Issue.issue_objects.filter(
+            started_issues = issues.filter(
                 issue_cycle__cycle_id=cycle_id,
                 issue_cycle__deleted_at__isnull=True,
                 workspace__slug=slug,
@@ -741,7 +748,7 @@ class CycleProgressEndpoint(BaseAPIView):
                 state__group="started",
             ).count()
 
-            cancelled_issues = Issue.issue_objects.filter(
+            cancelled_issues = issues.filter(
                 issue_cycle__cycle_id=cycle_id,
                 issue_cycle__deleted_at__isnull=True,
                 workspace__slug=slug,
@@ -749,7 +756,7 @@ class CycleProgressEndpoint(BaseAPIView):
                 state__group="cancelled",
             ).count()
 
-            completed_issues = Issue.issue_objects.filter(
+            completed_issues = issues.filter(
                 issue_cycle__cycle_id=cycle_id,
                 issue_cycle__deleted_at__isnull=True,
                 workspace__slug=slug,
@@ -757,7 +764,7 @@ class CycleProgressEndpoint(BaseAPIView):
                 state__group="completed",
             ).count()
 
-            total_issues = Issue.issue_objects.filter(
+            total_issues = issues.filter(
                 issue_cycle__cycle_id=cycle_id,
                 issue_cycle__deleted_at__isnull=True,
                 workspace__slug=slug,
@@ -787,13 +794,15 @@ class CycleAnalyticsEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, cycle_id):
         analytic_type = request.GET.get("type", "issues")
+        hidden = hidden_issue_ids(request.user)
+        issues = visible_issues(Issue.issue_objects.all(), request.user)
         cycle = (
             Cycle.objects.filter(workspace__slug=slug, project_id=project_id, id=cycle_id)
             .annotate(
                 total_issues=Count(
                     "issue_cycle__issue__id",
                     distinct=True,
-                    filter=Q(
+                    filter=~Q(issue_cycle__issue_id__in=hidden) & Q(
                         issue_cycle__issue__archived_at__isnull=True,
                         issue_cycle__issue__is_draft=False,
                         issue_cycle__issue__deleted_at__isnull=True,
@@ -842,7 +851,7 @@ class CycleAnalyticsEndpoint(BaseAPIView):
 
         if analytic_type == "points" and estimate_type:
             assignee_distribution = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     issue_cycle__cycle_id=cycle_id,
                     issue_cycle__deleted_at__isnull=True,
                     workspace__slug=slug,
@@ -896,7 +905,7 @@ class CycleAnalyticsEndpoint(BaseAPIView):
             )
 
             label_distribution = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     issue_cycle__cycle_id=cycle_id,
                     issue_cycle__deleted_at__isnull=True,
                     workspace__slug=slug,
@@ -935,11 +944,12 @@ class CycleAnalyticsEndpoint(BaseAPIView):
                 project_id=project_id,
                 plot_type="points",
                 cycle_id=cycle_id,
+                user=request.user,
             )
 
         if analytic_type == "issues":
             assignee_distribution = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     issue_cycle__cycle_id=cycle_id,
                     issue_cycle__deleted_at__isnull=True,
                     project_id=project_id,
@@ -998,7 +1008,7 @@ class CycleAnalyticsEndpoint(BaseAPIView):
             )
 
             label_distribution = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     issue_cycle__cycle_id=cycle_id,
                     issue_cycle__deleted_at__isnull=True,
                     project_id=project_id,
@@ -1037,6 +1047,7 @@ class CycleAnalyticsEndpoint(BaseAPIView):
                 project_id=project_id,
                 cycle_id=cycle_id,
                 plot_type="issues",
+                user=request.user,
             )
 
         return Response(

@@ -25,10 +25,32 @@ from plane.db.models import (
     ProjectMember,
 )
 from django.db.models import Subquery
+from plane.sharing.visibility import can_view_issue, issue_access_level, visible_issues
 
 # Third Party imports
 from celery import shared_task
 from bs4 import BeautifulSoup
+
+
+# =========== Sharing rules: only notify people who can see the work item ======================
+
+
+def viewers_of_issue(issue_id, user_ids):
+    """Keep the users in ``user_ids`` who can see the work item right now."""
+    if issue_access_level(None, issue_id) is None:
+        return list(user_ids)
+    users = {str(user.id): user for user in User.objects.filter(id__in=[str(uid) for uid in user_ids])}
+    return [uid for uid in user_ids if str(uid) in users and can_view_issue(users[str(uid)], issue_id)]
+
+
+def activity_names_hidden_issue(user_id, activity):
+    """True when the activity points at another work item (parent, relation) the user cannot see."""
+    refs = [ref for ref in (activity.get("old_identifier"), activity.get("new_identifier")) if ref]
+    referenced = Issue.all_objects.filter(pk__in=refs)
+    if not refs or not referenced.exists():
+        return False
+    user = User.objects.filter(id=user_id).first()
+    return visible_issues(referenced, user).count() != referenced.count()
 
 
 # =========== Issue Description Html Parsing and notification Functions ======================
@@ -307,6 +329,7 @@ def notifications(
             ).values_list("assignee", flat=True)
 
             issue_subscribers = list(set(issue_subscribers) - {uuid.UUID(actor_id)})
+            issue_subscribers = viewers_of_issue(issue_id, issue_subscribers)
 
             for subscriber in issue_subscribers:
                 if issue.created_by_id and issue.created_by_id == subscriber:
@@ -325,6 +348,9 @@ def notifications(
 
                     # Do not send notification for description update
                     if issue_activity.get("field") == "description":
+                        continue
+
+                    if activity_names_hidden_issue(subscriber, issue_activity):
                         continue
 
                     # Check if the value should be sent or not
@@ -462,10 +488,12 @@ def notifications(
 
             actor = User.objects.get(pk=actor_id)
 
-            for mention_id in comment_mentions:
+            for mention_id in viewers_of_issue(issue_id, comment_mentions):
                 if mention_id != actor_id:
                     preference = UserNotificationPreference.objects.get(user_id=mention_id)
                     for issue_activity in issue_activities_created:
+                        if activity_names_hidden_issue(mention_id, issue_activity):
+                            continue
                         notification = create_mention_notification(
                             project=project,
                             issue=issue,
@@ -519,7 +547,7 @@ def notifications(
                             )
                         bulk_notifications.append(notification)
 
-            for mention_id in new_mentions:
+            for mention_id in viewers_of_issue(issue_id, new_mentions):
                 if mention_id != actor_id:
                     preference = UserNotificationPreference.objects.get(user_id=mention_id)
                     if (
@@ -609,6 +637,8 @@ def notifications(
                             )
                     else:
                         for issue_activity in issue_activities_created:
+                            if activity_names_hidden_issue(mention_id, issue_activity):
+                                continue
                             notification = create_mention_notification(
                                 project=project,
                                 issue=issue,

@@ -25,9 +25,17 @@ from plane.db.models import (
 from plane.utils.paginator import BasePaginator
 from plane.utils.order_queryset import NOTIFICATION_ORDER_BY_ALLOWLIST, sanitize_order_by
 from plane.app.permissions import allow_permission, ROLE
+from plane.sharing.visibility import hidden_issue_ids, hidden_page_ids
 
 # Module imports
 from ..base import BaseAPIView, BaseViewSet
+
+
+def visible_notifications(queryset, user):
+    """Drop notifications about work items or pages hidden from ``user``."""
+    return queryset.exclude(entity_name="issue", entity_identifier__in=hidden_issue_ids(user)).exclude(
+        entity_name="page", entity_identifier__in=hidden_page_ids(user)
+    )
 
 
 class NotificationViewSet(BaseViewSet, BasePaginator):
@@ -35,14 +43,15 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
     serializer_class = NotificationSerializer
 
     def get_queryset(self):
-        return (
+        return visible_notifications(
             super()
             .get_queryset()
             .filter(
                 workspace__slug=self.kwargs.get("slug"),
                 receiver_id=self.request.user.id,
             )
-            .select_related("workspace", "project", "triggered_by", "receiver")
+            .select_related("workspace", "project", "triggered_by", "receiver"),
+            self.request.user,
         )
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
@@ -62,7 +71,8 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
         )
 
         notifications = (
-            Notification.objects.filter(workspace__slug=slug, receiver_id=request.user.id)
+            visible_notifications(Notification.objects, request.user)
+            .filter(workspace__slug=slug, receiver_id=request.user.id)
             .filter(entity_name="issue")
             .annotate(is_inbox_issue=Exists(intake_issue))
             .annotate(is_intake_issue=Exists(intake_issue))
@@ -155,7 +165,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def partial_update(self, request, slug, pk):
-        notification = Notification.objects.get(workspace__slug=slug, pk=pk, receiver=request.user)
+        notification = self.get_queryset().get(pk=pk)
         # Only read_at and snoozed_till can be updated
         notification_data = {"snoozed_till": request.data.get("snoozed_till", None)}
         serializer = NotificationSerializer(notification, data=notification_data, partial=True)
@@ -167,7 +177,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def mark_read(self, request, slug, pk):
-        notification = Notification.objects.get(receiver=request.user, workspace__slug=slug, pk=pk)
+        notification = self.get_queryset().get(pk=pk)
         notification.read_at = timezone.now()
         notification.save()
         serializer = NotificationSerializer(notification)
@@ -175,7 +185,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def mark_unread(self, request, slug, pk):
-        notification = Notification.objects.get(receiver=request.user, workspace__slug=slug, pk=pk)
+        notification = self.get_queryset().get(pk=pk)
         notification.read_at = None
         notification.save()
         serializer = NotificationSerializer(notification)
@@ -183,7 +193,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def archive(self, request, slug, pk):
-        notification = Notification.objects.get(receiver=request.user, workspace__slug=slug, pk=pk)
+        notification = self.get_queryset().get(pk=pk)
         notification.archived_at = timezone.now()
         notification.save()
         serializer = NotificationSerializer(notification)
@@ -191,7 +201,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def unarchive(self, request, slug, pk):
-        notification = Notification.objects.get(receiver=request.user, workspace__slug=slug, pk=pk)
+        notification = self.get_queryset().get(pk=pk)
         notification.archived_at = None
         notification.save()
         serializer = NotificationSerializer(notification)
@@ -205,7 +215,8 @@ class UnreadNotificationEndpoint(BaseAPIView):
     def get(self, request, slug):
         # Watching Issues Count
         unread_notifications_count = (
-            Notification.objects.filter(
+            visible_notifications(Notification.objects, request.user)
+            .filter(
                 workspace__slug=slug,
                 receiver_id=request.user.id,
                 read_at__isnull=True,
@@ -216,14 +227,18 @@ class UnreadNotificationEndpoint(BaseAPIView):
             .count()
         )
 
-        mention_notifications_count = Notification.objects.filter(
-            workspace__slug=slug,
-            receiver_id=request.user.id,
-            read_at__isnull=True,
-            archived_at__isnull=True,
-            snoozed_till__isnull=True,
-            sender__icontains="mentioned",
-        ).count()
+        mention_notifications_count = (
+            visible_notifications(Notification.objects, request.user)
+            .filter(
+                workspace__slug=slug,
+                receiver_id=request.user.id,
+                read_at__isnull=True,
+                archived_at__isnull=True,
+                snoozed_till__isnull=True,
+                sender__icontains="mentioned",
+            )
+            .count()
+        )
 
         return Response(
             {
@@ -242,7 +257,8 @@ class MarkAllReadNotificationViewSet(BaseViewSet):
         type = request.data.get("type", "all")
 
         notifications = (
-            Notification.objects.filter(workspace__slug=slug, receiver_id=request.user.id, read_at__isnull=True)
+            visible_notifications(Notification.objects, request.user)
+            .filter(workspace__slug=slug, receiver_id=request.user.id, read_at__isnull=True)
             .select_related("workspace", "project", "triggered_by", "receiver")
             .order_by("snoozed_till", "-created_at")
         )

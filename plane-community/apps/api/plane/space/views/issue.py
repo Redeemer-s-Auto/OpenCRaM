@@ -68,6 +68,19 @@ from plane.db.models import (
 )
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.utils.issue_filters import issue_filters
+from plane.sharing.visibility import restricted_issue_ids
+
+
+def without_restricted_parents(rows):
+    """A public board never names a restricted parent."""
+    rows = list(rows)
+    parent_ids = {row["parent_id"] for row in rows if row and row.get("parent_id")}
+    if parent_ids:
+        hidden = set(restricted_issue_ids().filter(issue_id__in=parent_ids).values_list("issue_id", flat=True))
+        for row in rows:
+            if row and row.get("parent_id") in hidden:
+                row["parent_id"] = None
+    return rows
 
 
 class ProjectIssuesPublicEndpoint(BaseAPIView):
@@ -86,6 +99,7 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
 
         issue_queryset = (
             Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id)
+            .exclude(pk__in=restricted_issue_ids())
             .select_related("workspace", "project", "state", "parent")
             .prefetch_related("assignees", "labels", "issue_module__module")
             .prefetch_related(
@@ -117,6 +131,7 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
             )
             .annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                .exclude(pk__in=restricted_issue_ids())
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -149,8 +164,8 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
                         request=request,
                         order_by=order_by_param,
                         queryset=issue_queryset,
-                        on_results=lambda issues: issue_on_results(
-                            group_by=group_by, issues=issues, sub_group_by=sub_group_by
+                        on_results=lambda issues: without_restricted_parents(
+                            issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by)
                         ),
                         paginator_cls=SubGroupedOffsetPaginator,
                         group_by_fields=issue_group_values(
@@ -182,8 +197,8 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
                     request=request,
                     order_by=order_by_param,
                     queryset=issue_queryset,
-                    on_results=lambda issues: issue_on_results(
-                        group_by=group_by, issues=issues, sub_group_by=sub_group_by
+                    on_results=lambda issues: without_restricted_parents(
+                        issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by)
                     ),
                     paginator_cls=GroupedOffsetPaginator,
                     group_by_fields=issue_group_values(
@@ -207,7 +222,9 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
                 order_by=order_by_param,
                 request=request,
                 queryset=issue_queryset,
-                on_results=lambda issues: issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by),
+                on_results=lambda issues: without_restricted_parents(
+                    issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by)
+                ),
             )
 
 
@@ -603,6 +620,7 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                 workspace__slug=deploy_board.workspace.slug,
                 project_id=deploy_board.project_id,
             )
+            .exclude(pk__in=restricted_issue_ids())
             .select_related("workspace", "project", "state", "parent")
             .prefetch_related("assignees", "labels", "issue_module__module")
             .annotate(
@@ -769,5 +787,6 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                 "reaction_items",
             )
         ).first()
+        issue_queryset = without_restricted_parents([issue_queryset])[0]
 
         return Response(issue_queryset, status=status.HTTP_200_OK)

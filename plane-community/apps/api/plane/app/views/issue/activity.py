@@ -19,6 +19,7 @@ from .. import BaseAPIView
 from plane.app.serializers import IssueActivitySerializer, IssueCommentSerializer
 from plane.app.permissions import ProjectEntityPermission, allow_permission, ROLE
 from plane.db.models import IssueActivity, IssueComment, CommentReaction, IntakeIssue
+from plane.sharing.visibility import visible_issues
 
 
 class IssueActivityEndpoint(BaseAPIView):
@@ -44,6 +45,9 @@ class IssueActivityEndpoint(BaseAPIView):
             .filter(**filters)
             .select_related("actor", "workspace", "issue", "project")
         ).order_by("created_at")
+        # Drop entries that name a hidden work item (parent and relation changes).
+        issue_activities = visible_issues(issue_activities, request.user, field="old_identifier")
+        issue_activities = visible_issues(issue_activities, request.user, field="new_identifier")
         issue_comments = (
             IssueComment.objects.filter(issue_id=issue_id)
             .filter(

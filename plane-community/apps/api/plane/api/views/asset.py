@@ -21,6 +21,7 @@ from plane.utils.path_validator import sanitize_filename
 from plane.db.models import FileAsset, User, Workspace
 from plane.app.permissions import WorkspaceUserPermission
 from plane.api.views.base import BaseAPIView
+from plane.sharing.visibility import visible_issues, visible_pages
 from plane.api.serializers import (
     UserAssetUploadSerializer,
     AssetUpdateSerializer,
@@ -434,8 +435,10 @@ class GenericAssetEndpoint(BaseAPIView):
             # Get the workspace
             workspace = Workspace.objects.get(slug=slug)
 
-            # Get the asset
-            asset = FileAsset.objects.get(id=asset_id, workspace_id=workspace.id, is_deleted=False)
+            # Get the asset; files of a hidden work item or page do not exist for the caller
+            assets = visible_issues(FileAsset.objects.all(), request.user, field="issue_id")
+            assets = visible_pages(assets, request.user, field="page_id")
+            asset = assets.get(id=asset_id, workspace_id=workspace.id, is_deleted=False)
 
             # Check if the asset exists and is uploaded
             if not asset.is_uploaded:

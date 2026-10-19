@@ -44,6 +44,10 @@ from plane.bgtasks.issue_activities_task import issue_activity
 from plane.bgtasks.issue_description_version_task import issue_description_version_task
 from plane.bgtasks.recent_visited_task import recent_visited_task
 from plane.bgtasks.webhook_task import model_activity
+from plane.app.serializers.issue import hide_issue_refs
+from plane.sharing.models import AccessLevel
+from plane.sharing.visibility import can_view_issue, visible_issues
+from plane.utils.uuid import is_valid_uuid
 from plane.db.models import (
     CycleIssue,
     FileAsset,
@@ -77,6 +81,17 @@ from plane.utils.timezone_converter import user_timezone_converter
 from .. import BaseAPIView, BaseViewSet
 
 
+def hidden_parent_error(request):
+    """400 when the request sets a parent the user cannot see, worded as for an unknown id."""
+    parent_id = request.data.get("parent_id") or request.data.get("parent")
+    if parent_id and is_valid_uuid(str(parent_id)) and not can_view_issue(request.user, parent_id):
+        return Response(
+            {"parent_id": [f'Invalid pk "{parent_id}" - object does not exist.']},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return None
+
+
 class IssueListEndpoint(BaseAPIView):
     filter_backends = (ComplexFilterBackend,)
     filterset_class = IssueFilterSet
@@ -92,6 +107,7 @@ class IssueListEndpoint(BaseAPIView):
 
         # Base queryset with basic filters
         queryset = Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id, pk__in=issue_ids)
+        queryset = visible_issues(queryset, request.user)
 
         # Restrict guests without full feature access to issues they created,
         # mirroring IssueViewSet.list.
@@ -142,7 +158,7 @@ class IssueListEndpoint(BaseAPIView):
                 .values("count")
             )
             .annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                sub_issues_count=visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -171,6 +187,7 @@ class IssueListEndpoint(BaseAPIView):
 
         if self.fields or self.expand:
             issues = IssueSerializer(issue_queryset, many=True, fields=self.fields, expand=self.expand).data
+            hide_issue_refs(issues, request.user)
         else:
             issues = issue_queryset.values(
                 "id",
@@ -202,6 +219,7 @@ class IssueListEndpoint(BaseAPIView):
             )
             datetime_fields = ["created_at", "updated_at"]
             issues = user_timezone_converter(issues, datetime_fields, request.user.user_timezone)
+            hide_issue_refs(issues, request.user)
         return Response(issues, status=status.HTTP_200_OK)
 
 
@@ -221,7 +239,7 @@ class IssueViewSet(BaseViewSet):
             workspace__slug=self.kwargs.get("slug"),
         ).distinct()
 
-        return issues
+        return visible_issues(issues, self.request.user)
 
     def apply_annotations(self, issues):
         issues = (
@@ -251,7 +269,7 @@ class IssueViewSet(BaseViewSet):
             )
             .annotate(
                 sub_issues_count=Subquery(
-                    Issue.issue_objects.filter(parent=OuterRef("id"))
+                    visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                     .values("parent")
                     .annotate(count=Count("id"))
                     .values("count")
@@ -335,8 +353,9 @@ class IssueViewSet(BaseViewSet):
                         order_by=order_by_param,
                         queryset=issue_queryset,
                         total_count_queryset=filtered_issue_queryset,
-                        on_results=lambda issues: issue_on_results(
-                            group_by=group_by, issues=issues, sub_group_by=sub_group_by
+                        on_results=lambda issues: hide_issue_refs(
+                            issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by),
+                            request.user,
                         ),
                         paginator_cls=SubGroupedOffsetPaginator,
                         group_by_fields=issue_group_values(
@@ -371,8 +390,9 @@ class IssueViewSet(BaseViewSet):
                     order_by=order_by_param,
                     queryset=issue_queryset,
                     total_count_queryset=filtered_issue_queryset,
-                    on_results=lambda issues: issue_on_results(
-                        group_by=group_by, issues=issues, sub_group_by=sub_group_by
+                    on_results=lambda issues: hide_issue_refs(
+                        issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by),
+                        request.user,
                     ),
                     paginator_cls=GroupedOffsetPaginator,
                     group_by_fields=issue_group_values(
@@ -398,12 +418,18 @@ class IssueViewSet(BaseViewSet):
                 request=request,
                 queryset=issue_queryset,
                 total_count_queryset=filtered_issue_queryset,
-                on_results=lambda issues: issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by),
+                on_results=lambda issues: hide_issue_refs(
+                    issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by),
+                    request.user,
+                ),
             )
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id):
         project = Project.objects.get(pk=project_id)
+        hidden_parent = hidden_parent_error(request)
+        if hidden_parent:
+            return hidden_parent
 
         serializer = IssueCreateSerializer(
             data=request.data,
@@ -469,6 +495,7 @@ class IssueViewSet(BaseViewSet):
             )
             datetime_fields = ["created_at", "updated_at"]
             issue = user_timezone_converter(issue, datetime_fields, request.user.user_timezone)
+            hide_issue_refs(issue, request.user)
             # Send the model activity
             model_activity.delay(
                 model_name="issue",
@@ -522,7 +549,7 @@ class IssueViewSet(BaseViewSet):
             )
             .annotate(
                 sub_issues_count=Subquery(
-                    Issue.issue_objects.filter(parent=OuterRef("id"))
+                    visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                     .values("parent")
                     .annotate(count=Count("id"))
                     .values("count")
@@ -622,10 +649,13 @@ class IssueViewSet(BaseViewSet):
         )
 
         serializer = IssueDetailSerializer(issue, expand=self.expand)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(hide_issue_refs(serializer.data, request.user), status=status.HTTP_200_OK)
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], creator=True, model=Issue)
     def partial_update(self, request, slug, project_id, pk=None):
+        hidden_parent = hidden_parent_error(request)
+        if hidden_parent:
+            return hidden_parent
         queryset = self.get_queryset()
         queryset = self.apply_annotations(queryset)
 
@@ -779,6 +809,8 @@ class BulkDeleteIssuesEndpoint(BaseAPIView):
             return Response({"error": "Issue IDs are required"}, status=status.HTTP_400_BAD_REQUEST)
 
         issues = Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id, pk__in=issue_ids)
+        # Items the user may not edit are skipped, as if their ids were not sent.
+        issues = visible_issues(issues, request.user, min_level=AccessLevel.EDIT)
 
         total_issues = len(issues)
 
@@ -809,6 +841,7 @@ class DeletedIssuesListViewSet(BaseAPIView):
             .filter(**filters)
             .values_list("id", flat=True)
         )
+        deleted_issues = visible_issues(deleted_issues, request.user)
 
         return Response(deleted_issues, status=status.HTTP_200_OK)
 
@@ -819,6 +852,7 @@ class IssuePaginatedViewSet(BaseViewSet):
         project_id = self.kwargs.get("project_id")
 
         issue_queryset = Issue.issue_objects.filter(workspace__slug=workspace_slug, project_id=project_id)
+        issue_queryset = visible_issues(issue_queryset, self.request.user)
 
         return (
             issue_queryset.select_related("state")
@@ -844,7 +878,7 @@ class IssuePaginatedViewSet(BaseViewSet):
             )
             .annotate(
                 sub_issues_count=Subquery(
-                    Issue.issue_objects.filter(parent=OuterRef("id"))
+                    visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                     .values("parent")
                     .annotate(count=Count("id"))
                     .values("count")
@@ -859,7 +893,7 @@ class IssuePaginatedViewSet(BaseViewSet):
         datetime_fields = ["created_at", "updated_at"]
         paginated_data = user_timezone_converter(paginated_data, datetime_fields, timezone)
 
-        return paginated_data
+        return hide_issue_refs(paginated_data, self.request.user)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def list(self, request, slug, project_id):
@@ -902,6 +936,7 @@ class IssuePaginatedViewSet(BaseViewSet):
 
         # querying issues
         base_queryset = Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id)
+        base_queryset = visible_issues(base_queryset, request.user)
 
         base_queryset = base_queryset.order_by("updated_at")
         queryset = self.get_queryset().order_by("updated_at")
@@ -999,7 +1034,7 @@ class IssueDetailEndpoint(BaseAPIView):
                 .values("count")
             )
             .annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                sub_issues_count=visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -1058,6 +1093,7 @@ class IssueDetailEndpoint(BaseAPIView):
         issue = Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id).filter(
             Exists(permission_subquery)
         )
+        issue = visible_issues(issue, request.user)
 
         # Add additional prefetch based on expand parameter
         if self.expand:
@@ -1065,14 +1101,18 @@ class IssueDetailEndpoint(BaseAPIView):
                 issue = issue.prefetch_related(
                     Prefetch(
                         "issue_relation",
-                        queryset=IssueRelation.objects.select_related("related_issue"),
+                        queryset=visible_issues(
+                            IssueRelation.objects.select_related("related_issue"), request.user, field="related_issue_id"
+                        ),
                     )
                 )
             if "issue_related" in self.expand:
                 issue = issue.prefetch_related(
                     Prefetch(
                         "issue_related",
-                        queryset=IssueRelation.objects.select_related("issue"),
+                        queryset=visible_issues(
+                            IssueRelation.objects.select_related("issue"), request.user, field="issue_id"
+                        ),
                     )
                 )
 
@@ -1097,9 +1137,10 @@ class IssueDetailEndpoint(BaseAPIView):
             order_by=order_by_param,
             queryset=issue,
             total_count_queryset=total_issue_queryset,
-            on_results=lambda issue: IssueListDetailSerializer(
-                issue, many=True, fields=self.fields, expand=self.expand
-            ).data,
+            on_results=lambda issue: hide_issue_refs(
+                IssueListDetailSerializer(issue, many=True, fields=self.fields, expand=self.expand).data,
+                request.user,
+            ),
         )
 
 
@@ -1131,7 +1172,9 @@ class IssueBulkUpdateDateEndpoint(BaseAPIView):
         epoch = int(timezone.now().timestamp())
 
         # Fetch all relevant issues in a single query
-        issues = list(Issue.objects.filter(id__in=issue_ids, workspace__slug=slug, project_id=project_id))
+        issues = Issue.objects.filter(id__in=issue_ids, workspace__slug=slug, project_id=project_id)
+        # Items the user may not edit are skipped, as if their ids were not sent.
+        issues = list(visible_issues(issues, request.user, min_level=AccessLevel.EDIT))
         issues_dict = {str(issue.id): issue for issue in issues}
         issues_to_update = []
 
@@ -1252,7 +1295,7 @@ class IssueDetailIdentifierEndpoint(BaseAPIView):
                 .values("count")
             )
             .annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                sub_issues_count=visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -1364,4 +1407,4 @@ class IssueDetailIdentifierEndpoint(BaseAPIView):
 
         # Serialize the issue
         serializer = IssueDetailSerializer(issue, expand=self.expand)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(hide_issue_refs(serializer.data, request.user), status=status.HTTP_200_OK)

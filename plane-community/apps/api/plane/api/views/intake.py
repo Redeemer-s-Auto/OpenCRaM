@@ -29,6 +29,7 @@ from plane.app.permissions import ProjectLitePermission
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.db.models import Intake, IntakeIssue, Issue, Project, ProjectMember, State, StateGroup
 from plane.utils.host import base_host
+from plane.sharing.visibility import can_view_issue, visible_issues
 from plane.utils.content_validator import validate_html_content
 from .base import BaseAPIView
 from plane.db.models.intake import SourceType
@@ -72,7 +73,7 @@ class IntakeIssueListCreateAPIEndpoint(BaseAPIView):
         if intake is None or not project.intake_view:
             return IntakeIssue.objects.none()
 
-        return (
+        return visible_issues(
             IntakeIssue.objects.filter(
                 Q(snoozed_till__gte=timezone.now()) | Q(snoozed_till__isnull=True),
                 workspace__slug=self.kwargs.get("slug"),
@@ -80,7 +81,9 @@ class IntakeIssueListCreateAPIEndpoint(BaseAPIView):
                 intake_id=intake.id,
             )
             .select_related("issue", "workspace", "project")
-            .order_by(self.kwargs.get("order_by", "-created_at"))
+            .order_by(self.kwargs.get("order_by", "-created_at")),
+            self.request.user,
+            field="issue_id",
         )
 
     @intake_docs(
@@ -246,7 +249,7 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
         if intake is None or not project.intake_view:
             return IntakeIssue.objects.none()
 
-        return (
+        return visible_issues(
             IntakeIssue.objects.filter(
                 Q(snoozed_till__gte=timezone.now()) | Q(snoozed_till__isnull=True),
                 workspace__slug=self.kwargs.get("slug"),
@@ -254,7 +257,9 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
                 intake_id=intake.id,
             )
             .select_related("issue", "workspace", "project")
-            .order_by(self.kwargs.get("order_by", "-created_at"))
+            .order_by(self.kwargs.get("order_by", "-created_at")),
+            self.request.user,
+            field="issue_id",
         )
 
     @intake_docs(
@@ -388,6 +393,11 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
 
             if not issue_serializer.is_valid():
                 return Response(issue_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # A hidden work item cannot be named as the duplicate target.
+        duplicate_to = request.data.get("duplicate_to")
+        if duplicate_to and not can_view_issue(request.user, duplicate_to):
+            return Response({"duplicate_to": ["Invalid work item."]}, status=status.HTTP_400_BAD_REQUEST)
 
         # Only project admins and members can edit intake issue attributes
         if project_member.role > 15:

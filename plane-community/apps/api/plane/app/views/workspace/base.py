@@ -50,6 +50,8 @@ from plane.bgtasks.event_tracking_task import track_event
 from plane.utils.url import contains_url
 from plane.utils.analytics_events import WORKSPACE_CREATED, WORKSPACE_DELETED
 from plane.utils.csv_utils import sanitize_csv_row
+from plane.sharing.visibility import visible_issues
+from plane.app.views.workspace.user import visible_activity
 
 
 class WorkSpaceViewSet(BaseViewSet):
@@ -262,7 +264,8 @@ class WeekInMonth(Func):
 class UserWorkspaceDashboardEndpoint(BaseAPIView):
     def get(self, request, slug):
         issue_activities = (
-            IssueActivity.objects.filter(
+            visible_activity(IssueActivity.objects, request.user)
+            .filter(
                 actor=request.user,
                 workspace__slug=slug,
                 created_at__date__gte=date.today() + relativedelta(months=-3),
@@ -276,7 +279,7 @@ class UserWorkspaceDashboardEndpoint(BaseAPIView):
         month = request.GET.get("month", 1)
 
         completed_issues = (
-            Issue.issue_objects.filter(
+            visible_issues(Issue.issue_objects, request.user).filter(
                 assignees__in=[request.user],
                 workspace__slug=slug,
                 completed_at__month=month,
@@ -289,34 +292,34 @@ class UserWorkspaceDashboardEndpoint(BaseAPIView):
             .order_by("week_in_month")
         )
 
-        assigned_issues = Issue.issue_objects.filter(workspace__slug=slug, assignees__in=[request.user]).count()
+        assigned_issues = visible_issues(Issue.issue_objects, request.user).filter(workspace__slug=slug, assignees__in=[request.user]).count()
 
-        pending_issues_count = Issue.issue_objects.filter(
+        pending_issues_count = visible_issues(Issue.issue_objects, request.user).filter(
             ~Q(state__group__in=["completed", "cancelled"]),
             workspace__slug=slug,
             assignees__in=[request.user],
         ).count()
 
-        completed_issues_count = Issue.issue_objects.filter(
+        completed_issues_count = visible_issues(Issue.issue_objects, request.user).filter(
             workspace__slug=slug, assignees__in=[request.user], state__group="completed"
         ).count()
 
         issues_due_week = (
-            Issue.issue_objects.filter(workspace__slug=slug, assignees__in=[request.user])
+            visible_issues(Issue.issue_objects, request.user).filter(workspace__slug=slug, assignees__in=[request.user])
             .annotate(target_week=ExtractWeek("target_date"))
             .filter(target_week=timezone.now().date().isocalendar()[1])
             .count()
         )
 
         state_distribution = (
-            Issue.issue_objects.filter(workspace__slug=slug, assignees__in=[request.user])
+            visible_issues(Issue.issue_objects, request.user).filter(workspace__slug=slug, assignees__in=[request.user])
             .annotate(state_group=F("state__group"))
             .values("state_group")
             .annotate(state_count=Count("state_group"))
             .order_by("state_group")
         )
 
-        overdue_issues = Issue.issue_objects.filter(
+        overdue_issues = visible_issues(Issue.issue_objects, request.user).filter(
             ~Q(state__group__in=["completed", "cancelled"]),
             workspace__slug=slug,
             assignees__in=[request.user],
@@ -324,7 +327,7 @@ class UserWorkspaceDashboardEndpoint(BaseAPIView):
             completed_at__isnull=True,
         ).values("id", "name", "workspace__slug", "project_id", "target_date")
 
-        upcoming_issues = Issue.issue_objects.filter(
+        upcoming_issues = visible_issues(Issue.issue_objects, request.user).filter(
             ~Q(state__group__in=["completed", "cancelled"]),
             start_date__gte=timezone.now(),
             workspace__slug=slug,
@@ -380,7 +383,7 @@ class ExportWorkspaceUserActivityEndpoint(BaseAPIView):
         if not request.data.get("date"):
             return Response({"error": "Date is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        user_activities = IssueActivity.objects.filter(
+        user_activities = visible_activity(IssueActivity.objects, request.user).filter(
             ~Q(field__in=["comment", "vote", "reaction", "draft"]),
             workspace__slug=slug,
             created_at__date=request.data.get("date"),

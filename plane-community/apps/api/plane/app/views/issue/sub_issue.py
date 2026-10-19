@@ -28,6 +28,8 @@ from plane.utils.timezone_converter import user_timezone_converter
 from collections import defaultdict
 from plane.utils.host import base_host
 from plane.utils.order_queryset import order_issue_queryset
+from plane.sharing.models import AccessLevel
+from plane.sharing.visibility import visible_issues
 
 
 class SubIssuesEndpoint(BaseAPIView):
@@ -36,7 +38,7 @@ class SubIssuesEndpoint(BaseAPIView):
     @method_decorator(gzip_page)
     def get(self, request, slug, project_id, issue_id):
         sub_issues = (
-            Issue.issue_objects.filter(parent_id=issue_id, workspace__slug=slug)
+            visible_issues(Issue.issue_objects.filter(parent_id=issue_id, workspace__slug=slug), request.user)
             .annotate(
                 cycle_id=Subquery(
                     CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
@@ -74,7 +76,7 @@ class SubIssuesEndpoint(BaseAPIView):
             .annotate(
                 sub_issues_count=Coalesce(
                     Subquery(
-                        Issue.issue_objects.filter(parent=OuterRef("id"))
+                        visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                         .order_by()
                         .values("parent")
                         .annotate(count=Count("id"))
@@ -213,6 +215,9 @@ class SubIssuesEndpoint(BaseAPIView):
 
         # Scope to workspace to prevent cross-tenant IDOR
         sub_issues = Issue.issue_objects.filter(id__in=sub_issue_ids, workspace__slug=slug)
+        # Attaching changes the child, so items the user may not edit are skipped.
+        sub_issues = visible_issues(sub_issues, request.user, min_level=AccessLevel.EDIT)
+        sub_issue_ids = [str(sub_issue_id) for sub_issue_id in sub_issues.values_list("id", flat=True)]
 
         for sub_issue in sub_issues:
             sub_issue.parent = parent_issue

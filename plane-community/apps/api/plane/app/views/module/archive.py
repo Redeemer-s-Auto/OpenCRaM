@@ -33,6 +33,7 @@ from plane.app.serializers import ModuleDetailSerializer
 from plane.db.models import Issue, Module, ModuleLink, UserFavorite, Project
 from plane.utils.analytics_plot import burndown_plot
 from plane.utils.timezone_converter import user_timezone_converter
+from plane.sharing.visibility import visible_issues
 
 
 # Module imports
@@ -50,8 +51,10 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             project_id=self.kwargs.get("project_id"),
             workspace__slug=self.kwargs.get("slug"),
         )
+        # Counts and sums leave out work items hidden from this user.
+        issues = visible_issues(Issue.issue_objects.all(), self.request.user)
         cancelled_issues = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 state__group="cancelled",
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
@@ -61,7 +64,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             .values("cnt")
         )
         completed_issues = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 state__group="completed",
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
@@ -71,7 +74,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             .values("cnt")
         )
         started_issues = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 state__group="started",
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
@@ -81,7 +84,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             .values("cnt")
         )
         unstarted_issues = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 state__group="unstarted",
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
@@ -91,7 +94,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             .values("cnt")
         )
         backlog_issues = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 state__group="backlog",
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
@@ -101,7 +104,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             .values("cnt")
         )
         total_issues = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
             )
@@ -110,7 +113,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             .values("cnt")
         )
         completed_estimate_point = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 estimate_point__estimate__type="points",
                 state__group="completed",
                 issue_module__module_id=OuterRef("pk"),
@@ -122,7 +125,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
         )
 
         total_estimate_point = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 estimate_point__estimate__type="points",
                 issue_module__module_id=OuterRef("pk"),
                 issue_module__deleted_at__isnull=True,
@@ -132,7 +135,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             .values("total_estimate_points")[:1]
         )
         backlog_estimate_point = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 estimate_point__estimate__type="points",
                 state__group="backlog",
                 issue_module__module_id=OuterRef("pk"),
@@ -143,7 +146,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             .values("backlog_estimate_point")[:1]
         )
         unstarted_estimate_point = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 estimate_point__estimate__type="points",
                 state__group="unstarted",
                 issue_module__module_id=OuterRef("pk"),
@@ -154,7 +157,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             .values("unstarted_estimate_point")[:1]
         )
         started_estimate_point = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 estimate_point__estimate__type="points",
                 state__group="started",
                 issue_module__module_id=OuterRef("pk"),
@@ -165,7 +168,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             .values("started_estimate_point")[:1]
         )
         cancelled_estimate_point = (
-            Issue.issue_objects.filter(
+            issues.filter(
                 estimate_point__estimate__type="points",
                 state__group="cancelled",
                 issue_module__module_id=OuterRef("pk"),
@@ -256,6 +259,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
         )
 
     def get(self, request, slug, project_id, pk=None):
+        issues = visible_issues(Issue.issue_objects.all(), request.user)
         if pk is None:
             queryset = self.get_queryset()
             modules = queryset.values(  # Required fields
@@ -296,7 +300,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
                 self.get_queryset()
                 .filter(pk=pk)
                 .annotate(
-                    sub_issues=Issue.issue_objects.filter(
+                    sub_issues=issues.filter(
                         project_id=self.kwargs.get("project_id"),
                         parent__isnull=False,
                         issue_module__module_id=pk,
@@ -322,7 +326,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
 
             if estimate_type:
                 assignee_distribution = (
-                    Issue.issue_objects.filter(
+                    issues.filter(
                         issue_module__module_id=pk,
                         issue_module__deleted_at__isnull=True,
                         workspace__slug=slug,
@@ -384,7 +388,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
                 )
 
                 label_distribution = (
-                    Issue.issue_objects.filter(
+                    issues.filter(
                         issue_module__module_id=pk,
                         workspace__slug=slug,
                         project_id=project_id,
@@ -426,10 +430,11 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
                         project_id=project_id,
                         plot_type="points",
                         module_id=pk,
+                        user=request.user,
                     )
 
             assignee_distribution = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     issue_module__module_id=pk,
                     issue_module__deleted_at__isnull=True,
                     workspace__slug=slug,
@@ -491,7 +496,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             )
 
             label_distribution = (
-                Issue.issue_objects.filter(
+                issues.filter(
                     issue_module__module_id=pk,
                     issue_module__deleted_at__isnull=True,
                     workspace__slug=slug,
@@ -537,6 +542,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
                     project_id=project_id,
                     plot_type="issues",
                     module_id=pk,
+                    user=request.user,
                 )
 
             return Response(data, status=status.HTTP_200_OK)

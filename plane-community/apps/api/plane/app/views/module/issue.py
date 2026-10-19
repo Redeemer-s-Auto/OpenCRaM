@@ -40,6 +40,8 @@ from plane.utils.filters import ComplexFilterBackend
 from plane.utils.filters import IssueFilterSet
 from .. import BaseViewSet
 from plane.utils.host import base_host
+from plane.sharing.models import AccessLevel
+from plane.sharing.visibility import hidden_issue_ids, visible_issues
 
 
 class ModuleIssueViewSet(BaseViewSet):
@@ -74,6 +76,7 @@ class ModuleIssueViewSet(BaseViewSet):
             )
             .annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                .exclude(id__in=hidden_issue_ids(self.request.user))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -82,13 +85,14 @@ class ModuleIssueViewSet(BaseViewSet):
         )
 
     def get_queryset(self):
-        return (
+        return visible_issues(
             Issue.issue_objects.filter(
                 project_id=self.kwargs.get("project_id"),
                 workspace__slug=self.kwargs.get("slug"),
                 issue_module__module_id=self.kwargs.get("module_id"),
                 issue_module__deleted_at__isnull=True,
-            )
+            ),
+            self.request.user,
         ).distinct()
 
     @method_decorator(gzip_page)
@@ -214,11 +218,16 @@ class ModuleIssueViewSet(BaseViewSet):
             return Response({"error": "Issues are required"}, status=status.HTTP_400_BAD_REQUEST)
         project = Project.objects.get(pk=project_id)
         # Scope to workspace+project to prevent cross-tenant IDOR
+        # Items the user cannot edit are skipped as if they did not exist.
         issues = list(
-            Issue.issue_objects.filter(
-                workspace__slug=slug,
-                project_id=project_id,
-                pk__in=issues,
+            visible_issues(
+                Issue.issue_objects.filter(
+                    workspace__slug=slug,
+                    project_id=project_id,
+                    pk__in=issues,
+                ),
+                request.user,
+                min_level=AccessLevel.EDIT,
             ).values_list("id", flat=True)
         )
         _ = ModuleIssue.objects.bulk_create(

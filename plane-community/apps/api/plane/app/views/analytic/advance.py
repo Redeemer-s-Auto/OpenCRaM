@@ -23,6 +23,7 @@ from plane.db.models import (
     ProjectMember,
 )
 from plane.utils.build_chart import build_analytics_chart
+from plane.sharing.visibility import visible_issues, visible_pages
 from plane.utils.date_utils import (
     get_analytics_filters,
 )
@@ -38,6 +39,10 @@ class AdvanceAnalyticsBaseView(BaseAPIView):
             date_filter=self.request.GET.get("date_filter", None),
             project_ids=self.request.GET.get("project_ids", None),
         )
+
+    def issues(self, manager=Issue.issue_objects):
+        """Work items, leaving out those hidden from this user."""
+        return visible_issues(manager.all(), self.request.user)
 
 
 class AdvanceAnalyticsEndpoint(AdvanceAnalyticsBaseView):
@@ -81,17 +86,17 @@ class AdvanceAnalyticsEndpoint(AdvanceAnalyticsBaseView):
             "total_members": self.get_filtered_counts(members_query.filter(role=ROLE.MEMBER.value)),
             "total_guests": self.get_filtered_counts(members_query.filter(role=ROLE.GUEST.value)),
             "total_projects": self.get_filtered_counts(Project.objects.filter(**self.filters["project_filters"])),
-            "total_work_items": self.get_filtered_counts(Issue.issue_objects.filter(**self.filters["base_filters"])),
+            "total_work_items": self.get_filtered_counts(self.issues().filter(**self.filters["base_filters"])),
             "total_cycles": self.get_filtered_counts(Cycle.objects.filter(**self.filters["base_filters"])),
             "total_intake": self.get_filtered_counts(
-                Issue.objects.filter(**self.filters["base_filters"]).filter(
+                self.issues(Issue.objects).filter(**self.filters["base_filters"]).filter(
                     issue_intake__status__in=["-2", "-1", "0", "1", "2"]  # TODO: Add description for reference.
                 )
             ),
         }
 
     def get_work_items_stats(self) -> Dict[str, Dict[str, int]]:
-        base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"])
+        base_queryset = self.issues().filter(**self.filters["base_filters"])
 
         return {
             "total_work_items": self.get_filtered_counts(base_queryset),
@@ -122,7 +127,7 @@ class AdvanceAnalyticsEndpoint(AdvanceAnalyticsBaseView):
 class AdvanceAnalyticsStatsEndpoint(AdvanceAnalyticsBaseView):
     def get_project_issues_stats(self) -> QuerySet:
         # Get the base queryset with workspace and project filters
-        base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"])
+        base_queryset = self.issues().filter(**self.filters["base_filters"])
 
         # Apply date range filter if available
         if self.filters["chart_period_range"]:
@@ -142,7 +147,7 @@ class AdvanceAnalyticsStatsEndpoint(AdvanceAnalyticsBaseView):
         )
 
     def get_work_items_stats(self) -> Dict[str, Dict[str, int]]:
-        base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"])
+        base_queryset = self.issues().filter(**self.filters["base_filters"])
         return (
             base_queryset.values("project_id", "project__name")
             .annotate(
@@ -172,7 +177,7 @@ class AdvanceAnalyticsStatsEndpoint(AdvanceAnalyticsBaseView):
 class AdvanceAnalyticsChartEndpoint(AdvanceAnalyticsBaseView):
     def project_chart(self) -> List[Dict[str, Any]]:
         # Get the base queryset with workspace and project filters
-        base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"])
+        base_queryset = self.issues().filter(**self.filters["base_filters"])
         date_filter = {}
 
         # Apply date range filter if available
@@ -186,13 +191,17 @@ class AdvanceAnalyticsChartEndpoint(AdvanceAnalyticsBaseView):
         total_work_items = base_queryset.filter(**date_filter).count()
         total_cycles = Cycle.objects.filter(**self.filters["base_filters"], **date_filter).count()
         total_modules = Module.objects.filter(**self.filters["base_filters"], **date_filter).count()
-        total_intake = Issue.objects.filter(
+        total_intake = self.issues(Issue.objects).filter(
             issue_intake__isnull=False, **self.filters["base_filters"], **date_filter
         ).count()
         total_members = WorkspaceMember.objects.filter(
             workspace__slug=self._workspace_slug, is_active=True, **date_filter
         ).count()
-        total_pages = ProjectPage.objects.filter(**self.filters["base_filters"], **date_filter).count()
+        total_pages = visible_pages(
+            ProjectPage.objects.filter(**self.filters["base_filters"], **date_filter),
+            self.request.user,
+            field="page_id",
+        ).count()
         total_views = IssueView.objects.filter(**self.filters["base_filters"], **date_filter).count()
 
         data = {
@@ -217,7 +226,7 @@ class AdvanceAnalyticsChartEndpoint(AdvanceAnalyticsBaseView):
     def work_item_completion_chart(self) -> Dict[str, Any]:
         # Get the base queryset
         queryset = (
-            Issue.issue_objects.filter(**self.filters["base_filters"])
+            self.issues().filter(**self.filters["base_filters"])
             .select_related("workspace", "state", "parent")
             .prefetch_related("assignees", "labels", "issue_module__module", "issue_cycle__cycle")
         )
@@ -294,7 +303,7 @@ class AdvanceAnalyticsChartEndpoint(AdvanceAnalyticsBaseView):
 
         elif type == "custom-work-items":
             queryset = (
-                Issue.issue_objects.filter(**self.filters["base_filters"])
+                self.issues().filter(**self.filters["base_filters"])
                 .select_related("workspace", "state", "parent")
                 .prefetch_related("assignees", "labels", "issue_module__module", "issue_cycle__cycle")
             )

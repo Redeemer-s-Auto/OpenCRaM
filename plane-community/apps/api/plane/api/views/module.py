@@ -44,6 +44,8 @@ from .base import BaseAPIView
 from plane.bgtasks.webhook_task import model_activity
 from plane.utils.host import base_host
 from plane.utils.order_queryset import ISSUE_ORDER_BY_ALLOWLIST, MODULE_ORDER_BY_ALLOWLIST, sanitize_order_by
+from plane.sharing.models import AccessLevel
+from plane.sharing.visibility import hidden_issue_ids, visible_issues
 from plane.utils.openapi import (
     module_docs,
     module_issue_docs,
@@ -102,6 +104,7 @@ class ModuleListCreateAPIEndpoint(BaseAPIView):
                 total_issues=Count(
                     "issue_module",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
                         issue_module__deleted_at__isnull=True,
@@ -113,6 +116,7 @@ class ModuleListCreateAPIEndpoint(BaseAPIView):
                 completed_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="completed",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -125,6 +129,7 @@ class ModuleListCreateAPIEndpoint(BaseAPIView):
                 cancelled_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="cancelled",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -137,6 +142,7 @@ class ModuleListCreateAPIEndpoint(BaseAPIView):
                 started_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="started",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -149,6 +155,7 @@ class ModuleListCreateAPIEndpoint(BaseAPIView):
                 unstarted_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="unstarted",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -161,6 +168,7 @@ class ModuleListCreateAPIEndpoint(BaseAPIView):
                 backlog_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="backlog",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -353,6 +361,7 @@ class ModuleDetailAPIEndpoint(BaseAPIView):
                 total_issues=Count(
                     "issue_module",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
                         issue_module__deleted_at__isnull=True,
@@ -364,6 +373,7 @@ class ModuleDetailAPIEndpoint(BaseAPIView):
                 completed_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="completed",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -376,6 +386,7 @@ class ModuleDetailAPIEndpoint(BaseAPIView):
                 cancelled_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="cancelled",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -388,6 +399,7 @@ class ModuleDetailAPIEndpoint(BaseAPIView):
                 started_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="started",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -400,6 +412,7 @@ class ModuleDetailAPIEndpoint(BaseAPIView):
                 unstarted_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="unstarted",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -412,6 +425,7 @@ class ModuleDetailAPIEndpoint(BaseAPIView):
                 backlog_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="backlog",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -593,9 +607,11 @@ class ModuleIssueListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
-        return (
+        return visible_issues(
             ModuleIssue.objects.annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("issue"))
+                sub_issues_count=visible_issues(
+                    Issue.issue_objects.filter(parent=OuterRef("issue")), self.request.user
+                )
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -615,7 +631,9 @@ class ModuleIssueListCreateAPIEndpoint(BaseAPIView):
             .prefetch_related("issue__assignees", "issue__labels")
             .prefetch_related("module__members")
             .order_by(self.kwargs.get("order_by", "-created_at"))
-            .distinct()
+            .distinct(),
+            self.request.user,
+            field="issue_id",
         )
 
     @module_issue_docs(
@@ -649,9 +667,10 @@ class ModuleIssueListCreateAPIEndpoint(BaseAPIView):
         """
         order_by = sanitize_order_by(request.GET.get("order_by", "created_at"), ISSUE_ORDER_BY_ALLOWLIST, "created_at")
         issues = (
-            Issue.issue_objects.filter(issue_module__module_id=module_id, issue_module__deleted_at__isnull=True)
+            visible_issues(Issue.issue_objects.all(), request.user)
+            .filter(issue_module__module_id=module_id, issue_module__deleted_at__isnull=True)
             .annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                sub_issues_count=visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -685,7 +704,9 @@ class ModuleIssueListCreateAPIEndpoint(BaseAPIView):
         return self.paginate(
             request=request,
             queryset=(issues),
-            on_results=lambda issues: IssueSerializer(issues, many=True, fields=self.fields, expand=self.expand).data,
+            on_results=lambda issues: IssueSerializer(
+                issues, many=True, fields=self.fields, expand=self.expand, context={"user": request.user}
+            ).data,
         )
 
     @module_issue_docs(
@@ -720,9 +741,12 @@ class ModuleIssueListCreateAPIEndpoint(BaseAPIView):
             return Response({"error": "Issues are required"}, status=status.HTTP_400_BAD_REQUEST)
         module = Module.objects.get(workspace__slug=slug, project_id=project_id, pk=module_id)
 
-        issues = Issue.objects.filter(workspace__slug=slug, project_id=project_id, pk__in=issues).values_list(
-            "id", flat=True
-        )
+        # Only work items the caller may edit can be moved into the module.
+        issues = visible_issues(
+            Issue.objects.filter(workspace__slug=slug, project_id=project_id, pk__in=issues),
+            request.user,
+            min_level=AccessLevel.EDIT,
+        ).values_list("id", flat=True)
 
         module_issues = list(ModuleIssue.objects.filter(issue_id__in=issues))
 
@@ -799,9 +823,11 @@ class ModuleIssueDetailAPIEndpoint(BaseAPIView):
     permission_classes = [ProjectEntityPermission]
 
     def get_queryset(self):
-        return (
+        return visible_issues(
             ModuleIssue.objects.annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("issue"))
+                sub_issues_count=visible_issues(
+                    Issue.issue_objects.filter(parent=OuterRef("issue")), self.request.user
+                )
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -821,7 +847,9 @@ class ModuleIssueDetailAPIEndpoint(BaseAPIView):
             .prefetch_related("issue__assignees", "issue__labels")
             .prefetch_related("module__members")
             .order_by(self.kwargs.get("order_by", "-created_at"))
-            .distinct()
+            .distinct(),
+            self.request.user,
+            field="issue_id",
         )
 
     @module_issue_docs(
@@ -855,13 +883,14 @@ class ModuleIssueDetailAPIEndpoint(BaseAPIView):
         """
         order_by = sanitize_order_by(request.GET.get("order_by", "created_at"), ISSUE_ORDER_BY_ALLOWLIST, "created_at")
         issues = (
-            Issue.issue_objects.filter(
+            visible_issues(Issue.issue_objects.all(), request.user)
+            .filter(
                 issue_module__module_id=module_id,
                 issue_module__deleted_at__isnull=True,
                 pk=issue_id,
             )
             .annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                sub_issues_count=visible_issues(Issue.issue_objects.filter(parent=OuterRef("id")), self.request.user)
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -895,7 +924,9 @@ class ModuleIssueDetailAPIEndpoint(BaseAPIView):
         return self.paginate(
             request=request,
             queryset=(issues),
-            on_results=lambda issues: IssueSerializer(issues, many=True, fields=self.fields, expand=self.expand).data,
+            on_results=lambda issues: IssueSerializer(
+                issues, many=True, fields=self.fields, expand=self.expand, context={"user": request.user}
+            ).data,
         )
 
     @module_issue_docs(
@@ -961,6 +992,7 @@ class ModuleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                 total_issues=Count(
                     "issue_module",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
                         issue_module__deleted_at__isnull=True,
@@ -972,6 +1004,7 @@ class ModuleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                 completed_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="completed",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -984,6 +1017,7 @@ class ModuleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                 cancelled_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="cancelled",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -996,6 +1030,7 @@ class ModuleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                 started_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="started",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -1008,6 +1043,7 @@ class ModuleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                 unstarted_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="unstarted",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,
@@ -1020,6 +1056,7 @@ class ModuleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                 backlog_issues=Count(
                     "issue_module__issue__state__group",
                     filter=Q(
+                        ~Q(issue_module__issue_id__in=hidden_issue_ids(self.request.user)),
                         issue_module__issue__state__group="backlog",
                         issue_module__issue__archived_at__isnull=True,
                         issue_module__issue__is_draft=False,

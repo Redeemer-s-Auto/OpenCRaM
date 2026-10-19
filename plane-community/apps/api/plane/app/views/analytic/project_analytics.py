@@ -24,6 +24,7 @@ from django.db import models
 from django.db.models import F, Case, When, Value
 from django.db.models.functions import Cast, Concat
 from plane.utils.build_chart import build_analytics_chart
+from plane.sharing.visibility import visible_issues
 from plane.utils.date_utils import (
     get_analytics_filters,
 )
@@ -39,6 +40,14 @@ class ProjectAdvanceAnalyticsBaseView(BaseAPIView):
             date_filter=self.request.GET.get("date_filter", None),
             project_ids=self.request.GET.get("project_ids", None),
         )
+
+    def issues(self):
+        """Work items, leaving out those hidden from this user."""
+        return visible_issues(Issue.issue_objects.all(), self.request.user)
+
+    def issue_rows(self, model):
+        """Cycle or module rows, leaving out those whose work item is hidden from this user."""
+        return visible_issues(model.objects.all(), self.request.user, field="issue_id")
 
 
 class ProjectAdvanceAnalyticsEndpoint(ProjectAdvanceAnalyticsBaseView):
@@ -61,17 +70,21 @@ class ProjectAdvanceAnalyticsEndpoint(ProjectAdvanceAnalyticsBaseView):
         """
         base_queryset = None
         if cycle_id is not None:
-            cycle_issues = CycleIssue.objects.filter(**self.filters["base_filters"], cycle_id=cycle_id).values_list(
-                "issue_id", flat=True
+            cycle_issues = (
+                self.issue_rows(CycleIssue)
+                .filter(**self.filters["base_filters"], cycle_id=cycle_id)
+                .values_list("issue_id", flat=True)
             )
-            base_queryset = Issue.issue_objects.filter(id__in=cycle_issues)
+            base_queryset = self.issues().filter(id__in=cycle_issues)
         elif module_id is not None:
-            module_issues = ModuleIssue.objects.filter(**self.filters["base_filters"], module_id=module_id).values_list(
-                "issue_id", flat=True
+            module_issues = (
+                self.issue_rows(ModuleIssue)
+                .filter(**self.filters["base_filters"], module_id=module_id)
+                .values_list("issue_id", flat=True)
             )
-            base_queryset = Issue.issue_objects.filter(id__in=module_issues)
+            base_queryset = self.issues().filter(id__in=module_issues)
         else:
-            base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"], project_id=project_id)
+            base_queryset = self.issues().filter(**self.filters["base_filters"], project_id=project_id)
 
         return {
             "total_work_items": self.get_filtered_counts(base_queryset),
@@ -97,7 +110,7 @@ class ProjectAdvanceAnalyticsEndpoint(ProjectAdvanceAnalyticsBaseView):
 class ProjectAdvanceAnalyticsStatsEndpoint(ProjectAdvanceAnalyticsBaseView):
     def get_project_issues_stats(self) -> QuerySet:
         # Get the base queryset with workspace and project filters
-        base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"])
+        base_queryset = self.issues().filter(**self.filters["base_filters"])
 
         # Apply date range filter if available
         if self.filters["chart_period_range"]:
@@ -119,17 +132,21 @@ class ProjectAdvanceAnalyticsStatsEndpoint(ProjectAdvanceAnalyticsBaseView):
     def get_work_items_stats(self, project_id, cycle_id=None, module_id=None) -> Dict[str, Dict[str, int]]:
         base_queryset = None
         if cycle_id is not None:
-            cycle_issues = CycleIssue.objects.filter(**self.filters["base_filters"], cycle_id=cycle_id).values_list(
-                "issue_id", flat=True
+            cycle_issues = (
+                self.issue_rows(CycleIssue)
+                .filter(**self.filters["base_filters"], cycle_id=cycle_id)
+                .values_list("issue_id", flat=True)
             )
-            base_queryset = Issue.issue_objects.filter(id__in=cycle_issues)
+            base_queryset = self.issues().filter(id__in=cycle_issues)
         elif module_id is not None:
-            module_issues = ModuleIssue.objects.filter(**self.filters["base_filters"], module_id=module_id).values_list(
-                "issue_id", flat=True
+            module_issues = (
+                self.issue_rows(ModuleIssue)
+                .filter(**self.filters["base_filters"], module_id=module_id)
+                .values_list("issue_id", flat=True)
             )
-            base_queryset = Issue.issue_objects.filter(id__in=module_issues)
+            base_queryset = self.issues().filter(id__in=module_issues)
         else:
-            base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"], project_id=project_id)
+            base_queryset = self.issues().filter(**self.filters["base_filters"], project_id=project_id)
         return (
             base_queryset.annotate(display_name=F("assignees__display_name"))
             .annotate(assignee_id=F("assignees__id"))
@@ -183,15 +200,17 @@ class ProjectAdvanceAnalyticsChartEndpoint(ProjectAdvanceAnalyticsBaseView):
     def work_item_completion_chart(self, project_id, cycle_id=None, module_id=None) -> Dict[str, Any]:
         # Get the base queryset
         queryset = (
-            Issue.issue_objects.filter(**self.filters["base_filters"])
+            self.issues().filter(**self.filters["base_filters"])
             .filter(project_id=project_id)
             .select_related("workspace", "state", "parent")
             .prefetch_related("assignees", "labels", "issue_module__module", "issue_cycle__cycle")
         )
 
         if cycle_id is not None:
-            cycle_issues = CycleIssue.objects.filter(**self.filters["base_filters"], cycle_id=cycle_id).values_list(
-                "issue_id", flat=True
+            cycle_issues = (
+                self.issue_rows(CycleIssue)
+                .filter(**self.filters["base_filters"], cycle_id=cycle_id)
+                .values_list("issue_id", flat=True)
             )
             cycle = Cycle.objects.filter(id=cycle_id).first()
             if cycle and cycle.start_date:
@@ -202,8 +221,10 @@ class ProjectAdvanceAnalyticsChartEndpoint(ProjectAdvanceAnalyticsBaseView):
             queryset = cycle_issues
 
         elif module_id is not None:
-            module_issues = ModuleIssue.objects.filter(**self.filters["base_filters"], module_id=module_id).values_list(
-                "issue_id", flat=True
+            module_issues = (
+                self.issue_rows(ModuleIssue)
+                .filter(**self.filters["base_filters"], module_id=module_id)
+                .values_list("issue_id", flat=True)
             )
             module = Module.objects.filter(id=module_id).first()
             if module and module.start_date:
@@ -325,7 +346,7 @@ class ProjectAdvanceAnalyticsChartEndpoint(ProjectAdvanceAnalyticsBaseView):
 
         if type == "custom-work-items":
             queryset = (
-                Issue.issue_objects.filter(**self.filters["base_filters"])
+                self.issues().filter(**self.filters["base_filters"])
                 .filter(project_id=project_id)
                 .select_related("workspace", "state", "parent")
                 .prefetch_related("assignees", "labels", "issue_module__module", "issue_cycle__cycle")
@@ -333,13 +354,15 @@ class ProjectAdvanceAnalyticsChartEndpoint(ProjectAdvanceAnalyticsBaseView):
 
             # Apply cycle/module filters if present
             if cycle_id is not None:
-                cycle_issues = CycleIssue.objects.filter(**self.filters["base_filters"], cycle_id=cycle_id).values_list(
-                    "issue_id", flat=True
+                cycle_issues = (
+                    self.issue_rows(CycleIssue)
+                    .filter(**self.filters["base_filters"], cycle_id=cycle_id)
+                    .values_list("issue_id", flat=True)
                 )
                 queryset = queryset.filter(id__in=cycle_issues)
 
             elif module_id is not None:
-                module_issues = ModuleIssue.objects.filter(
+                module_issues = self.issue_rows(ModuleIssue).filter(
                     **self.filters["base_filters"], module_id=module_id
                 ).values_list("issue_id", flat=True)
                 queryset = queryset.filter(id__in=module_issues)

@@ -35,6 +35,8 @@ from plane.app.permissions import allow_permission, ROLE
 from plane.utils.host import base_host
 from plane.utils.filters import ComplexFilterBackend
 from plane.utils.filters import IssueFilterSet
+from plane.sharing.models import AccessLevel
+from plane.sharing.visibility import hidden_issue_ids, visible_issues
 
 
 class CycleIssueViewSet(BaseViewSet):
@@ -50,10 +52,10 @@ class CycleIssueViewSet(BaseViewSet):
 
     def get_queryset(self):
         return self.filter_queryset(
-            super()
-            .get_queryset()
+            visible_issues(super().get_queryset(), self.request.user, field="issue_id")
             .annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("issue_id"))
+                .exclude(id__in=hidden_issue_ids(self.request.user))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -98,6 +100,7 @@ class CycleIssueViewSet(BaseViewSet):
             )
             .annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
+                .exclude(id__in=hidden_issue_ids(self.request.user))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -114,6 +117,7 @@ class CycleIssueViewSet(BaseViewSet):
             .filter(project_id=project_id)
             .filter(workspace__slug=slug)
         )
+        issue_queryset = visible_issues(issue_queryset, request.user)
 
         # Apply filtering from filterset
         issue_queryset = self.filter_queryset(issue_queryset)
@@ -239,12 +243,18 @@ class CycleIssueViewSet(BaseViewSet):
         # Scope to workspace+project to prevent cross-tenant IDOR: without this
         # scope, foreign-tenant CycleIssue rows matched by issue_id would be
         # reassigned to the caller's cycle (GHSA-4w5x-wc9w-f47x).
+        # Items the user cannot edit are skipped as if they did not exist.
         cycle_issues = list(
-            CycleIssue.objects.filter(
-                ~Q(cycle_id=cycle_id),
-                issue_id__in=issues,
-                workspace__slug=slug,
-                project_id=project_id,
+            visible_issues(
+                CycleIssue.objects.filter(
+                    ~Q(cycle_id=cycle_id),
+                    issue_id__in=issues,
+                    workspace__slug=slug,
+                    project_id=project_id,
+                ),
+                request.user,
+                field="issue_id",
+                min_level=AccessLevel.EDIT,
             )
         )
         existing_issues = [str(cycle_issue.issue_id) for cycle_issue in cycle_issues]
@@ -253,10 +263,14 @@ class CycleIssueViewSet(BaseViewSet):
         # Scope to workspace+project to prevent cross-tenant IDOR
         new_issues = list(
             str(i)
-            for i in Issue.issue_objects.filter(
-                workspace__slug=slug,
-                project_id=project_id,
-                pk__in=new_issues,
+            for i in visible_issues(
+                Issue.issue_objects.filter(
+                    workspace__slug=slug,
+                    project_id=project_id,
+                    pk__in=new_issues,
+                ),
+                request.user,
+                min_level=AccessLevel.EDIT,
             ).values_list("id", flat=True)
         )
 

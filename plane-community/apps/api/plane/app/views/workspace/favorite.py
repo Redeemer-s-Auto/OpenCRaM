@@ -15,6 +15,15 @@ from plane.app.views.base import BaseAPIView
 from plane.db.models import UserFavorite, Workspace
 from plane.app.serializers import UserFavoriteSerializer
 from plane.app.permissions import allow_permission, ROLE
+from plane.sharing.visibility import hidden_issue_ids, hidden_page_ids
+from plane.app.serializers.favorite import entity_hidden
+
+
+def visible_favorites(queryset, user):
+    """Drop favorites that point at a work item or page hidden from ``user``."""
+    return queryset.exclude(entity_type="issue", entity_identifier__in=hidden_issue_ids(user)).exclude(
+        entity_type="page", entity_identifier__in=hidden_page_ids(user)
+    )
 
 
 class WorkspaceFavoriteEndpoint(BaseAPIView):
@@ -23,7 +32,9 @@ class WorkspaceFavoriteEndpoint(BaseAPIView):
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug):
         # the second filter is to check if the user is a member of the project
-        favorites = UserFavorite.objects.filter(user=request.user, workspace__slug=slug, parent__isnull=True).filter(
+        favorites = visible_favorites(UserFavorite.objects, request.user).filter(
+            user=request.user, workspace__slug=slug, parent__isnull=True
+        ).filter(
             Q(project__isnull=True) & ~Q(entity_type="page")
             | (
                 Q(project__isnull=False)
@@ -31,13 +42,16 @@ class WorkspaceFavoriteEndpoint(BaseAPIView):
                 & Q(project__project_projectmember__is_active=True)
             )
         )
-        serializer = UserFavoriteSerializer(favorites, many=True)
+        serializer = UserFavoriteSerializer(favorites, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def post(self, request, slug):
         try:
             workspace = Workspace.objects.get(slug=slug)
+
+            if entity_hidden(request.data.get("entity_type"), request.data.get("entity_identifier"), request.user):
+                return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
             # If the favorite exists return
             if request.data.get("entity_identifier"):
@@ -50,11 +64,11 @@ class WorkspaceFavoriteEndpoint(BaseAPIView):
 
                 # If the favorite exists return
                 if user_favorites:
-                    serializer = UserFavoriteSerializer(user_favorites)
+                    serializer = UserFavoriteSerializer(user_favorites, context={"request": request})
                     return Response(serializer.data, status=status.HTTP_200_OK)
 
             # else create a new favorite
-            serializer = UserFavoriteSerializer(data=request.data)
+            serializer = UserFavoriteSerializer(data=request.data, context={"request": request})
             if serializer.is_valid():
                 serializer.save(
                     user_id=request.user.id,
@@ -69,7 +83,7 @@ class WorkspaceFavoriteEndpoint(BaseAPIView):
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def patch(self, request, slug, favorite_id):
         favorite = UserFavorite.objects.get(user=request.user, workspace__slug=slug, pk=favorite_id)
-        serializer = UserFavoriteSerializer(favorite, data=request.data, partial=True)
+        serializer = UserFavoriteSerializer(favorite, data=request.data, partial=True, context={"request": request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -85,7 +99,9 @@ class WorkspaceFavoriteEndpoint(BaseAPIView):
 class WorkspaceFavoriteGroupEndpoint(BaseAPIView):
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug, favorite_id):
-        favorites = UserFavorite.objects.filter(user=request.user, workspace__slug=slug, parent_id=favorite_id).filter(
+        favorites = visible_favorites(UserFavorite.objects, request.user).filter(
+            user=request.user, workspace__slug=slug, parent_id=favorite_id
+        ).filter(
             Q(project__isnull=True)
             | (
                 Q(project__isnull=False)
@@ -93,5 +109,5 @@ class WorkspaceFavoriteGroupEndpoint(BaseAPIView):
                 & Q(project__project_projectmember__is_active=True)
             )
         )
-        serializer = UserFavoriteSerializer(favorites, many=True)
+        serializer = UserFavoriteSerializer(favorites, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)

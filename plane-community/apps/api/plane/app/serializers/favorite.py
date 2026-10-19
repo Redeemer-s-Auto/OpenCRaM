@@ -2,9 +2,25 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+from uuid import UUID
+
 from rest_framework import serializers
 
 from plane.db.models import UserFavorite, Cycle, Module, Issue, IssueView, Page, Project
+from plane.sharing.visibility import can_view_issue, can_view_page
+
+
+def entity_hidden(entity_type, entity_identifier, user):
+    """Sharing rules: a restricted work item or page the viewer cannot see shows no data."""
+    try:
+        UUID(str(entity_identifier))
+    except ValueError:
+        return False
+    if entity_type == "issue":
+        return not can_view_issue(user, entity_identifier)
+    if entity_type == "page":
+        return not can_view_page(user, entity_identifier)
+    return False
 
 
 class ProjectFavoriteLiteSerializer(serializers.ModelSerializer):
@@ -78,6 +94,10 @@ class UserFavoriteSerializer(serializers.ModelSerializer):
     def get_entity_data(self, obj):
         entity_type = obj.entity_type
         entity_identifier = obj.entity_identifier
+
+        request = self.context.get("request")
+        if entity_hidden(entity_type, entity_identifier, getattr(request, "user", None)):
+            return None
 
         entity_model, entity_serializer = get_entity_model_and_serializer(entity_type)
         if entity_model and entity_serializer:

@@ -137,6 +137,23 @@ export const ProjectSettingsMemberDefaults = observer(function ProjectSettingsMe
       });
   };
 
+  const togglePrivate = async (value: boolean) => {
+    if (!workspaceSlug || !projectId) return;
+    updateProject(workspaceSlug, projectId, { is_private: value })
+      .then(() => {
+        setToast({
+          title: `${t("success")}!`,
+          type: TOAST_TYPE.SUCCESS,
+          message: value
+            ? "This project is now private. Only its members can see it."
+            : "This project is no longer private.",
+        });
+      })
+      .catch((err) => {
+        console.error(err);
+      });
+  };
+
   return (
     <div className="my-6 flex flex-col gap-y-6">
       <DefaultSettingItem title="Project Lead" description="Select the project lead for the project.">
@@ -190,6 +207,21 @@ export const ProjectSettingsMemberDefaults = observer(function ProjectSettingsMe
             <ToggleSwitch
               value={!!currentProjectDetails?.guest_view_all_features}
               onChange={() => toggleGuestViewAllIssues(!currentProjectDetails?.guest_view_all_features)}
+              disabled={!isAdmin}
+              size="sm"
+            />
+          </div>
+        </DefaultSettingItem>
+      )}
+      {currentProjectDetails && (
+        <DefaultSettingItem
+          title="Private project"
+          description="Only the members listed here can see this project and its cards. Workspace admins who are not members cannot see it, not even its name."
+        >
+          <div className="flex items-center justify-end">
+            <ToggleSwitch
+              value={!!currentProjectDetails?.is_private}
+              onChange={() => togglePrivate(!currentProjectDetails?.is_private)}
               disabled={!isAdmin}
               size="sm"
             />

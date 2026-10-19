@@ -31,6 +31,8 @@ export interface IPartialProject {
   page_view: boolean;
   inbox_view: boolean;
   guest_view_all_features?: boolean;
+  /** Only active members can see this project - workspace admins included. */
+  is_private?: boolean;
   project_lead?: IUserLite | string | null;
   network?: number;
   // Timestamps

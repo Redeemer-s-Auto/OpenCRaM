@@ -39,6 +39,7 @@ from plane.db.models import (
     ProjectPage,
 )
 from plane.bgtasks.webhook_task import model_activity, webhook_activity
+from plane.utils.private_projects import visible_projects_q
 from plane.utils.exception_logger import log_exception
 from .base import BaseAPIView
 from plane.utils.host import base_host
@@ -93,6 +94,7 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
                 )
                 | Q(network=2)
             )
+            .filter(visible_projects_q(self.request.user))
             .select_related("project_lead")
             .annotate(
                 is_member=Exists(
@@ -359,6 +361,7 @@ class ProjectListLiteAPIEndpoint(BaseAPIView):
                 )
                 | Q(network=2)
             )
+            .filter(visible_projects_q(self.request.user))
             .distinct()
         )
 
@@ -447,6 +450,7 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
                 )
                 | Q(network=2)
             )
+            .filter(visible_projects_q(self.request.user))
             .select_related("workspace", "workspace__owner", "default_assignee", "project_lead")
             .annotate(
                 is_member=Exists(

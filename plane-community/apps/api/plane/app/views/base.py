@@ -27,6 +27,7 @@ from rest_framework.viewsets import ModelViewSet
 # Module imports
 from plane.authentication.session import BaseSessionAuthentication
 from plane.utils.exception_logger import log_exception
+from plane.utils.private_projects import check_private_project_access
 from plane.utils.paginator import BasePaginator
 from plane.utils.core.mixins import ReadReplicaControlMixin
 
@@ -38,6 +39,10 @@ class TimezoneMixin:
     """
 
     def initial(self, request, *args, **kwargs):
+        # Private projects: non-members (admins included) get a 404, checked before
+        # the permission classes so the answer never confirms the project exists.
+        self.perform_authentication(request)
+        check_private_project_access(self, request)
         super().initial(request, *args, **kwargs)
         if request.user.is_authenticated:
             timezone.activate(zoneinfo.ZoneInfo(request.user.user_timezone))

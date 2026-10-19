@@ -136,7 +136,10 @@ class UserProjectInvitationsViewset(BaseViewSet):
         workspace_member = WorkspaceMember.objects.get(member=request.user, workspace__slug=slug, is_active=True)
 
         # Get all the projects
-        projects = Project.objects.filter(id__in=project_ids, workspace__slug=slug).only("id", "network")
+        # Private projects cannot be joined, not even by workspace admins; they only take invited members.
+        projects = Project.objects.filter(id__in=project_ids, workspace__slug=slug, is_private=False).only(
+            "id", "network"
+        )
         # Check if user has permission to join each project
         for project in projects:
             if project.network == ProjectNetwork.SECRET.value and workspace_member.role != ROLE.ADMIN.value:

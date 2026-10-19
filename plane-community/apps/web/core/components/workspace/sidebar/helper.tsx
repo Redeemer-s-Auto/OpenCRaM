@@ -17,6 +17,7 @@ import {
   YourWorkIcon,
 } from "@plane/propel/icons";
 import { cn } from "@plane/utils";
+import { Share2 } from "lucide-react";
 
 export const getSidebarNavigationItemIcon = (key: string, className: string = "") => {
   switch (key) {
@@ -40,5 +41,7 @@ export const getSidebarNavigationItemIcon = (key: string, className: string = ""
       return <ArchiveIcon className={cn("size-4 flex-shrink-0", className)} />;
     case "stickies":
       return <MultipleStickyIcon className={cn("size-4 flex-shrink-0", className)} />;
+    case "shared_with_me":
+      return <Share2 className={cn("size-4 flex-shrink-0", className)} />;
   }
 };

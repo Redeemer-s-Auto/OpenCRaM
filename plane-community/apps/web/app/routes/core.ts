@@ -100,6 +100,19 @@ export const coreRoutes: RouteConfigEntry[] = [
           ),
         ]),
 
+        // Shared with me
+        layout("./(all)/[workspaceSlug]/(projects)/shared-with-me/layout.tsx", [
+          route(":workspaceSlug/shared-with-me", "./(all)/[workspaceSlug]/(projects)/shared-with-me/page.tsx"),
+          route(
+            ":workspaceSlug/shared-with-me/issues/:issueId",
+            "./(all)/[workspaceSlug]/(projects)/shared-with-me/issues/[issueId]/page.tsx"
+          ),
+          route(
+            ":workspaceSlug/shared-with-me/pages/:pageId",
+            "./(all)/[workspaceSlug]/(projects)/shared-with-me/pages/[pageId]/page.tsx"
+          ),
+        ]),
+
         // Stickies
         layout("./(all)/[workspaceSlug]/(projects)/stickies/layout.tsx", [
           route(":workspaceSlug/stickies", "./(all)/[workspaceSlug]/(projects)/stickies/page.tsx"),

@@ -909,6 +909,18 @@
     "shared_items": "Shared items",
     "delete_group": "Delete group",
     "no_groups": "No groups yet.",
-    "admins_only": "Only workspace admins can change groups."
+    "admins_only": "Only workspace admins can change groups.",
+    "shared_with_me": "Shared with me",
+    "shared_with_me_empty": "Nothing is shared with you yet.",
+    "shared_by": "Shared by {name}",
+    "open_in_project": "Open in department",
+    "comments": "Comments",
+    "add_comment": "Write a comment",
+    "post_comment": "Comment",
+    "no_comments": "No comments yet.",
+    "edit": "Edit",
+    "view_only_page": "You can view this page. Editing pages from outside the department comes later.",
+    "work_item": "Work item",
+    "page": "Page"
   }
 }

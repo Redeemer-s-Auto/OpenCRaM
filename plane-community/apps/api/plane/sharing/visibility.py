@@ -47,9 +47,10 @@ def share_matches_user(user, min_level=AccessLevel.VIEW):
     """Q on ItemShare: the share reaches ``user`` at ``min_level`` or higher."""
     project_ids = ProjectMember.objects.filter(member=user, is_active=True, deleted_at__isnull=True).values("project_id")
     group_ids = AccessGroupMember.objects.filter(member=user).values("group_id")
-    workspace_ids = WorkspaceMember.objects.filter(member=user, is_active=True, deleted_at__isnull=True).values(
-        "workspace_id"
-    )
+    # "Everybody" means workspace members and admins, not outside guests (role 5).
+    workspace_ids = WorkspaceMember.objects.filter(
+        member=user, role__gte=15, is_active=True, deleted_at__isnull=True
+    ).values("workspace_id")
     return Q(level__gte=min_level) & (
         Q(target_type=ShareTarget.MEMBER, member=user)
         | Q(target_type=ShareTarget.PROJECT, project_id__in=project_ids)

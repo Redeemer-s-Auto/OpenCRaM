@@ -12,6 +12,7 @@ import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/prop
 import { useCustomField } from "@/hooks/store/use-custom-field";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // local
+import { AddCustomFieldButton } from "./add-field-button";
 import { getFieldTypeDetails } from "./helpers";
 import type { TCustomFieldInputValue } from "./value-input";
 import { CustomFieldValueInput } from "./value-input";
@@ -52,7 +53,7 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
 
   const fields = getProjectFields(projectId);
   const issue = getIssueById(issueId);
-  if (!fields?.length || !issue) return null;
+  if (!fields || !issue) return null;
 
   const handleChange = async (field: TCustomField, value: TCustomFieldInputValue) => {
     await update(workspaceSlug, projectId, issueId, buildCustomFieldsPayload(issue.custom_fields, field.id, value));
@@ -80,6 +81,7 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
           />
         </SidebarPropertyListItem>
       ))}
+      <AddCustomFieldButton workspaceSlug={workspaceSlug} projectId={projectId} variant="row" />
     </>
   );
 });

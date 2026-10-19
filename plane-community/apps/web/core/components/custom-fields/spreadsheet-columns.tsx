@@ -18,6 +18,7 @@ import { CustomMenu, Row } from "@plane/ui";
 // hooks
 import { useCustomField } from "@/hooks/store/use-custom-field";
 // local
+import { AddCustomFieldButton } from "./add-field-button";
 import { getFieldTypeDetails } from "./helpers";
 import { buildCustomFieldsPayload } from "./issue-properties";
 import { CustomFieldValueInput } from "./value-input";
@@ -43,6 +44,7 @@ type THeaderProps = {
 
 export const CustomFieldHeaderColumns = observer(function CustomFieldHeaderColumns(props: THeaderProps) {
   const { displayProperties, displayFilters, handleDisplayFilterUpdate } = props;
+  const { workspaceSlug, projectId } = useParams();
   const fields = useSpreadsheetCustomFields();
 
   return (
@@ -108,6 +110,15 @@ export const CustomFieldHeaderColumns = observer(function CustomFieldHeaderColum
             </th>
           );
         })}
+      {projectId && (
+        <th className="h-11 w-12 border border-t-0 border-b-0 border-subtle bg-layer-1 text-13" tabIndex={-1}>
+          <AddCustomFieldButton
+            workspaceSlug={workspaceSlug?.toString() ?? ""}
+            projectId={projectId.toString()}
+            variant="header"
+          />
+        </th>
+      )}
     </>
   );
 });
@@ -121,6 +132,7 @@ type TCellProps = {
 
 export const CustomFieldCells = observer(function CustomFieldCells(props: TCellProps) {
   const { displayProperties, issueDetail, disableUserActions, updateIssue } = props;
+  const { projectId } = useParams();
   const fields = useSpreadsheetCustomFields();
 
   return (
@@ -151,6 +163,8 @@ export const CustomFieldCells = observer(function CustomFieldCells(props: TCellP
             </div>
           </td>
         ))}
+      {/* empty cell under the "+" header column */}
+      {projectId && <td className="h-11 w-12 border-r-[1px] border-subtle" />}
     </>
   );
 });

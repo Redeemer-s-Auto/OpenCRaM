@@ -92,6 +92,10 @@ class ProjectCreateSerializer(BaseSerializer):
             "external_id",
             "is_issue_type_enabled",
             "is_time_tracking_enabled",
+            # Fork: an importer (or any API client) can make a board private or invite-only
+            # from the start, so nothing it creates is ever visible wider than intended.
+            "network",
+            "is_private",
         ]
 
         read_only_fields = [

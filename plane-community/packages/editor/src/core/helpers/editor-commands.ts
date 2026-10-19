@@ -192,6 +192,16 @@ export const insertCallout = (editor: Editor, range?: Range) => {
   else editor.chain().focus().insertCallout().run();
 };
 
+export const insertToggle = (editor: Editor, range?: Range) => {
+  if (range) editor.chain().focus().deleteRange(range).insertToggle().run();
+  else editor.chain().focus().insertToggle().run();
+};
+
+export const insertColumns = (editor: Editor, count: 2 | 3, range?: Range) => {
+  if (range) editor.chain().focus().deleteRange(range).insertColumns(count).run();
+  else editor.chain().focus().insertColumns(count).run();
+};
+
 export const openEmojiPicker = (editor: Editor, range?: Range) => {
   if (range) editor.chain().focus().deleteRange(range).run();
   const emojiStorage = editor.storage.emoji as ExtendedEmojiStorage;

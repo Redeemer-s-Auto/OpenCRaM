@@ -11,6 +11,7 @@ import {
   SheetLayoutIcon,
   TimelineLayoutIcon,
 } from "@plane/propel/icons";
+import { LayoutGrid } from "lucide-react";
 import type { ISvgIcons } from "@plane/propel/icons";
 import { EIssueLayoutTypes } from "@plane/types";
 
@@ -35,6 +36,8 @@ export function IssueLayoutIcon({
       return <SheetLayoutIcon {...iconProps} />;
     case EIssueLayoutTypes.GANTT:
       return <TimelineLayoutIcon {...iconProps} />;
+    case EIssueLayoutTypes.GALLERY:
+      return <LayoutGrid width={size ?? 16} height={size ?? 16} className={props.className} />;
     default:
       return null;
   }

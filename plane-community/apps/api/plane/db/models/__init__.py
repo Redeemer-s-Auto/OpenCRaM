@@ -92,3 +92,5 @@ from .sticky import Sticky
 from .description import Description, DescriptionVersion
 
 from .custom_field import CustomField, CustomFieldValue
+
+from .issue_template import IssueTemplate

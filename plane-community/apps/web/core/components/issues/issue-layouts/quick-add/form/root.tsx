@@ -64,6 +64,8 @@ export const QuickAddIssueFormRoot = observer(function QuickAddIssueFormRoot(pro
     [EIssueLayoutTypes.CALENDAR]: CalendarQuickAddIssueForm,
     [EIssueLayoutTypes.GANTT]: GanttQuickAddIssueForm,
     [EIssueLayoutTypes.SPREADSHEET]: SpreadsheetQuickAddIssueForm,
+    // the gallery has no inline quick-add row
+    [EIssueLayoutTypes.GALLERY]: ListQuickAddIssueForm,
   };
 
   const CurrentLayoutQuickAddIssueForm = QUICK_ADD_ISSUE_FORMS[layout] ?? null;

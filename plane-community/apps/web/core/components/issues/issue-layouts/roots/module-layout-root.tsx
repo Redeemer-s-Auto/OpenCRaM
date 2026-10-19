@@ -23,6 +23,7 @@ import { ModuleCalendarLayout } from "../calendar/roots/module-root";
 import { BaseGanttRoot } from "../gantt";
 import { ModuleKanBanLayout } from "../kanban/roots/module-root";
 import { ModuleListLayout } from "../list/roots/module-root";
+import { ModuleGalleryLayout } from "../gallery/roots/module-root";
 import { ModuleSpreadsheetLayout } from "../spreadsheet/roots/module-root";
 
 function ModuleIssueLayout(props: { activeLayout: EIssueLayoutTypes | undefined; moduleId: string }) {
@@ -37,6 +38,8 @@ function ModuleIssueLayout(props: { activeLayout: EIssueLayoutTypes | undefined;
       return <BaseGanttRoot viewId={props.moduleId} />;
     case EIssueLayoutTypes.SPREADSHEET:
       return <ModuleSpreadsheetLayout />;
+    case EIssueLayoutTypes.GALLERY:
+      return <ModuleGalleryLayout />;
     default:
       return null;
   }

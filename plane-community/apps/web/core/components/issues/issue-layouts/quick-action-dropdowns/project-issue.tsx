@@ -5,6 +5,7 @@
  */
 
 import { useState } from "react";
+import { LayoutTemplate } from "lucide-react";
 import { omit } from "lodash-es";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
@@ -13,6 +14,7 @@ import { ARCHIVABLE_STATE_GROUPS, EUserPermissions, EUserPermissionsLevel } from
 import type { TIssue } from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
 import { ContextMenu, CustomMenu } from "@plane/ui";
+import type { TContextMenuItem } from "@plane/ui";
 import { cn } from "@plane/utils";
 // hooks
 import { useIssues } from "@/hooks/store/use-issues";
@@ -20,6 +22,7 @@ import { useProject } from "@/hooks/store/use-project";
 import { useProjectState } from "@/hooks/store/use-project-state";
 import { useUserPermissions } from "@/hooks/store/user";
 // helper
+import { SaveAsTemplateModal } from "@/components/issue-templates/save-as-template-modal";
 import { ArchiveIssueModal } from "../../archive-issue-modal";
 import { DeleteIssueModal } from "../../delete-issue-modal";
 import { CreateUpdateIssueModal } from "../../issue-modal/modal";
@@ -46,6 +49,7 @@ export const ProjectIssueQuickActions = observer(function ProjectIssueQuickActio
   const [issueToEdit, setIssueToEdit] = useState<TIssue | undefined>(undefined);
   const [deleteIssueModal, setDeleteIssueModal] = useState(false);
   const [archiveIssueModal, setArchiveIssueModal] = useState(false);
+  const [saveTemplateModal, setSaveTemplateModal] = useState(false);
   const [_, setDuplicateWorkItemModal] = useState(false);
   // store hooks
   const { allowPermissions } = useUserPermissions();
@@ -98,7 +102,16 @@ export const ProjectIssueQuickActions = observer(function ProjectIssueQuickActio
     storeType: EIssuesStoreType.PROJECT,
   };
 
-  const MENU_ITEMS = useProjectIssueMenuItems(menuItemProps);
+  const MENU_ITEMS: TContextMenuItem[] = [
+    ...useProjectIssueMenuItems(menuItemProps),
+    {
+      key: "save-as-template",
+      title: "Save as template",
+      icon: LayoutTemplate,
+      action: () => setSaveTemplateModal(true),
+      shouldRender: isEditingAllowed && !issue.archived_at,
+    },
+  ];
 
   const CONTEXT_MENU_ITEMS = MENU_ITEMS.map(function CONTEXT_MENU_ITEMS(item) {
     return {
@@ -138,6 +151,14 @@ export const ProjectIssueQuickActions = observer(function ProjectIssueQuickActio
         storeType={EIssuesStoreType.PROJECT}
       />
 
+      {workspaceSlug && (
+        <SaveAsTemplateModal
+          isOpen={saveTemplateModal}
+          onClose={() => setSaveTemplateModal(false)}
+          workspaceSlug={workspaceSlug.toString()}
+          issue={issue}
+        />
+      )}
       <ContextMenu parentRef={parentRef} items={CONTEXT_MENU_ITEMS} />
       <CustomMenu
         ellipsis

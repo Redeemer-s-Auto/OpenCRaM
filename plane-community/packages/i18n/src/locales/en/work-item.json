@@ -75,12 +75,14 @@
       "calendar": "Calendar",
       "spreadsheet": "Table",
       "gantt": "Timeline",
+      "gallery": "Gallery",
       "title": {
         "list": "List Layout",
         "kanban": "Board Layout",
         "calendar": "Calendar Layout",
         "spreadsheet": "Table Layout",
-        "gantt": "Timeline Layout"
+        "gantt": "Timeline Layout",
+        "gallery": "Gallery Layout"
       }
     },
     "states": {

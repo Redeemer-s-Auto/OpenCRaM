@@ -173,6 +173,7 @@ export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader
                 EIssueLayoutTypes.KANBAN,
                 EIssueLayoutTypes.CALENDAR,
                 EIssueLayoutTypes.SPREADSHEET,
+                EIssueLayoutTypes.GALLERY,
                 EIssueLayoutTypes.GANTT,
               ]}
               onChange={(layout) => handleLayoutChange(layout)}

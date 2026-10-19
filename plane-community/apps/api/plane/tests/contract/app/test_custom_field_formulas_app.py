@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from plane.db.models import CustomField, Issue, Project, ProjectMember, State
+from plane.db.models import CustomField, Project, ProjectMember, State
 from plane.utils import formula
 
 FIELDS_URL = "/api/workspaces/{slug}/projects/{project_id}/custom-fields/"
@@ -112,20 +112,18 @@ class TestFormulaFields:
             field_type="formula",
             settings={"expression": 'prop("Hours") >= 4', "result_type": "checkbox"},
         )
-        a = _card(
-            session_client, workspace, project, name="A", custom_fields={visit["id"]: "2026-10-01", big["id"]: 6}
-        )
+        a = _card(session_client, workspace, project, name="A", custom_fields={visit["id"]: "2026-10-01", big["id"]: 6})
         _card(session_client, workspace, project, name="B", custom_fields={visit["id"]: "2026-10-20", big["id"]: 1})
         assert _values(session_client, workspace, project, a["id"])[follow["id"]] == "2026-10-08"
 
         url = ISSUES_URL.format(slug=workspace.slug, project_id=project.id)
-        rows = session_client.get(
-            url, {"filters": json.dumps({f"customfield_{follow['id']}__lt": "2026-10-15"})}
-        ).data["results"]
+        rows = session_client.get(url, {"filters": json.dumps({f"customfield_{follow['id']}__lt": "2026-10-15"})}).data[
+            "results"
+        ]
         assert [r["name"] for r in rows] == ["A"]
-        rows = session_client.get(
-            url, {"filters": json.dumps({f"customfield_{long_job['id']}__exact": True})}
-        ).data["results"]
+        rows = session_client.get(url, {"filters": json.dumps({f"customfield_{long_job['id']}__exact": True})}).data[
+            "results"
+        ]
         assert [r["name"] for r in rows] == ["A"]
         rows = session_client.get(url, {"order_by": f"-custom_field__{follow['id']}"}).data["results"]
         assert [r["name"] for r in rows] == ["B", "A"]
@@ -152,7 +150,9 @@ class TestFormulaFields:
             {"expression": "1", "result_type": "colour"},
             {"expression": 'prop("Self F") + 1', "result_type": "number"},
         ]:
-            response = _field(session_client, workspace, project, name="Self F", field_type="formula", settings=settings)
+            response = _field(
+                session_client, workspace, project, name="Self F", field_type="formula", settings=settings
+            )
             assert response.status_code == 400, settings
 
     def test_formula_loop_is_refused(self, session_client, workspace, project):

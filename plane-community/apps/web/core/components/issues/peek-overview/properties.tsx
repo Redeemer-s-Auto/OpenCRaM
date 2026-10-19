@@ -42,6 +42,7 @@ import type { TIssueOperations } from "../issue-detail";
 import { IssueCycleSelect } from "../issue-detail/cycle-select";
 import { IssueLabel } from "../issue-detail/label";
 import { IssueModuleSelect } from "../issue-detail/module-select";
+import { IssueRepeatSection } from "@/components/repeat";
 import { IssueSharingSection } from "@/components/sharing";
 
 interface IPeekOverviewProperties {
@@ -254,6 +255,7 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
           update={issueOperations.update}
         />
       </div>
+      <IssueRepeatSection workspaceSlug={workspaceSlug} projectId={projectId} issueId={issueId} disabled={disabled} />
       <IssueSharingSection workspaceSlug={workspaceSlug} projectId={projectId} issueId={issueId} />
     </div>
   );

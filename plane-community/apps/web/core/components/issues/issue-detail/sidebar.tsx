@@ -39,6 +39,7 @@ import { useProjectState } from "@/hooks/store/use-project-state";
 import { IssueParentSelectRoot } from "@/components/issues/parent-select-root";
 import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
 import { IssueCustomFieldProperties } from "@/components/custom-fields/issue-properties";
+import { IssueRepeatSection } from "@/components/repeat";
 import { IssueSharingSection } from "@/components/sharing";
 import { IssueCycleSelect } from "./cycle-select";
 import { IssueLabel } from "./label";
@@ -259,6 +260,12 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
               update={issueOperations.update}
             />
           </div>
+          <IssueRepeatSection
+            workspaceSlug={workspaceSlug}
+            projectId={projectId}
+            issueId={issueId}
+            disabled={!isEditable}
+          />
           <IssueSharingSection workspaceSlug={workspaceSlug} projectId={projectId} issueId={issueId} />
         </div>
       </div>

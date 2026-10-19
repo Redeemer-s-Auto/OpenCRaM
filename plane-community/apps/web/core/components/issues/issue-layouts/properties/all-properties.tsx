@@ -32,6 +32,7 @@ import { EstimateDropdown } from "@/components/dropdowns/estimate";
 import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
 import { ModuleDropdown } from "@/components/dropdowns/module/dropdown";
 import { PriorityDropdown } from "@/components/dropdowns/priority";
+import { RepeatBadge } from "@/components/repeat";
 import { StateDropdown } from "@/components/dropdowns/state/dropdown";
 // hooks
 import { useProjectEstimates } from "@/hooks/store/estimates";
@@ -196,6 +197,15 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
 
   return (
     <div className={className}>
+      {/* repeating card */}
+      {!isEpic && (
+        <RepeatBadge
+          workspaceSlug={workspaceSlug?.toString()}
+          projectId={issue.project_id}
+          issueId={issue.id}
+          isMobile={isMobile}
+        />
+      )}
       {/* basic properties */}
       {/* state */}
       <WithDisplayPropertiesHOC displayProperties={displayProperties} displayPropertyKey="state">

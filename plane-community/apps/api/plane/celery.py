@@ -51,6 +51,11 @@ app.conf.beat_schedule = {
         "task": "plane.license.bgtasks.telemetry_metrics.push_instance_metrics",
         "schedule": schedule(run_every=timedelta(minutes=METRICS_PUSH_INTERVAL_MINUTES)),
     },
+    # Repeating work items: make the copies that are due (plane.recurrence)
+    "check-every-five-minutes-to-make-repeating-work-items": {
+        "task": "plane.recurrence.tasks.run_due_repeats",
+        "schedule": crontab(minute="*/5"),
+    },
     # Occurs once every day
     "check-every-day-to-delete-hard-delete": {
         "task": "plane.bgtasks.deletion_task.hard_delete",

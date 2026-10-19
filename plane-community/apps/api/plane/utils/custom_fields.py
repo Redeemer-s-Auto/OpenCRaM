@@ -172,7 +172,9 @@ def check_formula_references(project_id, field_name, settings, field_id=None):
             raise ValidationError({"settings": "Formula: a formula cannot use itself."})
         if name in fields and fields[name].field_type in CustomField.LINKED_TYPES:
             # Formula results are stored for everyone; linked cards differ per viewer.
-            raise ValidationError({"settings": f'Formula: "{name}" is a relation or rollup, which formulas cannot use.'})
+            raise ValidationError(
+                {"settings": f'Formula: "{name}" is a relation or rollup, which formulas cannot use.'}
+            )
         if name not in known:
             raise ValidationError({"settings": f'Formula: there is no field called "{name}" on this project.'})
 
@@ -427,7 +429,8 @@ def validate_values(project_id, data, current=None):
             if field.field_type == CustomField.RELATION:
                 from plane.relations.service import clean_relation_value
 
-                cleaned.append((field, clean_relation_value(field, raw), None))
+                now = (current or {}).get(str(field.id))
+                cleaned.append((field, clean_relation_value(field, raw, current=now), None))
                 continue
             value, columns = clean_value(field, raw, new_label_options)
         except ValidationError as e:

@@ -565,6 +565,11 @@ def model_activity(model_name, model_id, requested_data, current_instance, actor
         if key in current_instance:
             current_value = current_instance.get(key, None)
             requested_value = requested_data.get(key, None)
+            if key == "custom_fields":
+                # Relation and rollup values were worked out for the person who saved; never send them on.
+                from plane.relations.service import drop_linked_values
+
+                current_value, requested_value = drop_linked_values(current_value), drop_linked_values(requested_value)
             if current_value != requested_value:
                 webhook_activity.delay(
                     event=model_name,

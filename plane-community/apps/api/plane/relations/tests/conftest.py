@@ -101,7 +101,11 @@ class Cast:
         if target_field_id is not None:
             settings["target_field_id"] = target_field_id
         return self.field(
-            self.alpha, name=name or f"R {function} {uuid4().hex[:4]}", field_type="rollup", settings=settings, expect=expect
+            self.alpha,
+            name=name or f"R {function} {uuid4().hex[:4]}",
+            field_type="rollup",
+            settings=settings,
+            expect=expect,
         )
 
     def mirror_of(self, relation):
@@ -120,7 +124,9 @@ def cast(db):
 
     c = Cast()
     c.workspace, c.alpha, c.beta, c.admin = workspace, alpha, beta, admin
-    c.alpha_state = State.objects.create(name="Todo", project=alpha, workspace=workspace, group="unstarted", default=True)
+    c.alpha_state = State.objects.create(
+        name="Todo", project=alpha, workspace=workspace, group="unstarted", default=True
+    )
     c.beta_state = State.objects.create(name="Todo", project=beta, workspace=workspace, group="unstarted", default=True)
 
     roles = {

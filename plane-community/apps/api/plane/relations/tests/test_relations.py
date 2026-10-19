@@ -148,7 +148,11 @@ class TestTwoWay:
     def test_two_way_needs_admin_of_target(self, cast):
         response = cast.alpha_admin_client.post(
             FIELDS_URL.format(slug=cast.workspace.slug, project_id=cast.alpha.id),
-            {"name": "L", "field_type": "relation", "settings": {"target_project_id": str(cast.beta.id), "two_way": True}},
+            {
+                "name": "L",
+                "field_type": "relation",
+                "settings": {"target_project_id": str(cast.beta.id), "two_way": True},
+            },
             format="json",
         )
         assert response.status_code == 400 and "admin of the target board" in str(response.data)

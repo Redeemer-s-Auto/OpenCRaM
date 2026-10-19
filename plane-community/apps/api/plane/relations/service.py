@@ -18,8 +18,9 @@ jobs, webhooks, exports) relation and rollup values are left out entirely.
 
 # Python imports
 import datetime
+import re
 import uuid
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 # Django imports
 from django.db import transaction
@@ -31,7 +32,7 @@ from crum import get_current_user
 from rest_framework.exceptions import ValidationError
 
 # Module imports
-from plane.db.models import CustomField, CustomFieldValue, Issue, Project, ProjectMember
+from plane.db.models import CustomField, CustomFieldValue, Issue, Project, ProjectMember, WorkspaceMember
 
 from .models import CardLink
 from .visibility import _real_user, editable_issues, viewable_issues
@@ -91,6 +92,12 @@ def _uuid(value):
         return str(uuid.UUID(str(value)))
     except (ValueError, TypeError, AttributeError):
         return None
+
+
+def _as_bool(value):
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes")
+    return bool(value)
 
 
 def _is_member(user, project_id, min_role=MEMBER):
@@ -159,14 +166,21 @@ def clean_relation_settings(project_id, settings, instance=None, user=None):
         target_id = _uuid(settings.get("target_project_id"))
         if target_id is None:
             raise _settings_error("Pick the board this relation links to (target_project_id).")
-        if project is None or not Project.objects.filter(pk=target_id, workspace_id=project.workspace_id).exists():
-            raise _settings_error("The target board must be a board in this workspace.")
-        if not _is_member(user, target_id):
-            raise _settings_error("You must be a member of the target board to link to it.")
+        in_workspace = (
+            project is not None and Project.objects.filter(pk=target_id, workspace_id=project.workspace_id).exists()
+        )
+        if not in_workspace or not _is_member(user, target_id):
+            # One message for both, so a board id cannot be probed.
+            raise _settings_error("Pick a board in this workspace that you are a member of.")
 
     is_mirror = bool(old.get("is_mirror", False))
     mirror_field_id = old.get("mirror_field_id")
-    two_way = bool(settings.get("two_way", old.get("two_way", False)))
+    two_way = _as_bool(settings.get("two_way", old.get("two_way", False)))
+    if instance is not None and not is_mirror and mirror_field_id and not two_way:
+        if not _is_member(user, target_id, ADMIN):
+            raise _settings_error(
+                "Turning two-way off removes a field on the target board, so it needs an admin there."
+            )
     if is_mirror:
         if not two_way:
             raise _settings_error(
@@ -261,10 +275,12 @@ def sync_mirror(field, mirror_name=None):
     mirror_id = settings.get("mirror_field_id")
     if settings.get("two_way") and not mirror_id:
         source = Project.objects.get(pk=field.project_id)
+        # Members of the target board may not be on a private source board: do not show its name.
+        default_name = "Linked cards" if getattr(source, "is_private", False) else source.name
         mirror = CustomField.objects.create(
             project_id=settings["target_project_id"],
             workspace_id=field.workspace_id,
-            name=_unique_name(settings["target_project_id"], mirror_name or source.name),
+            name=_unique_name(settings["target_project_id"], mirror_name or default_name),
             field_type=CustomField.RELATION,
             settings={
                 "target_project_id": str(field.project_id),
@@ -325,12 +341,19 @@ def before_field_delete(field):
 # ---------------------------------------------------------------------------
 
 
-def _storage(field):
-    """``(primary_field_id, forward)`` for reading and writing this field's links, or (None, True)."""
+def _storage(field, live_field_ids=None):
+    """``(primary_field_id, forward)`` for reading and writing this field's links, or (None, False).
+
+    ``live_field_ids``: a set of existing field ids, to skip the lookup when reading many fields.
+    """
     settings = field.settings or {}
     if settings.get("is_mirror"):
         primary = settings.get("mirror_field_id")
-        if not primary or not CustomField.objects.filter(pk=primary).exists():
+        if live_field_ids is not None:
+            exists = bool(primary) and str(primary) in live_field_ids
+        else:
+            exists = bool(primary) and CustomField.objects.filter(pk=primary).exists()
+        if not exists:
             return None, False
         return primary, False
     return str(field.id), True
@@ -350,13 +373,15 @@ def _ids_from(raw):
     return ids
 
 
-def clean_relation_value(field, raw, user=None):
+def clean_relation_value(field, raw, user=None, current=None):
     """Check a relation value: a list of card ids (or ``{"id": ...}`` objects).
 
-    Every id must be a live card on the target board that the writer can see; for a
-    two-way relation the writer must also be able to change it (its other side
-    changes; checked in ``set_links`` for the cards being added). Returns the list
-    of ids, or None to clear the writer's visible links.
+    Every id must be a live card on the target board that the writer can see. For a
+    two-way relation, every card being added must also be one the writer can change
+    (its other side changes); ``current`` is the card's value as the writer sees it
+    now, so cards already linked are not re-checked. Checked here, before anything is
+    saved, so a refused value never leaves a half-made card. Returns the list of
+    ids, or None to clear the writer's visible links.
     """
     user = viewer(user)
     if user is None:
@@ -377,7 +402,19 @@ def clean_relation_value(field, raw, user=None):
     if any(i not in allowed_ids for i in ids):
         # Same message whether the card is missing, on another board or hidden: say nothing about it.
         raise _err(field, "One or more cards cannot be linked here.")
+    if settings.get("two_way"):
+        already = set(_ids_from(current) or []) if current else set()
+        new = [i for i in ids if i not in already]
+        if new and not _all_editable(user, new):
+            raise _err(field, "One or more cards cannot be linked here.")
     return ids
+
+
+def _all_editable(user, ids):
+    editable = {
+        str(i) for i in editable_issues(user, Issue.issue_objects.filter(pk__in=ids)).values_list("id", flat=True)
+    }
+    return all(str(i) in editable for i in ids)
 
 
 @transaction.atomic
@@ -397,20 +434,19 @@ def set_links(issue, field, ids, user=None):
     )
     other_col = "to_issue_id" if forward else "from_issue_id"
     existing = {str(getattr(link, other_col)): link for link in links}
-    # Same rule as reading: archived, draft and deleted cards are not shown, so they are kept here.
-    shown = viewable_issues(user, Issue.issue_objects.filter(pk__in=list(existing)))
+    # Same rule as reading: archived, draft, deleted and moved-away cards are not shown, so they are kept here.
+    target = (field.settings or {}).get("target_project_id")
+    shown = viewable_issues(user, Issue.issue_objects.filter(pk__in=list(existing), project_id=target))
     visible = {str(i) for i in shown.values_list("id", flat=True)}
     old_visible = [i for i in existing if i in visible]
 
-    remove = [existing[i].pk for i in old_visible if i not in ids]
-    if remove:
-        CardLink.objects.filter(pk__in=remove).delete()
+    removing = [i for i in old_visible if i not in ids]
     add = [i for i in ids if i not in existing]
-    if add and (field.settings or {}).get("two_way"):
-        # Adding a two-way link changes the other card too, so the writer must be able to edit it.
-        editable = {str(i) for i in editable_issues(user, Issue.issue_objects.filter(pk__in=add)).values_list("id", flat=True)}
-        if any(i not in editable for i in add):
-            raise _err(field, "One or more cards cannot be linked here.")
+    if (field.settings or {}).get("two_way") and not _all_editable(user, removing + add):
+        # A two-way link changes the other card too, so the writer must be able to edit it.
+        raise _err(field, "One or more cards cannot be linked here.")
+    if removing:
+        CardLink.objects.filter(pk__in=[existing[i].pk for i in removing]).delete()
     CardLink.objects.bulk_create(
         [
             CardLink(
@@ -446,25 +482,40 @@ def _date_key(value):
     if isinstance(value, datetime.date):
         return datetime.datetime.combine(value, datetime.time(), tzinfo=datetime.timezone.utc)
     text = str(value)
-    if "T" in text:
-        parsed = parse_datetime(text.replace("Z", "+00:00"))
-        return _date_key(parsed)
-    return _date_key(parse_date(text[:10]))
+    try:
+        if "T" in text:
+            return _date_key(parse_datetime(text.replace("Z", "+00:00")))
+        return _date_key(parse_date(text[:10]))
+    except ValueError:
+        return None
 
 
-def _unique_texts(field, value):
+def _unique_texts(field, value, names=None):
     """The separate display texts inside one stored value (multi values split)."""
     from plane.utils.custom_fields import display_value
 
     if value is None or value == "" or value == []:
         return []
+    if names is not None and field is not None and field.field_type == FT.PERSON:
+        return [names[str(v)] for v in (value if isinstance(value, list) else [value]) if names.get(str(v))]
     if isinstance(value, list) and field is not None:
         return [t for t in (display_value(field, [v]) for v in value) if t]
     text = display_value(field, value) if field is not None else str(value)
     return [text] if text else []
 
 
-def compute_rollup(function, cards, values, target, money):
+def _decimal(value):
+    """A stored number as Decimal, or None when it is not a number (e.g. a formula that changed type)."""
+    if isinstance(value, bool):
+        return None
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+    return number if number.is_finite() else None
+
+
+def compute_rollup(function, cards, values, target, money, names=None):
     """Work out one rollup.
 
     ``cards``: linked card ids the viewer can see. ``values``: card id -> raw value
@@ -485,7 +536,7 @@ def compute_rollup(function, cards, values, target, money):
     if function in ("sum", "avg", "min", "max"):
         if not cards:
             return None
-        numbers = [Decimal(str(v)) for v in present if not empty(v)]
+        numbers = [n for n in (_decimal(v) for v in present if not empty(v)) if n is not None]
         if function == "sum":
             result = sum(numbers, Decimal(0))
         elif not numbers:
@@ -511,7 +562,7 @@ def compute_rollup(function, cards, values, target, money):
     if function == "unique":
         seen = []
         for v in present:
-            for text in _unique_texts(target, v):
+            for text in _unique_texts(target, v, names):
                 if text not in seen:
                     seen.append(text)
         return seen[:MAX_UNIQUE] or None
@@ -529,7 +580,9 @@ def linked_values(issue_ids, user=None):
     issue_ids = [str(i) for i in issue_ids if i]
     if user is None or not issue_ids:
         return {}
-    issue_projects = {str(i): str(p) for i, p in Issue.all_objects.filter(pk__in=issue_ids).values_list("id", "project_id")}
+    issue_projects = {
+        str(i): str(p) for i, p in Issue.all_objects.filter(pk__in=issue_ids).values_list("id", "project_id")
+    }
     fields = list(
         CustomField.objects.filter(
             project_id__in=set(issue_projects.values()),
@@ -543,11 +596,19 @@ def linked_values(issue_ids, user=None):
     rollups = [f for f in fields if f.field_type == CustomField.ROLLUP]
 
     # 1. Raw links for every relation field on these boards.
-    storage = {fid: _storage(f) for fid, f in relations.items()}
+    mirror_primaries = [str((f.settings or {}).get("mirror_field_id")) for f in relations.values()]
+    live = {
+        str(i)
+        for i in CustomField.objects.filter(pk__in=[_uuid(i) for i in mirror_primaries if _uuid(i)]).values_list(
+            "id", flat=True
+        )
+    }
+    storage = {fid: _storage(f, live) for fid, f in relations.items()}
     forward_ids = [p for p, fwd in storage.values() if p and fwd]
     backward_ids = [p for p, fwd in storage.values() if p and not fwd]
     raw = CardLink.objects.filter(
-        Q(field_id__in=forward_ids, from_issue_id__in=issue_ids) | Q(field_id__in=backward_ids, to_issue_id__in=issue_ids)
+        Q(field_id__in=forward_ids, from_issue_id__in=issue_ids)
+        | Q(field_id__in=backward_ids, to_issue_id__in=issue_ids)
     ).values_list("field_id", "from_issue_id", "to_issue_id")
     # (primary_id, forward, this card) -> [other card ids in link order]
     by_key = {}
@@ -563,8 +624,15 @@ def linked_values(issue_ids, user=None):
     cards = {}
     if all_linked:
         rows = viewable_issues(user, Issue.issue_objects.filter(pk__in=all_linked)).values(
-            "id", "name", "sequence_id", "project_id", "project__identifier", "state__name", "priority",
-            "start_date", "target_date",
+            "id",
+            "name",
+            "sequence_id",
+            "project_id",
+            "project__identifier",
+            "state__name",
+            "priority",
+            "start_date",
+            "target_date",
         )
         cards = {str(r["id"]): r for r in rows}
 
@@ -596,9 +664,7 @@ def linked_values(issue_ids, user=None):
 
     # 3. Rollups: read target values for the visible linked cards only.
     target_ids = {
-        (r.settings or {}).get("target_field_id")
-        for r in rollups
-        if _uuid((r.settings or {}).get("target_field_id"))
+        (r.settings or {}).get("target_field_id") for r in rollups if _uuid((r.settings or {}).get("target_field_id"))
     }
     targets = {str(f.id): f for f in CustomField.objects.filter(pk__in=target_ids, archived_at__isnull=True)}
     stored = {}
@@ -615,7 +681,7 @@ def linked_values(issue_ids, user=None):
         if relation is None or function not in ROLLUP_FUNCTIONS or relation.project_id != rollup.project_id:
             continue
         key = settings.get("target_field_id")
-        target, values_of, money = None, None, False
+        target, values_of, money, names = None, None, False, None
         if ROLLUP_FUNCTIONS[function] is not None:
             if key in BUILTIN_TARGETS:
                 getter = BUILTIN_TARGETS[key][1]
@@ -624,20 +690,60 @@ def linked_values(issue_ids, user=None):
                 target = targets.get(str(key))
                 if target is None or str(target.project_id) != str((relation.settings or {}).get("target_project_id")):
                     continue
+                needs = ROLLUP_FUNCTIONS[function]
+                if needs != ANY and _target_kind(target) != needs:
+                    # The target changed type since the rollup was saved (e.g. a formula result type).
+                    continue
                 from plane.utils.custom_fields import effective_type
 
                 money = effective_type(target) == FT.MONEY
                 column = stored.get(str(target.id), {})
                 values_of = lambda ids, col=column: {c: col.get(c) for c in ids}  # noqa: E731
+                if function == "unique" and target.field_type == FT.PERSON:
+                    # One lookup for every person shown, not one per value.
+                    people = {str(p) for v in column.values() for p in (v if isinstance(v, list) else [v]) if p}
+                    names = {
+                        str(m): n
+                        for m, n in WorkspaceMember.objects.filter(
+                            workspace_id=target.workspace_id, member_id__in=[_uuid(p) for p in people if _uuid(p)]
+                        ).values_list("member_id", "member__display_name")
+                    }
         for issue_id, project_id in issue_projects.items():
             if str(rollup.project_id) != project_id:
                 continue
             linked = linked_by_field.get((str(relation.id), issue_id), [])
             values = values_of(linked) if values_of else {}
-            value = compute_rollup(function, linked, values, target, money)
+            value = compute_rollup(function, linked, values, target, money, names)
             if value is not None:
                 result.setdefault(issue_id, {})[str(rollup.id)] = value
     return result
+
+
+def hide_target_board(settings, user=None):
+    """Relation settings as ``user`` may see them: the target board id only for its members."""
+    user = viewer(user)
+    target = settings.get("target_project_id")
+    if target and not _is_member(user, target, 5):
+        return {**settings, "target_project_id": None}
+    return settings
+
+
+def drop_linked_values(values):
+    """A copy of a ``{field_id: value}`` map without relation and rollup values.
+
+    For anything that leaves the viewer's own screen (webhooks): those values were
+    worked out for one person and must not travel to anyone else.
+    """
+    if not isinstance(values, dict) or not values:
+        return values
+    ids = [_uuid(k) for k in values if _uuid(k)]
+    linked = {
+        str(i)
+        for i in CustomField.all_objects.filter(pk__in=ids, field_type__in=list(CustomField.LINKED_TYPES)).values_list(
+            "id", flat=True
+        )
+    }
+    return {k: v for k, v in values.items() if _uuid(k) not in linked}
 
 
 def link_candidates(field, user, search="", limit=20):
@@ -649,7 +755,7 @@ def link_candidates(field, user, search="", limit=20):
     search = (search or "").strip()
     if search:
         q = Q(name__icontains=search)
-        if search.isdigit():
+        if re.fullmatch(r"[0-9]{1,9}", search):
             q |= Q(sequence_id=int(search))
         queryset = queryset.filter(q)
     rows = queryset.order_by("-created_at").values("id", "name", "sequence_id", "project_id", "project__identifier")[

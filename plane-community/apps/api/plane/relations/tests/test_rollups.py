@@ -124,7 +124,10 @@ class TestRollupSettings:
             settings={"target_project_id": str(cast.alpha.id)},
         )
         inner_rollup = cast.field(
-            cast.beta, name="Inner count", field_type="rollup", settings={"relation_field_id": inner["id"], "function": "count"}
+            cast.beta,
+            name="Inner count",
+            field_type="rollup",
+            settings={"relation_field_id": inner["id"], "function": "count"},
         )
         cast.rollup(board.rel, "sum", fid(inner_rollup), expect=400)
         # The relation must be on the same board.
@@ -148,7 +151,11 @@ class TestRollupSettings:
             {
                 "name": "Peek",
                 "field_type": "rollup",
-                "settings": {"relation_field_id": fid(board.rel), "function": "sum", "target_field_id": fid(board.amount)},
+                "settings": {
+                    "relation_field_id": fid(board.rel),
+                    "function": "sum",
+                    "target_field_id": fid(board.amount),
+                },
             },
             format="json",
         )
@@ -194,7 +201,11 @@ class TestRollupStaysCurrent:
         cast.patch(board.a2, {fid(rel): [str(board.b1.id)]})
         response = cast.admin_client.post(
             FIELDS_URL.format(slug=cast.workspace.slug, project_id=cast.beta.id),
-            {"name": "Linked count", "field_type": "rollup", "settings": {"relation_field_id": str(mirror.id), "function": "count"}},
+            {
+                "name": "Linked count",
+                "field_type": "rollup",
+                "settings": {"relation_field_id": str(mirror.id), "function": "count"},
+            },
             format="json",
         )
         assert response.status_code == 201, response.data

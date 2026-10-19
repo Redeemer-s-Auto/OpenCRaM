@@ -183,8 +183,8 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
     try {
       if (isEdit && field) await updateField(workspaceSlug, projectId, field.id, payload);
       else await createField(workspaceSlug, projectId, { ...payload, field_type: fieldType });
-      // A two-way relation adds (or removes) a field on the other board.
-      if (fieldType === "relation" && targetProjectId && targetProjectId !== projectId)
+      // A two-way relation adds (or removes) a field on the other board, or on this one for a same-board relation.
+      if (fieldType === "relation" && targetProjectId)
         await fetchProjectFields(workspaceSlug, targetProjectId).catch(() => undefined);
       setToast({ type: TOAST_TYPE.SUCCESS, title: isEdit ? "Field saved" : "Field added", message: name.trim() });
       onClose();

@@ -57,6 +57,14 @@ class CustomFieldSerializer(BaseSerializer):
             "updated_by",
         ]
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.field_type == CustomField.RELATION:
+            from plane.relations.service import hide_target_board
+
+            data["settings"] = hide_target_board(data.get("settings") or {})
+        return data
+
     def validate_name(self, value):
         value = " ".join(str(value).split())
         if not value:

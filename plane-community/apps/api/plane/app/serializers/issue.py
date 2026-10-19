@@ -200,7 +200,8 @@ class IssueCreateSerializer(BaseSerializer):
 
         if "custom_fields" in attrs:
             project_id = self.context.get("project_id") or (self.instance and self.instance.project_id)
-            attrs["custom_fields"] = validate_values(project_id, attrs["custom_fields"])
+            current = values_for_issues([self.instance.id]).get(str(self.instance.id)) if self.instance else None
+            attrs["custom_fields"] = validate_values(project_id, attrs["custom_fields"], current)
 
         return attrs
 

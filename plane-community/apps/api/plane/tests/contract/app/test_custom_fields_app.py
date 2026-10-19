@@ -353,6 +353,23 @@ class TestCustomFieldValues:
         assert response.status_code == 201, response.data
         assert response.data["custom_fields"] == {fields["money"]["id"]: 64000}
 
+    def test_whole_map_round_trip_skips_unchanged(
+        self, session_client, workspace, project, state, create_user, member, fields
+    ):
+        """The screen sends the whole map back. Unchanged keys are skipped, even if
+        they would fail a check today (here: a person who left the workspace)."""
+        issue = _make_issue("Card", project, state, create_user)
+        person, money = fields["person"]["id"], fields["money"]["id"]
+        _patch_values(session_client, workspace, project, issue, {person: [str(member.id)], money: 100})
+        WorkspaceMember.objects.filter(member=member).update(is_active=False)
+        response = _patch_values(session_client, workspace, project, issue, {person: [str(member.id)], money: 200})
+        assert response.status_code == 204, response.data
+        detail = session_client.get(ISSUE_URL.format(slug=workspace.slug, project_id=project.id, pk=issue.id))
+        assert detail.data["custom_fields"][money] == 200
+        # A changed value is still checked.
+        bad = _patch_values(session_client, workspace, project, issue, {person: [str(member.id), str(uuid4())]})
+        assert bad.status_code == 400
+
     def test_guest_member_cannot_write_values(self, guest, workspace, project, state, create_user, fields):
         issue = _make_issue("Card", project, state, create_user)
         response = _patch_values(_client(guest), workspace, project, issue, {fields["text"]["id"]: "x"})
@@ -416,6 +433,7 @@ class TestCustomFieldFilterAndSort:
         assert names({k("done", "exact"): False}) == {"low", "empty"}
         brakes = CustomField.objects.get(pk=setup["tags"]["id"]).options[0]["id"]
         assert names({k("tags", "in"): [brakes]}) == {"low"}
+        assert names({k("tags", "exact"): brakes}) == {"low"}
         assert names({k("text", "icontains"): "r-"}) == {"low", "mid"}
         assert names({"or": [{k("money", "lt"): 10000}, {k("done", "exact"): True}]}) == {"low", "mid", "high"}
 

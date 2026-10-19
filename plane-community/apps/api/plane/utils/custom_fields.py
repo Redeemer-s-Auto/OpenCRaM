@@ -303,16 +303,21 @@ def clean_value(field, raw, new_label_options=None):
     raise err("Unknown field type.")
 
 
-def validate_values(project_id, data):
+def validate_values(project_id, data, current=None):
     """Check a ``{field_id: value}`` dict for a project.
 
     Returns a list of ``(field, value, typed_columns)``. Raises ValidationError
     for unknown or archived fields and for bad values. Nothing is saved.
+
+    ``current`` is the work item's stored ``{field_id: value}``. Keys whose value
+    did not change are skipped, so a client may send back the whole map.
     """
     if data is None:
         return []
     if not isinstance(data, dict):
         raise ValidationError({"custom_fields": "Must be an object of field id to value."})
+    if current:
+        data = {k: v for k, v in data.items() if str(k) not in current or current[str(k)] != v}
 
     ids = []
     for key in data.keys():
@@ -503,9 +508,10 @@ _LOOKUPS_BY_TYPE = {
     FT.DATE: {"exact", "gt", "gte", "lt", "lte", "range", "isnull"},
     FT.CHECKBOX: {"exact"},
     FT.SELECT: {"exact", "in", "isnull"},
-    FT.MULTI_SELECT: {"in", "isnull"},
-    FT.LABEL: {"in", "isnull"},
-    FT.PERSON: {"in", "isnull"},
+    # "exact" with one id means the same as "in" (the filter screen sends it for a single pick).
+    FT.MULTI_SELECT: {"exact", "in", "isnull"},
+    FT.LABEL: {"exact", "in", "isnull"},
+    FT.PERSON: {"exact", "in", "isnull"},
 }
 
 

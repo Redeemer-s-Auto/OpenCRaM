@@ -133,9 +133,10 @@ const CardFaceValue = observer(function CardFaceValue(props: {
   // Dropdown: shows the picked option; pick another or clear it right on the card.
   if (field.field_type === "select") {
     const option = field.options.find((o) => o.id === value);
+    if (!option) return null; // the picked option was deleted
     const chip = (
       <span className="flex h-5 max-w-48 items-center text-caption-sm-regular text-tertiary">
-        <OptionChip name={option?.name ?? ""} color={option?.color ?? ""} />
+        <OptionChip name={option.name} color={option.color} />
       </span>
     );
     if (!updateIssue) return withTooltip(chip);
@@ -170,6 +171,7 @@ const CardFaceValue = observer(function CardFaceValue(props: {
   if (field.field_type === "multi_select" || field.field_type === "label") {
     const picked = (Array.isArray(value) ? value : []) as string[];
     const options = picked.flatMap((id) => field.options.filter((o) => o.id === id));
+    if (options.length === 0) return null;
     return withTooltip(
       <span className="flex h-5 max-w-48 items-center gap-1 overflow-hidden text-caption-sm-regular text-tertiary">
         {options.slice(0, 2).map((o) => (
@@ -196,6 +198,7 @@ const CardFaceValue = observer(function CardFaceValue(props: {
   }
 
   // Text, long text, number, money, date, link, formula, rollup: plain text, truncated.
+  if (!text) return null;
   return withTooltip(
     <span className={chipClass}>
       <Icon className="size-3 flex-shrink-0" />

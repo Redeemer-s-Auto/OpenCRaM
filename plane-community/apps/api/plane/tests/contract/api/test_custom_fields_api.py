@@ -105,6 +105,65 @@ class TestCustomFieldsPublicAPI:
         bad_filter = api_key_client.get(issues_url, {"custom_field_filters": "{not json"})
         assert bad_filter.status_code == 400
 
+    def test_hub_card_flow(self, api_key_client, workspace, project, state):
+        """The hub's only door: create a card with a page body, fields and an outside id,
+        find it again by that id or by its identifier, update it, and read it back."""
+        fields_url = f"{base(workspace, project)}/custom-fields/"
+        ro = _id(api_key_client.post(fields_url, {"name": "RO", "field_type": "text"}, format="json").data)
+        when = _id(
+            api_key_client.post(
+                fields_url,
+                {"name": "Call-back", "field_type": "date", "settings": {"include_time": True}},
+                format="json",
+            ).data
+        )
+        issues_url = f"{base(workspace, project)}/issues/"
+        created = api_key_client.post(
+            issues_url,
+            {
+                "name": "Call client back",
+                "state": str(state.id),
+                "description_html": "<p>Asked about the brake quote.</p>",
+                "external_source": "crm",
+                "external_id": "lead-42",
+                "custom_fields": {ro: "10432", when: "2026-10-22T14:30:00-05:00"},
+            },
+            format="json",
+        )
+        assert created.status_code == 201, created.data
+        assert created.data["custom_fields"] == {ro: "10432", when: "2026-10-22T19:30:00Z"}
+        assert "brake quote" in created.data["description_html"]
+
+        # Find it by the outside id.
+        found = api_key_client.get(issues_url, {"external_source": "crm", "external_id": "lead-42"})
+        assert found.status_code == 200
+        assert found.data["custom_fields"][ro] == "10432"
+
+        # Find it by its identifier (BRD-<n>).
+        by_identifier = api_key_client.get(
+            f"/api/v1/workspaces/{workspace.slug}/issues/BRD-{created.data['sequence_id']}/"
+        )
+        assert by_identifier.status_code == 200, by_identifier.data
+        assert by_identifier.data["custom_fields"][ro] == "10432"
+
+        # Update the body and one field together; the other field stays.
+        detail = f"{issues_url}{_id(created.data)}/"
+        updated = api_key_client.patch(
+            detail,
+            {"description_html": "<p>Called back, booked Thursday.</p>", "custom_fields": {ro: "10433"}},
+            format="json",
+        )
+        assert updated.status_code == 200, updated.data
+        after = api_key_client.get(detail).data
+        assert after["custom_fields"] == {ro: "10433", when: "2026-10-22T19:30:00Z"}
+        assert "booked Thursday" in after["description_html"]
+
+        # ?fields= keeps or drops custom_fields like any other field.
+        slim = api_key_client.get(issues_url, {"fields": "id,name,custom_fields"})
+        assert slim.data["results"][0]["custom_fields"][ro] == "10433"
+        slimmer = api_key_client.get(issues_url, {"fields": "id,name"})
+        assert "custom_fields" not in slimmer.data["results"][0]
+
     def test_field_of_other_project_ignored_in_filters(self, api_key_client, workspace, project, create_user):
         other = Project.objects.create(name="Other", identifier="OTH", workspace=workspace, created_by=create_user)
         ProjectMember.objects.create(project=other, member=create_user, workspace=workspace, role=20, is_active=True)

@@ -13,7 +13,7 @@ caller's visibility checks; nothing in this module lists values on its own.
 import datetime
 import re
 import uuid
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 # Django imports
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -28,6 +28,7 @@ from rest_framework.exceptions import ValidationError
 
 # Module imports
 from plane.db.models import CustomField, CustomFieldValue, WorkspaceMember
+from plane.utils import formula
 
 FT = CustomField.FieldType
 
@@ -114,7 +115,82 @@ def clean_settings(field_type, settings):
         except (TypeError, ValueError):
             raise ValidationError({"settings": "decimals must be a whole number."})
         cleaned["decimals"] = max(0, min(decimals, 6))
+    if field_type == FT.FORMULA:
+        expression = settings.get("expression")
+        result_type = settings.get("result_type", "number")
+        if result_type not in CustomField.FORMULA_RESULT_TYPES:
+            choices = ", ".join(sorted(CustomField.FORMULA_RESULT_TYPES))
+            raise ValidationError({"settings": f"result_type must be one of: {choices}."})
+        try:
+            formula.parse(expression)
+        except formula.FormulaError as e:
+            raise ValidationError({"settings": f"Formula: {e}"})
+        cleaned["expression"] = expression.strip()
+        cleaned["result_type"] = result_type
     return cleaned
+
+
+# Built-in card properties a formula can read with prop("..."). A custom field with
+# the same name wins.
+BUILTIN_PROPS = {
+    "Title": lambda issue: issue.name,
+    "Start date": lambda issue: issue.start_date,
+    "Due date": lambda issue: issue.target_date,
+    "Priority": lambda issue: issue.priority,
+    "State": lambda issue: issue.state.name if issue.state_id and issue.state else None,
+    "Created": lambda issue: issue.created_at,
+}
+
+
+def effective_type(field):
+    """The type a field's stored value behaves as. A formula behaves as its result type."""
+    if field.field_type == FT.FORMULA:
+        return {
+            "number": FT.NUMBER,
+            "money": FT.MONEY,
+            "text": FT.TEXT,
+            "date": FT.DATE,
+            "checkbox": FT.CHECKBOX,
+        }.get((field.settings or {}).get("result_type"), FT.NUMBER)
+    return field.field_type
+
+
+def check_formula_references(project_id, field_name, settings, field_id=None):
+    """A formula must only name existing fields and must not loop back to itself."""
+    tree = formula.parse(settings["expression"])
+    fields = {
+        f.name: f
+        for f in CustomField.objects.filter(project_id=project_id, archived_at__isnull=True).exclude(pk=field_id)
+    }
+    known = set(fields) | set(BUILTIN_PROPS)
+    for name in formula.referenced_names(tree):
+        if name == field_name:
+            raise ValidationError({"settings": "Formula: a formula cannot use itself."})
+        if name not in known:
+            raise ValidationError({"settings": f'Formula: there is no field called "{name}" on this project.'})
+
+    # Loop check across formula fields: A uses B uses A.
+    graph = {}
+    for f in fields.values():
+        if f.field_type == FT.FORMULA:
+            try:
+                graph[f.name] = set(formula.referenced_names(formula.parse(f.settings.get("expression", ""))))
+            except formula.FormulaError:
+                graph[f.name] = set()
+    graph[field_name] = set(formula.referenced_names(tree))
+
+    def reaches(start, target, seen):
+        for nxt in graph.get(start, ()):
+            if nxt == target:
+                return True
+            if nxt not in seen:
+                seen.add(nxt)
+                if reaches(nxt, target, seen):
+                    return True
+        return False
+
+    if reaches(field_name, field_name, set()):
+        raise ValidationError({"settings": "Formula: these formulas use each other in a loop."})
 
 
 # ---------------------------------------------------------------------------
@@ -337,6 +413,9 @@ def validate_values(project_id, data, current=None):
         if field is None:
             errors[str(key)] = "This field does not exist on this project or is archived."
             continue
+        if field.field_type == FT.FORMULA:
+            # Formulas are worked out by the server. A client sending one back is ignored.
+            continue
         try:
             value, columns = clean_value(field, raw, new_label_options)
         except ValidationError as e:
@@ -406,7 +485,173 @@ def set_values(issue, cleaned):
                 setattr(row, c, v)
             row.save()
         changes[str(field.id)] = (old_value, value)
+    compute_formulas(issue)
     return changes
+
+
+# ---------------------------------------------------------------------------
+# Formulas: values are worked out on the server and stored like any other value
+# ---------------------------------------------------------------------------
+
+
+def _prop_value(field, value):
+    """Turn a stored value into what a formula sees."""
+    if value is None:
+        return None
+    t = effective_type(field)
+    if t == FT.NUMBER:
+        return Decimal(str(value))
+    if t == FT.MONEY:
+        return Decimal(int(value)) / 100
+    if t == FT.CHECKBOX:
+        return bool(value)
+    if t == FT.DATE:
+        text = str(value)
+        if "T" in text:
+            return parse_datetime(text.replace("Z", "+00:00"))
+        return parse_date(text[:10])
+    if t == FT.SELECT:
+        return next((o["name"] for o in field.options or [] if o["id"] == value), None)
+    if t in (FT.MULTI_SELECT, FT.LABEL):
+        by_id = {o["id"]: o["name"] for o in field.options or []}
+        return [by_id[i] for i in _to_list(value) if i in by_id]
+    if t == FT.PERSON:
+        names = dict(
+            WorkspaceMember.objects.filter(workspace_id=field.workspace_id, member_id__in=_to_list(value)).values_list(
+                "member_id", "member__display_name"
+            )
+        )
+        return [names.get(uuid.UUID(i), "") for i in _to_list(value)]
+    return str(value)
+
+
+def _formula_result(field, result):
+    """Turn a formula result into (stored value, typed columns), or (None, {}) for empty."""
+    if result is None:
+        return None, {}
+    t = (field.settings or {}).get("result_type", "number")
+    if t == "number":
+        number = formula._to_number(result)
+        if number is None or not number.is_finite() or abs(number) >= NUMBER_MAX:
+            return None, {}
+        number = round(number, 6)
+        value = int(number) if number == number.to_integral_value() else float(number)
+        return value, {"value_number": number}
+    if t == "money":
+        number = formula._to_number(result)
+        if number is None or not number.is_finite():
+            return None, {}
+        cents = int((number * 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+        if abs(cents) >= MONEY_MAX_CENTS:
+            return None, {}
+        return cents, {"value_number": Decimal(cents)}
+    if t == "checkbox":
+        checked = formula._truthy(result)
+        return checked, {"value_bool": checked}
+    if t == "date":
+        if isinstance(result, datetime.datetime):
+            if timezone.is_naive(result):
+                result = timezone.make_aware(result, datetime.timezone.utc)
+            result = result.astimezone(datetime.timezone.utc)
+            return result.isoformat().replace("+00:00", "Z"), {"value_datetime": result, "value_date": result.date()}
+        if isinstance(result, datetime.date):
+            return result.isoformat(), {"value_date": result}
+        return None, {}
+    text = formula._to_text(result)[:TEXT_MAX]
+    if not text:
+        return None, {}
+    return text, {"value_text": text}
+
+
+def _formula_order(formula_fields):
+    """Formula fields in an order where each comes after the formulas it uses."""
+    by_name = {f.name: f for f in formula_fields}
+    deps = {}
+    for f in formula_fields:
+        try:
+            names = formula.referenced_names(formula.parse(f.settings.get("expression", "")))
+        except formula.FormulaError:
+            names = []
+        deps[f.name] = [n for n in names if n in by_name]
+    ordered, done, visiting = [], set(), set()
+
+    def visit(name):
+        if name in done or name in visiting:
+            return
+        visiting.add(name)
+        for dep in deps.get(name, []):
+            visit(dep)
+        visiting.discard(name)
+        done.add(name)
+        ordered.append(by_name[name])
+
+    for f in formula_fields:
+        visit(f.name)
+    return ordered
+
+
+def compute_formulas(issue, fields=None):
+    """Work out every formula field on one card and store the results."""
+    if fields is None:
+        fields = list(CustomField.objects.filter(project_id=issue.project_id, archived_at__isnull=True))
+    formula_fields = [f for f in fields if f.field_type == FT.FORMULA]
+    if not formula_fields:
+        return
+    by_name = {f.name: f for f in fields}
+    stored = {row.field_id: row for row in CustomFieldValue.objects.filter(issue_id=issue.id, field__in=fields)}
+    computed = {}
+
+    def get_prop(name):
+        field = by_name.get(name)
+        if field is not None:
+            if field.id in computed:
+                return computed[field.id]
+            row = stored.get(field.id)
+            return _prop_value(field, row.value if row else None)
+        builtin = BUILTIN_PROPS.get(name)
+        return builtin(issue) if builtin else None
+
+    for field in _formula_order(formula_fields):
+        try:
+            result = formula.evaluate(formula.parse(field.settings.get("expression", "")), get_prop)
+        except formula.FormulaError:
+            result = None
+        value, columns = _formula_result(field, result)
+        computed[field.id] = _prop_value(field, value)
+        _store_formula_value(issue, field, stored.get(field.id), value, columns)
+
+
+def _store_formula_value(issue, field, row, value, columns):
+    if value is None:
+        if row is not None:
+            CustomFieldValue.all_objects.filter(pk=row.pk).delete()
+        return
+    typed = {c: columns.get(c) for c in _TYPED_COLUMNS}
+    if row is None:
+        CustomFieldValue.objects.create(
+            issue_id=issue.id,
+            field=field,
+            project_id=issue.project_id,
+            workspace_id=issue.workspace_id,
+            value=value,
+            **typed,
+        )
+    elif row.value != value or any(getattr(row, c) != v for c, v in typed.items()):
+        row.value = value
+        for c, v in typed.items():
+            setattr(row, c, v)
+        row.save()
+
+
+def recompute_project_formulas(project_id):
+    """Work out formulas again on every card of a project (after a field changes)."""
+    from plane.db.models import Issue
+
+    fields = list(CustomField.objects.filter(project_id=project_id, archived_at__isnull=True))
+    if not any(f.field_type == FT.FORMULA for f in fields):
+        return
+    for issue in Issue.issue_objects.filter(project_id=project_id).select_related("state"):
+        compute_formulas(issue, fields)
 
 
 def refresh_display_text(field):
@@ -439,7 +684,7 @@ def display_value(field, value):
     """Plain text for activity logs and exports."""
     if value is None or value == []:
         return ""
-    t = field.field_type
+    t = effective_type(field)
     if t == FT.MONEY:
         cents = int(value)
         sign = "-" if cents < 0 else ""
@@ -574,13 +819,13 @@ def build_filter_q(key, raw, fields_by_id):
     field = fields_by_id.get(field_id.lower())
     if field is None:
         raise ValidationError({"message": f"Custom field '{field_id}' does not exist.", "code": "invalid_filter_field"})
-    allowed = _LOOKUPS_BY_TYPE.get(field.field_type, set())
+    allowed = _LOOKUPS_BY_TYPE.get(effective_type(field), set())
     if lookup not in allowed:
         raise ValidationError(
             {"message": f"'{lookup}' is not allowed for a {field.field_type} field.", "code": "invalid_filter_lookup"}
         )
 
-    t = field.field_type
+    t = effective_type(field)
     if lookup == "isnull":
         exists = _has_value_q(field)
         return ~exists if _as_bool(raw) else exists
@@ -604,7 +849,8 @@ def build_filter_q(key, raw, fields_by_id):
         return _has_value_q(field, **{f"value_number__{lookup}": _to_number(field, raw)})
 
     if t == FT.DATE:
-        column = "value_datetime__date" if (field.settings or {}).get("include_time") else "value_date"
+        uses_time = (field.settings or {}).get("include_time") and field.field_type != FT.FORMULA
+        column = "value_datetime__date" if uses_time else "value_date"
         if lookup == "range":
             bounds = _split_list(raw)
             if len(bounds) != 2:
@@ -681,11 +927,12 @@ def order_queryset(issue_queryset, order_by):
         return None, None
 
     values = CustomFieldValue.objects.filter(issue_id=OuterRef("pk"), field_id=field.id)
-    t = field.field_type
+    t = effective_type(field)
     if t in (FT.NUMBER, FT.MONEY):
         expression = Subquery(values.values("value_number")[:1])
     elif t == FT.DATE:
-        column = "value_datetime" if (field.settings or {}).get("include_time") else "value_date"
+        uses_time = (field.settings or {}).get("include_time") and field.field_type != FT.FORMULA
+        column = "value_datetime" if uses_time else "value_date"
         expression = Subquery(values.values(column)[:1])
     elif t == FT.CHECKBOX:
         expression = Subquery(values.values("value_bool")[:1])

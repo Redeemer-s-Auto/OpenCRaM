@@ -15,7 +15,8 @@ export type TCustomFieldType =
   | "multi_select"
   | "label"
   | "person"
-  | "url";
+  | "url"
+  | "formula";
 
 export type TCustomFieldOption = {
   id: string;
@@ -30,7 +31,13 @@ export type TCustomFieldSettings = {
   multiple?: boolean;
   /** number: places after the point; unset keeps what was typed */
   decimals?: number;
+  /** formula: the formula text, for example prop("Amount") * 1.0825 */
+  expression?: string;
+  /** formula: what the result is shown and sorted as */
+  result_type?: TCustomFieldFormulaResult;
 };
+
+export type TCustomFieldFormulaResult = "number" | "money" | "text" | "date" | "checkbox";
 
 export type TCustomField = {
   id: string;

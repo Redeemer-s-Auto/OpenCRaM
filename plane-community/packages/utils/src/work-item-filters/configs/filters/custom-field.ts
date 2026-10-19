@@ -42,8 +42,10 @@ export const getCustomFieldFilterConfig = <P extends TFilterProperty>(
 ): TFilterConfig<P> | undefined => {
   const { field } = params;
   const base = { id: key, label: field.name, ...params, icon: params.filterIcon };
+  // A formula filters as its result type.
+  const type = field.field_type === "formula" ? (field.settings?.result_type ?? "number") : field.field_type;
 
-  switch (field.field_type) {
+  switch (type) {
     case "date":
       return createFilterConfig<P>({
         ...base,

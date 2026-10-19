@@ -7,7 +7,7 @@ from rest_framework import serializers
 
 # Module imports
 from plane.db.models import CustomField
-from plane.utils.custom_fields import clean_options, clean_settings
+from plane.utils.custom_fields import check_formula_references, clean_options, clean_settings
 
 from .base import BaseSerializer
 
@@ -73,4 +73,9 @@ class CustomFieldSerializer(BaseSerializer):
             attrs["options"] = clean_options(field_type, attrs.get("options"), existing)
         if "settings" in attrs or self.instance is None:
             attrs["settings"] = clean_settings(field_type, attrs.get("settings"))
+        if field_type == CustomField.FieldType.FORMULA and ("settings" in attrs or "name" in attrs):
+            project_id = self.context.get("project_id") or self.instance.project_id
+            settings = attrs.get("settings") or self.instance.settings
+            name = attrs.get("name") or self.instance.name
+            check_formula_references(project_id, name, settings, field_id=self.instance.pk if self.instance else None)
         return attrs

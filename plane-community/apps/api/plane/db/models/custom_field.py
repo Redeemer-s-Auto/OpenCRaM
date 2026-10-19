@@ -34,11 +34,14 @@ class CustomField(ProjectBaseModel):
         LABEL = "label", "Label"
         PERSON = "person", "Person"
         URL = "url", "Link"
+        FORMULA = "formula", "Formula"
 
     # Types whose value is a list of option ids or user ids.
     MULTI_VALUE_TYPES = {FieldType.MULTI_SELECT, FieldType.LABEL, FieldType.PERSON}
     # Types that carry an option list in ``options``.
     OPTION_TYPES = {FieldType.SELECT, FieldType.MULTI_SELECT, FieldType.LABEL}
+    # What a formula's result is stored and shown as (settings["result_type"]).
+    FORMULA_RESULT_TYPES = {"number", "money", "text", "date", "checkbox"}
 
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
@@ -46,7 +49,8 @@ class CustomField(ProjectBaseModel):
     # Choices for select / multi_select / label: [{"id", "name", "color"}]
     options = models.JSONField(default=list, blank=True)
     # Per-type settings, for example {"include_time": true} for dates,
-    # {"multiple": true} for people, {"decimals": 2} for numbers.
+    # {"multiple": true} for people, {"decimals": 2} for numbers,
+    # {"expression": "...", "result_type": "money"} for formulas.
     settings = models.JSONField(default=dict, blank=True)
     sort_order = models.FloatField(default=65535)
     archived_at = models.DateTimeField(null=True, blank=True)

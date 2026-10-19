@@ -14,13 +14,25 @@ from rest_framework.response import Response
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.serializers import CustomFieldSerializer
 from plane.db.models import CustomField, CustomFieldValue
-from plane.utils.custom_fields import refresh_display_text
+from plane.utils.custom_fields import recompute_project_formulas, refresh_display_text
+from plane.utils.formula import rename_prop
 
 from .base import BaseAPIView
 
 
 def _field_queryset(slug, project_id):
     return CustomField.objects.filter(workspace__slug=slug, project_id=project_id)
+
+
+def _rename_in_formulas(project_id, old_name, new_name):
+    """Keep formulas working when a field they use is renamed (like Notion does)."""
+    formulas = CustomField.objects.filter(project_id=project_id, field_type=CustomField.FieldType.FORMULA)
+    for formula_field in formulas:
+        expression = (formula_field.settings or {}).get("expression", "")
+        rewritten = rename_prop(expression, old_name, new_name)
+        if rewritten != expression:
+            formula_field.settings = {**formula_field.settings, "expression": rewritten}
+            formula_field.save(update_fields=["settings", "updated_at"])
 
 
 class CustomFieldEndpoint(BaseAPIView):
@@ -40,6 +52,7 @@ class CustomFieldEndpoint(BaseAPIView):
         serializer = CustomFieldSerializer(data=request.data, context={"project_id": project_id})
         serializer.is_valid(raise_exception=True)
         serializer.save(project_id=project_id)
+        recompute_project_formulas(project_id)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -64,10 +77,14 @@ class CustomFieldDetailEndpoint(BaseAPIView):
             return Response({"error": "Field not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = CustomFieldSerializer(field, data=request.data, partial=True, context={"project_id": project_id})
         serializer.is_valid(raise_exception=True)
+        old_name = field.name
         with transaction.atomic():
             field = serializer.save()
             if "options" in request.data:
                 refresh_display_text(field)
+            if field.name != old_name:
+                _rename_in_formulas(project_id, old_name, field.name)
+        recompute_project_formulas(project_id)
         return Response(CustomFieldSerializer(field).data)
 
     @allow_permission([ROLE.ADMIN])
@@ -87,6 +104,7 @@ class CustomFieldDetailEndpoint(BaseAPIView):
         with transaction.atomic():
             CustomFieldValue.all_objects.filter(field_id=field.id).delete()
             CustomField.all_objects.filter(pk=field.id).delete()
+        recompute_project_formulas(project_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -101,6 +119,7 @@ class CustomFieldArchiveEndpoint(BaseAPIView):
         if field.archived_at is None:
             field.archived_at = timezone.now()
             field.save(update_fields=["archived_at", "updated_at"])
+        recompute_project_formulas(project_id)
         return Response(CustomFieldSerializer(field).data)
 
     @allow_permission([ROLE.ADMIN])
@@ -110,6 +129,7 @@ class CustomFieldArchiveEndpoint(BaseAPIView):
             return Response({"error": "Field not found."}, status=status.HTTP_404_NOT_FOUND)
         field.archived_at = None
         field.save(update_fields=["archived_at", "updated_at"])
+        recompute_project_formulas(project_id)
         return Response(CustomFieldSerializer(field).data)
 
 

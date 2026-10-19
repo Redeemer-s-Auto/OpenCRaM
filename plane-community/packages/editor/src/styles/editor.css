@@ -193,6 +193,8 @@ ul[data-type="taskList"] li > div {
 ul[data-type="taskList"] li[data-checked="true"] {
   & > div > p.editor-paragraph-block {
     color: var(--color-placeholder);
+    /* Notion-style: a checked to-do is struck through */
+    text-decoration: line-through;
   }
 
   [data-text-color] {

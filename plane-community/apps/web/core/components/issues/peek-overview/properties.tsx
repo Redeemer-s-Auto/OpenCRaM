@@ -41,6 +41,7 @@ import type { TIssueOperations } from "../issue-detail";
 import { IssueCycleSelect } from "../issue-detail/cycle-select";
 import { IssueLabel } from "../issue-detail/label";
 import { IssueModuleSelect } from "../issue-detail/module-select";
+import { IssueSharingSection } from "@/components/sharing";
 
 interface IPeekOverviewProperties {
   workspaceSlug: string;
@@ -244,6 +245,7 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
           <IssueLabel workspaceSlug={workspaceSlug} projectId={projectId} issueId={issueId} disabled={disabled} />
         </SidebarPropertyListItem>
       </div>
+      <IssueSharingSection workspaceSlug={workspaceSlug} projectId={projectId} issueId={issueId} />
     </div>
   );
 });

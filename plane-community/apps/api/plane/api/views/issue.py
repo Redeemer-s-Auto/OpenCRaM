@@ -79,6 +79,12 @@ from plane.db.models import (
     Workspace,
 )
 from plane.settings.storage import S3Storage
+from plane.utils.custom_fields import (
+    build_flat_filters as build_custom_field_filters,
+    is_order_key as is_custom_field_order_key,
+    order_queryset as custom_field_order_queryset,
+    prefetch_onto,
+)
 from plane.utils.path_validator import sanitize_filename
 from plane.utils.order_queryset import (
     ACTIVITY_ORDER_BY_ALLOWLIST,
@@ -350,8 +356,10 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
         # Reject any field not in the allowlist before it reaches .order_by().
         # An unrecognised value is replaced with the safe default, preventing
         # ORM order_by injection via relational traversal (GHSA-p885-6jpg-cr2p).
+        raw_order_by = request.GET.get("order_by", "-created_at")
+        custom_field_order = is_custom_field_order_key(raw_order_by)
         order_by_param = sanitize_order_by(
-            request.GET.get("order_by", "-created_at"),
+            "-created_at" if custom_field_order else raw_order_by,
             ISSUE_ORDER_BY_ALLOWLIST,
             default="-created_at",
         )
@@ -382,8 +390,22 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
 
         total_issue_queryset = Issue.issue_objects.filter(project_id=project_id, workspace__slug=slug)
 
+        # custom_field_filters={"customfield_<id>__<lookup>": value, ...} (all must match)
+        custom_field_filters = request.GET.get("custom_field_filters")
+        if custom_field_filters:
+            custom_q = build_custom_field_filters(custom_field_filters, project_id)
+            issue_queryset = issue_queryset.filter(custom_q)
+            total_issue_queryset = total_issue_queryset.filter(custom_q)
+
+        custom_ordered = None
+        if custom_field_order:
+            custom_ordered, _ = custom_field_order_queryset(issue_queryset, raw_order_by)
+
+        if custom_ordered is not None:
+            issue_queryset = custom_ordered
+
         # Priority Ordering
-        if order_by_param == "priority" or order_by_param == "-priority":
+        elif order_by_param == "priority" or order_by_param == "-priority":
             priority_order = priority_order if order_by_param == "priority" else priority_order[::-1]
             issue_queryset = issue_queryset.annotate(
                 priority_order=Case(
@@ -424,7 +446,9 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             request=request,
             queryset=(issue_queryset),
             total_count_queryset=total_issue_queryset,
-            on_results=lambda issues: IssueSerializer(issues, many=True, fields=self.fields, expand=self.expand).data,
+            on_results=lambda issues: IssueSerializer(
+                prefetch_onto(issues), many=True, fields=self.fields, expand=self.expand
+            ).data,
         )
 
     @work_item_docs(

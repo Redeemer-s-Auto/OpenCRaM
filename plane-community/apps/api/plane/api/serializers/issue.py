@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+from plane.utils.custom_fields import set_values, validate_values, values_for_issues
+
 # Django imports
 from django.utils import timezone
 from lxml import html
@@ -66,6 +68,8 @@ class IssueSerializer(BaseSerializer):
     type_id = serializers.PrimaryKeyRelatedField(
         source="type", queryset=IssueType.objects.all(), required=False, allow_null=True
     )
+    # {field_id: value}. Write only the fields to change; null clears a field.
+    custom_fields = serializers.DictField(write_only=True, required=False)
 
     class Meta:
         model = Issue
@@ -146,11 +150,17 @@ class IssueSerializer(BaseSerializer):
         ):
             raise serializers.ValidationError("Estimate point is not valid please pass a valid estimate_point_id")
 
+        if "custom_fields" in data:
+            project_id = self.context.get("project_id") or (self.instance and self.instance.project_id)
+            current = values_for_issues([self.instance.id]).get(str(self.instance.id)) if self.instance else None
+            data["custom_fields"] = validate_values(project_id, data["custom_fields"], current)
+
         return data
 
     def create(self, validated_data):
         assignees = validated_data.pop("assignees", None)
         labels = validated_data.pop("labels", None)
+        custom_fields = validated_data.pop("custom_fields", None)
 
         project_id = self.context["project_id"]
         workspace_id = self.context["workspace_id"]
@@ -229,11 +239,18 @@ class IssueSerializer(BaseSerializer):
             except IntegrityError:
                 pass
 
+        if custom_fields:
+            set_values(issue, custom_fields)
+
         return issue
 
     def update(self, instance, validated_data):
         assignees = validated_data.pop("assignees", None)
         labels = validated_data.pop("labels", None)
+        custom_fields = validated_data.pop("custom_fields", None)
+
+        if custom_fields:
+            set_values(instance, custom_fields)
 
         # Related models
         project_id = instance.project_id
@@ -316,6 +333,11 @@ class IssueSerializer(BaseSerializer):
                 data["labels"] = [
                     str(label) for label in IssueLabel.objects.filter(issue=instance).values_list("label_id", flat=True)
                 ]
+        if "custom_fields" in self.fields:
+            prefetched = getattr(instance, "_custom_field_values", None)
+            data["custom_fields"] = (
+                prefetched if prefetched is not None else values_for_issues([instance.id]).get(str(instance.id), {})
+            )
 
         return data
 

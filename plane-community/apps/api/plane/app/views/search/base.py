@@ -27,6 +27,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 # Module imports
+from plane.utils.private_projects import visible_projects_q
 from plane.app.views.base import BaseAPIView
 from plane.app.permissions import WorkspaceUserPermission
 from plane.db.models import (
@@ -376,6 +377,7 @@ class SearchEndpoint(BaseAPIView):
                         Project.objects.filter(
                             q,
                             Q(project_projectmember__member=self.request.user) | Q(network=2),
+                            visible_projects_q(self.request.user),
                             workspace__slug=slug,
                         )
                         .order_by("-created_at")
@@ -581,6 +583,7 @@ class SearchEndpoint(BaseAPIView):
                         Project.objects.filter(
                             q,
                             Q(project_projectmember__member=self.request.user) | Q(network=2),
+                            visible_projects_q(self.request.user),
                             workspace__slug=slug,
                         )
                         .order_by("-created_at")

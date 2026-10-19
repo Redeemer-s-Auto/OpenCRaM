@@ -432,6 +432,7 @@
     "module": "Module",
     "modules": "Modules",
     "labels": "Labels",
+    "custom_fields": "Custom fields",
     "label": "Label",
     "admins": "Admins",
     "users": "Users",

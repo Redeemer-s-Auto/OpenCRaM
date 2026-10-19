@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useMemo } from "react";
-import { AtSign, Briefcase } from "lucide-react";
+import { AtSign, Briefcase, SlidersHorizontal } from "lucide-react";
 // plane imports
 import { Logo } from "@plane/propel/emoji-icon-picker";
 import {
@@ -38,6 +38,8 @@ import {
   getAssigneeFilterConfig,
   getCreatedAtFilterConfig,
   getCreatedByFilterConfig,
+  getCustomFieldFilterConfig,
+  getCustomFieldFilterKey,
   getCycleFilterConfig,
   getFileURL,
   getLabelFilterConfig,
@@ -54,6 +56,7 @@ import {
   isLoaderReady,
 } from "@plane/utils";
 // store hooks
+import { useCustomField } from "@/hooks/store/use-custom-field";
 import { useCycle } from "@/hooks/store/use-cycle";
 import { useLabel } from "@/hooks/store/use-label";
 import { useMember } from "@/hooks/store/use-member";
@@ -98,7 +101,9 @@ export const useWorkItemFiltersConfig = (props: TUseWorkItemFiltersConfigProps):
   const { getModuleById } = useModule();
   const { getStateById } = useProjectState();
   const { getUserDetails } = useMember();
+  const { getProjectFields } = useCustomField();
   // derived values
+  const customFields = getProjectFields(projectId);
   const operatorConfigs = useFiltersOperatorConfigs({ workspaceSlug });
   const filtersToShow = useMemo(() => new Set(allowedFilters), [allowedFilters]);
   const project = useMemo(() => getProjectById(projectId), [projectId, getProjectById]);
@@ -362,6 +367,37 @@ export const useWorkItemFiltersConfig = (props: TUseWorkItemFiltersConfigProps):
     [isFilterEnabled, projects, operatorConfigs]
   );
 
+  // custom field filter configs (one per filterable field of this board)
+  const customFieldFilterConfigs = useMemo(
+    () =>
+      (customFields ?? [])
+        .map((field) =>
+          getCustomFieldFilterConfig<TWorkItemFilterProperty>(
+            getCustomFieldFilterKey(field.id) as TWorkItemFilterProperty,
+            {
+              isEnabled: true,
+              filterIcon: SlidersHorizontal,
+              field,
+              members: members ?? [],
+              getOptionIcon: (color) => (
+                <span className="flex size-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: color }} />
+              ),
+              getMemberIcon: (memberDetails) => (
+                <Avatar
+                  name={memberDetails.display_name}
+                  src={getFileURL(memberDetails.avatar_url)}
+                  showTooltip={false}
+                  size="sm"
+                />
+              ),
+              ...operatorConfigs,
+            }
+          )
+        )
+        .filter((config): config is TFilterConfig<TWorkItemFilterProperty> => !!config),
+    [customFields, members, operatorConfigs]
+  );
+
   return {
     areAllConfigsInitialized,
     configs: [
@@ -380,6 +416,7 @@ export const useWorkItemFiltersConfig = (props: TUseWorkItemFiltersConfigProps):
       updatedAtFilterConfig,
       createdByFilterConfig,
       subscriberFilterConfig,
+      ...customFieldFilterConfigs,
     ],
     configMap: {
       project_id: projectFilterConfig,
@@ -397,6 +434,7 @@ export const useWorkItemFiltersConfig = (props: TUseWorkItemFiltersConfigProps):
       target_date: targetDateFilterConfig,
       created_at: createdAtFilterConfig,
       updated_at: updatedAtFilterConfig,
+      ...Object.fromEntries(customFieldFilterConfigs.map((config) => [config.id, config])),
     },
     isFilterEnabled,
     members: members ?? [],

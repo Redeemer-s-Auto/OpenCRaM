@@ -61,6 +61,7 @@ from plane.db.models import (
     ProjectMember,
     UserRecentVisit,
 )
+from plane.utils.custom_fields import attach_to_rows as attach_custom_fields
 from plane.utils.filters import ComplexFilterBackend, IssueFilterSet
 from plane.utils.global_paginator import paginate
 from plane.utils.grouper import (
@@ -201,7 +202,7 @@ class IssueListEndpoint(BaseAPIView):
                 "deleted_at",
             )
             datetime_fields = ["created_at", "updated_at"]
-            issues = user_timezone_converter(issues, datetime_fields, request.user.user_timezone)
+            issues = attach_custom_fields(user_timezone_converter(issues, datetime_fields, request.user.user_timezone))
         return Response(issues, status=status.HTTP_200_OK)
 
 
@@ -469,6 +470,7 @@ class IssueViewSet(BaseViewSet):
             )
             datetime_fields = ["created_at", "updated_at"]
             issue = user_timezone_converter(issue, datetime_fields, request.user.user_timezone)
+            attach_custom_fields([issue])
             # Send the model activity
             model_activity.delay(
                 model_name="issue",
@@ -859,7 +861,7 @@ class IssuePaginatedViewSet(BaseViewSet):
         datetime_fields = ["created_at", "updated_at"]
         paginated_data = user_timezone_converter(paginated_data, datetime_fields, timezone)
 
-        return paginated_data
+        return attach_custom_fields(list(paginated_data))
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def list(self, request, slug, project_id):
@@ -1097,9 +1099,9 @@ class IssueDetailEndpoint(BaseAPIView):
             order_by=order_by_param,
             queryset=issue,
             total_count_queryset=total_issue_queryset,
-            on_results=lambda issue: IssueListDetailSerializer(
-                issue, many=True, fields=self.fields, expand=self.expand
-            ).data,
+            on_results=lambda issue: attach_custom_fields(
+                list(IssueListDetailSerializer(issue, many=True, fields=self.fields, expand=self.expand).data)
+            ),
         )
 
 

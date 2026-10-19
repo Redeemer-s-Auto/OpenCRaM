@@ -40,6 +40,7 @@ from plane.db.models import (
     IssueLabel,
     ModuleIssue,
 )
+from plane.utils.custom_fields import attach_to_rows as attach_custom_fields
 from plane.utils.issue_filters import issue_filters
 from plane.utils.order_queryset import VIEW_ORDER_BY_ALLOWLIST, order_issue_queryset, sanitize_order_by
 from plane.bgtasks.recent_visited_task import recent_visited_task
@@ -254,7 +255,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
             order_by=order_by_param,
             request=request,
             queryset=issue_queryset,
-            on_results=lambda issues: ViewIssueListSerializer(issues, many=True).data,
+            on_results=lambda issues: attach_custom_fields(list(ViewIssueListSerializer(issues, many=True).data)),
             total_count_queryset=total_issue_count_queryset,
         )
 

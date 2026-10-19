@@ -6,6 +6,7 @@
 
 import type { TIssuePriorities } from "../issues";
 import type { TStateGroups } from "../state";
+import type { TCustomFieldValues } from "../custom-field";
 import type { TIssuePublicComment } from "./activity/issue_comment";
 import type { TIssueAttachment } from "./issue_attachment";
 import type { TIssueLink } from "./issue_link";
@@ -77,6 +78,9 @@ export type TBaseIssue = {
   is_draft: boolean;
   is_epic?: boolean;
   is_intake?: boolean;
+
+  /** Custom field values, keyed by field id. Only the project's live fields. */
+  custom_fields?: TCustomFieldValues;
 };
 
 type IssueRelation = {

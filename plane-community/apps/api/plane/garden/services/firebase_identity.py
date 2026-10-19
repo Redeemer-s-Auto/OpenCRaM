@@ -239,6 +239,116 @@ def roles_mode_capabilities(record: dict[str, Any], decoded: dict[str, Any]) -> 
     return roles, tuple(capabilities)
 
 
+# ---- Roles mode through a hub access endpoint (no Google credential on this server) --------------
+#
+#   GARDEN_HUB_ACCESS_URL=https://.../notesAccess   HTTPS endpoint run by the sign-in hub
+#   GARDEN_HUB_ACCESS_SECRET=<32+ chars>             shared secret, sent as X-Notes-Access-Secret
+#
+# With both set (and GARDEN_ACCESS_MODE=roles), this server holds no service-account
+# key. The ID token is checked locally against Google's public certificates (project
+# id only), then the hub endpoint re-checks it with its own Admin SDK (revoked and
+# disabled accounts included), reads the person's record and answers
+# {uid, email, emailVerified, displayName, firstName, lastName, photoURL, active,
+#  access: "admin" | "member" | "none"}. Any failure refuses the sign-in.
+
+HUB_ACCESS_TIMEOUT_SECONDS = 8
+_HUB_CAPABILITIES = {"admin": ("work.read", "work.admin"), "member": ("work.read",), "none": ()}
+
+
+def hub_access_url() -> str:
+    value = os.environ.get("GARDEN_HUB_ACCESS_URL", "").strip()
+    return value if value.startswith("https://") else ""
+
+
+def hub_access_secret() -> str:
+    value = os.environ.get("GARDEN_HUB_ACCESS_SECRET", "").strip()
+    return value if len(value) >= 32 else ""
+
+
+def hub_access_configured() -> bool:
+    return access_mode() == ACCESS_MODE_ROLES and bool(hub_access_url()) and bool(hub_access_secret())
+
+
+def _verify_token_with_public_certs(raw_token: str, project_id: str) -> dict[str, Any]:
+    """Verify a Firebase ID token with Google's public certificates only (no credential)."""
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token
+
+    decoded = id_token.verify_firebase_token(
+        raw_token, google_requests.Request(), audience=project_id, clock_skew_in_seconds=10
+    )
+    if not isinstance(decoded, dict):
+        raise GardenIdentityError("Firebase token verification failed")
+    if decoded.get("iss") != f"https://securetoken.google.com/{project_id}":
+        raise GardenIdentityError("Firebase token issuer does not match")
+    return decoded
+
+
+def _ask_hub(raw_token: str) -> dict[str, Any]:
+    import requests
+
+    try:
+        response = requests.post(
+            hub_access_url(),
+            headers={"Authorization": f"Bearer {raw_token}", "X-Notes-Access-Secret": hub_access_secret()},
+            timeout=HUB_ACCESS_TIMEOUT_SECONDS,
+        )
+    except Exception as exc:
+        logger.warning("Hub access endpoint unreachable: %s", type(exc).__name__)
+        raise GardenIdentityError("Hub access check is unavailable") from exc
+    try:
+        body = response.json()
+    except ValueError:
+        body = {}
+    if response.status_code != 200 or not isinstance(body, dict) or body.get("ok") is not True:
+        code = body.get("error") if isinstance(body, dict) else None
+        logger.warning("Hub access endpoint refused: %s %s", response.status_code, code)
+        raise GardenIdentityError(f"Hub access check refused ({code or response.status_code})")
+    return body
+
+
+def _verify_via_hub(raw_token: str) -> "GardenFirebasePrincipal":
+    project_id = os.environ.get("GARDEN_FIREBASE_PROJECT_ID", "").strip()
+    if not project_id:
+        raise GardenIdentityError("GARDEN_FIREBASE_PROJECT_ID is not configured")
+    try:
+        decoded = _verify_token_with_public_certs(raw_token, project_id)
+    except GardenIdentityError:
+        raise
+    except Exception as exc:
+        logger.warning("Firebase token verification failed: %s", type(exc).__name__)
+        raise GardenIdentityError("Firebase token verification failed") from exc
+    uid = decoded.get("user_id") or decoded.get("sub")
+    if not isinstance(uid, str) or not uid:
+        raise GardenIdentityError("Firebase token has no UID")
+
+    body = _ask_hub(raw_token)
+    if body.get("uid") != uid:
+        raise GardenIdentityError("Hub access answer is for a different account")
+    access = body.get("access")
+    capabilities = _HUB_CAPABILITIES.get(access if isinstance(access, str) else "none", ())
+    if body.get("active") is not True:
+        capabilities = ()
+
+    email = _clean_string(body.get("email")).lower() or None
+    first_name = _clean_string(body.get("firstName"))
+    last_name = _clean_string(body.get("lastName"))
+    display_name = _clean_string(body.get("displayName")) or " ".join(p for p in (first_name, last_name) if p)
+    photo_url = _clean_string(body.get("photoURL"))
+    return GardenFirebasePrincipal(
+        uid=uid,
+        email=email,
+        email_verified=body.get("emailVerified") is True,
+        display_name=display_name,
+        first_name=first_name,
+        last_name=last_name,
+        photo_url=photo_url if photo_url.startswith("https://") else "",
+        roles=(),
+        capabilities=capabilities,
+        person_id=uid,
+    )
+
+
 def _roles_mode_record(uid: str, app) -> dict[str, Any]:
     collection = os.environ.get("GARDEN_ROLES_PROFILE_COLLECTION", "users").strip() or "users"
     return _firestore_document(collection, uid, app, fail_closed=True)
@@ -319,6 +429,9 @@ def load_firebase_profile(uid: str) -> GardenFirebasePrincipal:
 def verify_firebase_id_token(raw_token: str) -> GardenFirebasePrincipal:
     if not raw_token:
         raise GardenIdentityError("Firebase ID token is required")
+
+    if hub_access_configured():
+        return _verify_via_hub(raw_token)
 
     app = _firebase_app()
     project_id = os.environ.get("GARDEN_FIREBASE_PROJECT_ID", "").strip()

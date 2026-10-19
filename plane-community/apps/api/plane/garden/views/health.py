@@ -8,6 +8,8 @@ from django.db import connection
 from django.http import JsonResponse
 from django.views import View
 
+from plane.garden.services.firebase_identity import hub_access_configured
+
 
 class GardenWorkHealthView(View):
     """Minimal readiness endpoint for the self-hosted Garden Work stack."""
@@ -19,9 +21,13 @@ class GardenWorkHealthView(View):
         checks = {
             "gardenAuth": os.environ.get("GARDEN_AUTH_ENABLED", "0") == "1",
             "firebaseProject": bool(os.environ.get("GARDEN_FIREBASE_PROJECT_ID", "").strip()),
-            "firebaseCredentials": bool(credential_path) and Path(credential_path).is_file(),
             "workspaceSlug": bool(os.environ.get("GARDEN_WORKSPACE_SLUG", "").strip()),
         }
+        if hub_access_configured():
+            # Roles mode through the hub's access endpoint needs no credential file.
+            checks["hubAccess"] = True
+        else:
+            checks["firebaseCredentials"] = bool(credential_path) and Path(credential_path).is_file()
 
         try:
             connection.ensure_connection()

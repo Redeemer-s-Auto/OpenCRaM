@@ -311,3 +311,207 @@ def test_wrong_origin_is_never_redirected(monkeypatch):
 
     assert response.status_code == 403
     assert response.json()["error"] == "origin_not_allowed"
+
+
+# ---- roles mode through the hub access endpoint (no credential file) ----------------------------
+
+HUB_URL = "https://hub.example/notesAccess"
+HUB_SECRET = "x" * 40
+
+
+class _Resp:
+    def __init__(self, status, body):
+        self.status_code = status
+        self._body = body
+
+    def json(self):
+        if isinstance(self._body, Exception):
+            raise self._body
+        return self._body
+
+
+@pytest.fixture
+def hub_env(monkeypatch):
+    monkeypatch.setenv("GARDEN_ACCESS_MODE", "roles")
+    monkeypatch.setenv("GARDEN_FIREBASE_PROJECT_ID", "hub-project")
+    monkeypatch.setenv("GARDEN_HUB_ACCESS_URL", HUB_URL)
+    monkeypatch.setenv("GARDEN_HUB_ACCESS_SECRET", HUB_SECRET)
+
+    def no_admin_sdk(*a, **k):
+        raise AssertionError("the Admin SDK / a credential must not be used in hub mode")
+
+    monkeypatch.setattr(firebase_identity, "_firebase_app", no_admin_sdk)
+    monkeypatch.setattr(firebase_identity, "_firestore_document", no_admin_sdk)
+    monkeypatch.setattr(
+        firebase_identity,
+        "_verify_token_with_public_certs",
+        lambda token, project: {"user_id": "hub-uid", "sub": "hub-uid", "aud": project},
+    )
+
+
+def _hub_reply(monkeypatch, status=200, body=None, seen=None):
+    import requests
+
+    def post(url, headers=None, timeout=None):
+        if seen is not None:
+            seen.append((url, headers, timeout))
+        return _Resp(status, body)
+
+    monkeypatch.setattr(requests, "post", post)
+
+
+def _body(**overrides):
+    body = {
+        "ok": True,
+        "uid": "hub-uid",
+        "email": "Pat@Example.com",
+        "emailVerified": True,
+        "displayName": "Pat Doe",
+        "firstName": "Pat",
+        "lastName": "Doe",
+        "photoURL": "https://lh3.example/p",
+        "active": True,
+        "access": "member",
+    }
+    body.update(overrides)
+    return body
+
+
+@pytest.mark.unit
+def test_hub_mode_sends_token_and_secret_and_maps_member(hub_env, monkeypatch):
+    seen = []
+    _hub_reply(monkeypatch, body=_body(), seen=seen)
+    principal = verify_firebase_id_token("raw-token")
+    url, headers, timeout = seen[0]
+    assert url == HUB_URL
+    assert headers == {"Authorization": "Bearer raw-token", "X-Notes-Access-Secret": HUB_SECRET}
+    assert timeout and timeout <= 10
+    assert principal.uid == "hub-uid"
+    assert principal.email == "pat@example.com"
+    assert principal.display_name == "Pat Doe"
+    assert principal.can_read_work is True
+    assert principal.can_admin_work is False
+
+
+@pytest.mark.unit
+def test_hub_mode_admin_and_none(hub_env, monkeypatch):
+    _hub_reply(monkeypatch, body=_body(access="admin"))
+    assert verify_firebase_id_token("t").can_admin_work is True
+    _hub_reply(monkeypatch, body=_body(access="none"))
+    assert verify_firebase_id_token("t").can_read_work is False
+    _hub_reply(monkeypatch, body=_body(access="admin", active=False))
+    assert verify_firebase_id_token("t").can_read_work is False
+    _hub_reply(monkeypatch, body=_body(access="superuser"))
+    assert verify_firebase_id_token("t").can_read_work is False
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "status,body",
+    [
+        (401, {"ok": False, "error": "token_invalid"}),
+        (401, {"ok": False, "error": "bad_secret"}),
+        (500, ValueError("html")),
+        (200, {"ok": False}),
+    ],
+)
+def test_hub_mode_refusal_or_outage_fails_closed(hub_env, monkeypatch, status, body):
+    _hub_reply(monkeypatch, status=status, body=body)
+    with pytest.raises(GardenIdentityError):
+        verify_firebase_id_token("t")
+
+
+@pytest.mark.unit
+def test_hub_mode_network_error_fails_closed(hub_env, monkeypatch):
+    import requests
+
+    def boom(*a, **k):
+        raise requests.ConnectionError("down")
+
+    monkeypatch.setattr(requests, "post", boom)
+    with pytest.raises(GardenIdentityError, match="unavailable"):
+        verify_firebase_id_token("t")
+
+
+@pytest.mark.unit
+def test_hub_mode_answer_for_another_uid_is_refused(hub_env, monkeypatch):
+    _hub_reply(monkeypatch, body=_body(uid="someone-else"))
+    with pytest.raises(GardenIdentityError, match="different account"):
+        verify_firebase_id_token("t")
+
+
+@pytest.mark.unit
+def test_hub_mode_bad_local_token_never_calls_hub(hub_env, monkeypatch):
+    def bad(token, project):
+        raise ValueError("Token expired")
+
+    monkeypatch.setattr(firebase_identity, "_verify_token_with_public_certs", bad)
+    called = []
+    _hub_reply(monkeypatch, body=_body(), seen=called)
+    with pytest.raises(GardenIdentityError, match="verification failed"):
+        verify_firebase_id_token("t")
+    assert called == []
+
+
+@pytest.mark.unit
+def test_hub_mode_needs_https_url_and_long_secret(monkeypatch):
+    monkeypatch.setenv("GARDEN_ACCESS_MODE", "roles")
+    monkeypatch.setenv("GARDEN_HUB_ACCESS_URL", "http://hub.example/x")
+    monkeypatch.setenv("GARDEN_HUB_ACCESS_SECRET", HUB_SECRET)
+    assert firebase_identity.hub_access_configured() is False
+    monkeypatch.setenv("GARDEN_HUB_ACCESS_URL", HUB_URL)
+    monkeypatch.setenv("GARDEN_HUB_ACCESS_SECRET", "short")
+    assert firebase_identity.hub_access_configured() is False
+    monkeypatch.setenv("GARDEN_HUB_ACCESS_SECRET", HUB_SECRET)
+    assert firebase_identity.hub_access_configured() is True
+    monkeypatch.setenv("GARDEN_ACCESS_MODE", "projection")
+    assert firebase_identity.hub_access_configured() is False
+
+
+@pytest.mark.django_db
+@pytest.mark.contract
+def test_health_needs_no_credential_file_in_hub_mode(hub_env, monkeypatch):
+    monkeypatch.setenv("GARDEN_AUTH_ENABLED", "1")
+    monkeypatch.setenv("GARDEN_WORKSPACE_SLUG", "the-garden")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "/nonexistent.json")
+    response = Client().get("/auth/firebase/health/")
+    assert response.status_code == 200
+    assert response.json()["checks"]["hubAccess"] is True
+    assert "firebaseCredentials" not in response.json()["checks"]
+
+
+@pytest.mark.django_db
+@pytest.mark.contract
+def test_health_still_needs_credentials_by_default(monkeypatch):
+    monkeypatch.delenv("GARDEN_ACCESS_MODE", raising=False)
+    monkeypatch.setenv("GARDEN_AUTH_ENABLED", "1")
+    monkeypatch.setenv("GARDEN_FIREBASE_PROJECT_ID", "p")
+    monkeypatch.setenv("GARDEN_WORKSPACE_SLUG", "the-garden")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "/nonexistent.json")
+    response = Client().get("/auth/firebase/health/")
+    assert response.status_code == 503
+    assert response.json()["checks"]["firebaseCredentials"] is False
+
+
+@pytest.mark.django_db
+@pytest.mark.contract
+def test_session_exchange_through_hub_links_existing_user_by_email(hub_env, monkeypatch):
+    from plane.db.models import User, WorkspaceMember
+    from plane.garden.models import GardenExternalIdentity
+
+    monkeypatch.setenv("GARDEN_AUTH_ENABLED", "1")
+    monkeypatch.setenv("GARDEN_AUTH_ALLOWED_ORIGINS", "https://hub.example")
+    monkeypatch.setenv("GARDEN_WORKSPACE_SLUG", "the-garden")
+    monkeypatch.setenv("GARDEN_WORKSPACE_BOOTSTRAP", "1")
+    existing = User.objects.create(email="pat@example.com", username="pat-native", is_active=True)
+    existing.set_password("native-password")
+    existing.save()
+
+    _hub_reply(monkeypatch, body=_body(access="admin"))
+    response = Client().post("/auth/firebase/mobile/", {"firebase_token": "t"}, HTTP_ORIGIN="https://hub.example")
+
+    assert response.status_code == 302
+    assert User.objects.filter(email="pat@example.com").count() == 1
+    link = GardenExternalIdentity.objects.get(external_id="hub-uid")
+    assert link.user_id == existing.id
+    assert WorkspaceMember.objects.get(member=existing, workspace__slug="the-garden").role == 20

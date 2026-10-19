@@ -550,6 +550,11 @@ class DeployBoardViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, slug, project_id):
+        if Project.objects.filter(pk=project_id, is_private=True).exists():
+            return Response(
+                {"error": "A private project cannot be published. Turn off Private project first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         comments = request.data.get("is_comments_enabled", False)
         reactions = request.data.get("is_reactions_enabled", False)
         intake = request.data.get("intake", None)

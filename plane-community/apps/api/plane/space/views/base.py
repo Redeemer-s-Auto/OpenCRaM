@@ -25,6 +25,7 @@ from rest_framework.viewsets import ModelViewSet
 # Module imports
 from plane.utils.exception_logger import log_exception
 from plane.utils.paginator import BasePaginator
+from plane.utils.private_projects import check_published_anchor
 from plane.authentication.session import BaseSessionAuthentication
 
 
@@ -35,6 +36,8 @@ class TimezoneMixin:
     """
 
     def initial(self, request, *args, **kwargs):
+        # A private project is never public, even if it was published before.
+        check_published_anchor(self)
         super().initial(request, *args, **kwargs)
         if request.user.is_authenticated:
             timezone.activate(zoneinfo.ZoneInfo(request.user.user_timezone))

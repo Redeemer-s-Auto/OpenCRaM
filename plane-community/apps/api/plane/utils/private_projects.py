@@ -74,3 +74,22 @@ def check_private_project_access(view, request):
         )
         if hidden:
             raise NotFound("The requested resource does not exist.")
+
+
+def check_published_anchor(view):
+    """Public boards (space app): a private project is never public.
+
+    Raise 404 for any ``anchor`` URL whose board belongs to a private project, so a
+    board published before the project was made private stops answering.
+    """
+    anchor = (getattr(view, "kwargs", {}) or {}).get("anchor")
+    if not anchor:
+        return
+    from plane.db.models import DeployBoard
+
+    board = DeployBoard.objects.filter(anchor=anchor).values("project_id", "entity_name", "entity_identifier").first()
+    if not board:
+        return
+    project_id = board["project_id"] or (board["entity_identifier"] if board["entity_name"] == "project" else None)
+    if project_id and Project.objects.filter(pk=project_id, is_private=True).exists():
+        raise NotFound("The requested resource does not exist.")

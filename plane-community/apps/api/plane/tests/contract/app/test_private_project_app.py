@@ -150,3 +150,27 @@ class TestPrivateProject:
             results = response.data.get("results", [])
             rows = results if isinstance(results, list) else []
             assert all(str(r["id"]) != str(card.id) for r in rows)
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+class TestPrivateProjectPublicBoards:
+    def test_cannot_publish_private_project(self, session_client, workspace, private_project):
+        url = f"/api/workspaces/{workspace.slug}/projects/{private_project.id}/project-deploy-boards/"
+        assert session_client.post(url, {}, format="json").status_code == 400
+
+    def test_published_board_goes_dark_when_project_turns_private(self, session_client, workspace, create_user):
+        from plane.db.models import DeployBoard
+
+        project = Project.objects.create(name="Open", identifier="OPN", workspace=workspace, created_by=create_user)
+        ProjectMember.objects.create(project=project, member=create_user, workspace=workspace, role=20)
+        url = f"/api/workspaces/{workspace.slug}/projects/{project.id}/project-deploy-boards/"
+        assert session_client.post(url, {}, format="json").status_code == 200
+        anchor = DeployBoard.objects.get(entity_identifier=project.id).anchor
+
+        public = APIClient()
+        assert public.get(f"/api/public/anchor/{anchor}/settings/").status_code == 200
+        project.is_private = True
+        project.save(update_fields=["is_private"])
+        for path in ["settings", "meta", "issues"]:
+            assert public.get(f"/api/public/anchor/{anchor}/{path}/").status_code == 404, path

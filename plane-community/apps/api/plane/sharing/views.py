@@ -1,0 +1,194 @@
+# Copyright (c) 2026 OpenCRaM contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+from django.db import transaction
+from django.db.models import Count, Q
+from rest_framework import status
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
+
+from plane.app.permissions import ROLE, allow_permission
+from plane.app.views.base import BaseAPIView
+from plane.db.models import Issue, Page, Project, User, Workspace
+from plane.sharing.models import AccessGroup, AccessGroupMember
+from plane.sharing.services import can_manage_sharing, is_workspace_admin, read_sharing, write_sharing
+
+FORBIDDEN = Response({"error": "You don't have the required permissions."}, status=status.HTTP_403_FORBIDDEN)
+
+
+class IssueSharingEndpoint(BaseAPIView):
+    """GET/PUT the "who can see this" settings of one work item."""
+
+    def _issue(self, slug, project_id, issue_id):
+        return Issue.objects.get(workspace__slug=slug, project_id=project_id, pk=issue_id)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def get(self, request, slug, project_id, issue_id):
+        issue = self._issue(slug, project_id, issue_id)
+        data = read_sharing(issue=issue)
+        data["can_manage"] = can_manage_sharing(request.user, issue.workspace, issue.created_by_id)
+        return Response(data)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def put(self, request, slug, project_id, issue_id):
+        issue = self._issue(slug, project_id, issue_id)
+        if not can_manage_sharing(request.user, issue.workspace, issue.created_by_id):
+            return FORBIDDEN
+        data = write_sharing(issue.workspace, request.data, issue=issue)
+        data["can_manage"] = True
+        return Response(data)
+
+
+class PageSharingEndpoint(BaseAPIView):
+    """GET/PUT the "who can see this" settings of one page."""
+
+    def _page(self, slug, project_id, page_id):
+        return Page.objects.get(
+            workspace__slug=slug,
+            pk=page_id,
+            project_pages__project_id=project_id,
+            project_pages__deleted_at__isnull=True,
+        )
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def get(self, request, slug, project_id, page_id):
+        page = self._page(slug, project_id, page_id)
+        data = read_sharing(page=page)
+        data["can_manage"] = can_manage_sharing(request.user, page.workspace, page.owned_by_id)
+        return Response(data)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def put(self, request, slug, project_id, page_id):
+        page = self._page(slug, project_id, page_id)
+        if not can_manage_sharing(request.user, page.workspace, page.owned_by_id):
+            return FORBIDDEN
+        data = write_sharing(page.workspace, request.data, page=page)
+        data["can_manage"] = True
+        return Response(data)
+
+
+def _group_payload(group):
+    members = list(group.members.select_related("member").order_by("member__display_name"))
+    return {
+        "id": str(group.id),
+        "name": group.name,
+        "description": group.description,
+        "member_ids": [str(row.member_id) for row in members],
+        "member_count": len(members),
+        "shared_item_count": getattr(group, "shared_item_count", None),
+    }
+
+
+def _set_group_members(group, workspace, member_ids):
+    if not isinstance(member_ids, list):
+        raise ValidationError({"member_ids": "Must be a list."})
+    valid = set(
+        User.objects.filter(
+            id__in=member_ids,
+            member_workspace__workspace=workspace,
+            member_workspace__is_active=True,
+            member_workspace__deleted_at__isnull=True,
+        ).values_list("id", flat=True)
+    )
+    if len(valid) != len(set(map(str, member_ids))):
+        raise ValidationError({"member_ids": "Every person must be in this workspace."})
+    group.members.exclude(member_id__in=valid).delete()
+    existing = set(group.members.values_list("member_id", flat=True))
+    AccessGroupMember.objects.bulk_create(
+        AccessGroupMember(group=group, member_id=member_id) for member_id in valid - existing
+    )
+
+
+class AccessGroupEndpoint(BaseAPIView):
+    """Groups: every workspace member may list them; only admins change them."""
+
+    def _groups(self, slug):
+        return AccessGroup.objects.filter(workspace__slug=slug).annotate(
+            shared_item_count=Count("item_shares", distinct=True)
+        )
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    def get(self, request, slug, group_id=None):
+        if group_id:
+            return Response(_group_payload(self._groups(slug).get(pk=group_id)))
+        return Response([_group_payload(group) for group in self._groups(slug)])
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def post(self, request, slug):
+        workspace = Workspace.objects.get(slug=slug)
+        name = (request.data.get("name") or "").strip()
+        if not name:
+            return Response({"error": "Name is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if AccessGroup.objects.filter(workspace=workspace, name__iexact=name).exists():
+            return Response({"error": "A group with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            group = AccessGroup.objects.create(
+                workspace=workspace, name=name, description=request.data.get("description", ""), created_by=request.user
+            )
+            _set_group_members(group, workspace, request.data.get("member_ids", []))
+        return Response(_group_payload(self._groups(slug).get(pk=group.id)), status=status.HTTP_201_CREATED)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def patch(self, request, slug, group_id):
+        workspace = Workspace.objects.get(slug=slug)
+        group = AccessGroup.objects.get(workspace=workspace, pk=group_id)
+        with transaction.atomic():
+            if "name" in request.data:
+                name = (request.data.get("name") or "").strip()
+                if not name:
+                    return Response({"error": "Name is required."}, status=status.HTTP_400_BAD_REQUEST)
+                if AccessGroup.objects.filter(workspace=workspace, name__iexact=name).exclude(pk=group.pk).exists():
+                    return Response(
+                        {"error": "A group with this name already exists."}, status=status.HTTP_400_BAD_REQUEST
+                    )
+                group.name = name
+            if "description" in request.data:
+                group.description = request.data.get("description") or ""
+            group.save()
+            if "member_ids" in request.data:
+                _set_group_members(group, workspace, request.data.get("member_ids"))
+        return Response(_group_payload(self._groups(slug).get(pk=group.id)))
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def delete(self, request, slug, group_id):
+        AccessGroup.objects.filter(workspace__slug=slug, pk=group_id).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ShareTargetSearchEndpoint(BaseAPIView):
+    """Picker search: people, departments and groups that an item can be shared with."""
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def get(self, request, slug):
+        search = (request.query_params.get("search") or "").strip()
+        people = User.objects.filter(
+            member_workspace__workspace__slug=slug,
+            member_workspace__is_active=True,
+            member_workspace__deleted_at__isnull=True,
+            is_bot=False,
+        )
+        projects = Project.objects.filter(workspace__slug=slug, deleted_at__isnull=True, archived_at__isnull=True)
+        groups = AccessGroup.objects.filter(workspace__slug=slug)
+        if search:
+            people = people.filter(
+                Q(display_name__icontains=search)
+                | Q(first_name__icontains=search)
+                | Q(last_name__icontains=search)
+                | Q(email__icontains=search)
+            )
+            projects = projects.filter(name__icontains=search)
+            groups = groups.filter(name__icontains=search)
+        return Response(
+            {
+                "people": [
+                    {"id": str(user.id), "name": user.display_name or user.first_name or user.email, "avatar": user.avatar_url}
+                    for user in people.order_by("display_name")[:20]
+                ],
+                "projects": [{"id": str(p.id), "name": p.name} for p in projects.order_by("name")[:20]],
+                "groups": [
+                    {"id": str(g.id), "name": g.name, "member_count": g.member_count}
+                    for g in groups.annotate(member_count=Count("members")).order_by("name")[:20]
+                ],
+                "is_admin": is_workspace_admin(request.user, Workspace.objects.get(slug=slug)),
+            }
+        )

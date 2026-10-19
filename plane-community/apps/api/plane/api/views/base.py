@@ -22,6 +22,7 @@ from rest_framework.exceptions import APIException
 from rest_framework.generics import GenericAPIView
 
 # Module imports
+from plane.sharing.guard import enforce_item_access
 from plane.api.middleware.api_authentication import APIKeyAuthentication
 from plane.api.rate_limit import ApiKeyRateThrottle
 from plane.utils.exception_logger import log_exception
@@ -40,6 +41,7 @@ class TimezoneMixin:
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
+        enforce_item_access(request, kwargs)
         if request.user.is_authenticated:
             timezone.activate(zoneinfo.ZoneInfo(request.user.user_timezone))
         else:

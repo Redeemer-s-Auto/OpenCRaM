@@ -23,6 +23,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
 # Module imports
+from plane.sharing.guard import enforce_item_access
 from plane.utils.exception_logger import log_exception
 from plane.utils.paginator import BasePaginator
 from plane.authentication.session import BaseSessionAuthentication
@@ -36,6 +37,7 @@ class TimezoneMixin:
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
+        enforce_item_access(request, kwargs)
         if request.user.is_authenticated:
             timezone.activate(zoneinfo.ZoneInfo(request.user.user_timezone))
         else:

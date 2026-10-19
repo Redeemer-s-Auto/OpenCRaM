@@ -22,8 +22,7 @@ import { useProject } from "@/hooks/store/use-project";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
 
-const gardenMode = process.env.VITE_GARDEN_AUTH_ENABLED === "1";
-const gardenAdminUrl = (process.env.VITE_GARDEN_ADMIN_URL || "").replace(/\/$/, "");
+import { gardenAccessUrl, gardenAdminConfigured, gardenMode } from "@/lib/garden-config";
 
 export const NoProjectsEmptyState = observer(function NoProjectsEmptyState() {
   // navigation
@@ -75,7 +74,7 @@ export const NoProjectsEmptyState = observer(function NoProjectsEmptyState() {
       flag: "visited_members",
       cta: {
         text: "home.empty.invite_team.cta",
-        link: gardenMode && gardenAdminUrl ? `${gardenAdminUrl}/access` : `/${workspaceSlug}/settings/members`,
+        link: gardenMode && gardenAdminConfigured ? gardenAccessUrl : `/${workspaceSlug}/settings/members`,
         targetTop: gardenMode,
         disabled: !isWorkspaceAdmin,
       },

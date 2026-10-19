@@ -159,6 +159,91 @@ def _access_version(value: Any) -> int:
     return value if type(value) is int and value >= 0 else 0
 
 
+# ---- Access modes -------------------------------------------------------------------------------
+#
+# "projection" (default): Garden's own model. accessProfiles/{uid} and
+# workAccessProjections/{uid} in Firestore decide Work access, with the token's
+# `capabilities` claim as the fallback. Unchanged behaviour.
+#
+# "roles": for a Firebase project whose sign-in hub keeps a simple role list and
+# app list per person (for example `users/{uid}` = {roles: [...], apps: [...],
+# active: bool}, mirrored into the token as the `roles` / `apps` claims). Work
+# access is derived from that record, read live from Firestore on every sign-in
+# so a change in the hub applies at the next launch without waiting for the
+# token to refresh. No accessProfiles or workAccessProjections are needed.
+#
+#   GARDEN_ACCESS_MODE=roles
+#   GARDEN_ROLES_PROFILE_COLLECTION=users        Firestore collection keyed by Firebase UID
+#   GARDEN_ROLES_APP_ID=notes                    an `apps` entry that opens Work (member)
+#   GARDEN_ROLES_ADMIN_ROLES=owner,manager       roles that open Work as admin
+#   GARDEN_ROLES_MEMBER_ROLES=                   optional roles that open Work as member without the app
+#
+# A record with `active: false` is always refused. A missing record falls back
+# to the token claims (the hub may not have written the record yet).
+
+ACCESS_MODE_PROJECTION = "projection"
+ACCESS_MODE_ROLES = "roles"
+
+
+def access_mode() -> str:
+    mode = os.environ.get("GARDEN_ACCESS_MODE", ACCESS_MODE_PROJECTION).strip().lower()
+    return ACCESS_MODE_ROLES if mode == ACCESS_MODE_ROLES else ACCESS_MODE_PROJECTION
+
+
+def _env_list(name: str) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(item.strip() for item in os.environ.get(name, "").split(",") if item.strip()))
+
+
+def _role_list(record: dict[str, Any], decoded: dict[str, Any]) -> tuple[str, ...]:
+    """Roles from the live record, then the token. A single legacy `role` string counts as a one-item list."""
+    for source in (record, decoded):
+        roles = _string_tuple(source.get("roles"))
+        if roles:
+            return roles
+    for source in (record, decoded):
+        single = _clean_string(source.get("role"))
+        if single:
+            return (single,)
+    return ()
+
+
+def _app_list(record: dict[str, Any], decoded: dict[str, Any]) -> tuple[str, ...]:
+    if isinstance(record.get("apps"), list):
+        return _string_tuple(record.get("apps"))
+    return _string_tuple(decoded.get("apps"))
+
+
+def roles_mode_capabilities(record: dict[str, Any], decoded: dict[str, Any]) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Return (roles, capabilities) for roles mode. PURE: no Firebase calls.
+
+    capabilities holds `work.read` when the person may open Work, plus
+    `work.admin` when they hold an admin role. Nothing is granted when the
+    record says `active: false`, or when no role/app setting is configured.
+    """
+    roles = _role_list(record, decoded)
+    if record.get("active") is False:
+        return roles, ()
+
+    admin_roles = set(_env_list("GARDEN_ROLES_ADMIN_ROLES"))
+    member_roles = set(_env_list("GARDEN_ROLES_MEMBER_ROLES"))
+    app_id = os.environ.get("GARDEN_ROLES_APP_ID", "").strip()
+
+    is_admin = bool(admin_roles.intersection(roles))
+    can_read = is_admin or bool(member_roles.intersection(roles)) or bool(app_id and app_id in _app_list(record, decoded))
+
+    capabilities: list[str] = []
+    if can_read:
+        capabilities.append("work.read")
+    if is_admin:
+        capabilities.append("work.admin")
+    return roles, tuple(capabilities)
+
+
+def _roles_mode_record(uid: str, app) -> dict[str, Any]:
+    collection = os.environ.get("GARDEN_ROLES_PROFILE_COLLECTION", "users").strip() or "users"
+    return _firestore_document(collection, uid, app, fail_closed=True)
+
+
 def _identity_fields(uid: str, user_record, profile: dict[str, Any], decoded: dict[str, Any] | None = None) -> dict[str, Any]:
     decoded = decoded or {}
     email = getattr(user_record, "email", None) or decoded.get("email")
@@ -252,6 +337,25 @@ def verify_firebase_id_token(raw_token: str) -> GardenFirebasePrincipal:
     except Exception as exc:
         logger.warning("Firebase token verification failed: %s", type(exc).__name__)
         raise GardenIdentityError("Firebase token verification failed") from exc
+
+    if access_mode() == ACCESS_MODE_ROLES:
+        # The token's own `capabilities` claim is ignored here: Work access comes
+        # only from the configured roles/apps, read live from the record.
+        roles, capabilities = roles_mode_capabilities(_roles_mode_record(uid, app), decoded)
+        fields = _identity_fields(uid, user_record, _firestore_profile(uid, app), decoded)
+        return GardenFirebasePrincipal(
+            uid=uid,
+            email=fields["email"],
+            email_verified=fields["email_verified"],
+            display_name=fields["display_name"],
+            first_name=fields["first_name"],
+            last_name=fields["last_name"],
+            photo_url=fields["photo_url"],
+            roles=roles,
+            capabilities=capabilities,
+            person_id=fields["person_id"],
+            preferred_name=fields["preferred_name"],
+        )
 
     roles = _string_tuple(decoded.get("roles"))
     capabilities = _string_tuple(decoded.get("capabilities"))

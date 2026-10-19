@@ -22,8 +22,7 @@ import { useUserPermissions } from "@/hooks/store/user";
 import type { Route } from "./+types/page";
 import { MembersProjectSettingsHeader } from "./header";
 
-const gardenMode = process.env.VITE_GARDEN_AUTH_ENABLED === "1";
-const gardenAdminUrl = (process.env.VITE_GARDEN_ADMIN_URL || "").replace(/\/$/, "");
+import { gardenAccessUrl, gardenAdminConfigured, gardenAdminName, gardenLocalProjectMembers, gardenMode, gardenOrgName } from "@/lib/garden-config";
 
 function MembersSettingsPage({ params }: Route.ComponentProps) {
   // router
@@ -42,19 +41,19 @@ function MembersSettingsPage({ params }: Route.ComponentProps) {
   const isWorkspaceAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
   const canPerformProjectMemberActions = isProjectMemberOrAdmin || isWorkspaceAdmin;
 
-  if (gardenMode) {
+  if (gardenMode && !gardenLocalProjectMembers) {
     return (
       <SettingsContentWrapper header={<MembersProjectSettingsHeader />} hugging>
         <PageHead title={pageTitle} />
         <section className="flex size-full items-start justify-center p-8">
           <div className="w-full max-w-2xl rounded-xl border border-subtle bg-layer-2 p-6">
-            <h4 className="text-h3-medium text-primary">Project access is managed by The Garden</h4>
+            <h4 className="text-h3-medium text-primary">Project access is managed by {gardenOrgName}</h4>
             <p className="mt-2 text-body-sm-regular text-tertiary">
-              Project membership and roles are projected from Garden roles, departments, and access policy. Change access in Garden Admin instead of maintaining a second member list here.
+              Project membership and roles are projected from {gardenOrgName} roles, departments, and access policy. Change access in {gardenAdminName} instead of maintaining a second member list here.
             </p>
-            {gardenAdminUrl && (
+            {gardenAdminConfigured && (
               <a
-                href={`${gardenAdminUrl}/access`}
+                href={gardenAccessUrl}
                 target="_top"
                 className="mt-4 inline-flex rounded-md bg-accent-primary px-4 py-2 text-body-sm-medium text-on-color hover:opacity-90"
               >

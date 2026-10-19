@@ -10,15 +10,15 @@ import gardenMark from "@/app/assets/garden-mark.svg?url";
 import LogoSpinnerDark from "@/app/assets/images/logo-spinner-dark.gif?url";
 import LogoSpinnerLight from "@/app/assets/images/logo-spinner-light.gif?url";
 
-const gardenMode = process.env.VITE_GARDEN_AUTH_ENABLED === "1";
+import { gardenAppName, gardenMode } from "@/lib/garden-config";
 
 export function LogoSpinner() {
   const { resolvedTheme } = useTheme();
 
   if (gardenMode) {
     return (
-      <div className="flex items-center justify-center" aria-label="The Garden Work is loading">
-        <img src={gardenMark} alt="The Garden Work" className="h-8 w-8 animate-pulse object-contain sm:h-11 sm:w-11" />
+      <div className="flex items-center justify-center" aria-label={`${gardenAppName} is loading`}>
+        <img src={gardenMark} alt={gardenAppName} className="h-8 w-8 animate-pulse object-contain sm:h-11 sm:w-11" />
       </div>
     );
   }

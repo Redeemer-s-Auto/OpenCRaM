@@ -12,6 +12,7 @@ from plane.garden.services.project_policy import (
     garden_mode_enabled,
     garden_workspace_slug,
     harden_garden_workspace_projects,
+    local_project_membership,
 )
 
 
@@ -159,7 +160,11 @@ class GardenAuthorizationMiddleware:
             path,
         )
         if project_governance and method in _MUTATING_METHODS:
-            return self._deny("Garden manages project membership from Firebase access policy")
+            # In roles mode Firebase has no per-project mapping, so Work admins
+            # add people to boards inside Work. Workspace membership (who may
+            # sign in at all) still comes only from Firebase.
+            if not (local_project_membership() and self._workspace_admin(request, slug)):
+                return self._deny("Garden manages project membership from Firebase access policy")
 
         if path == user_project_invites and method == "POST":
             return self._deny("Garden manages project membership from Firebase access policy")

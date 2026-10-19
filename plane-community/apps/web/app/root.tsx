@@ -25,6 +25,7 @@ import type { Route } from "./+types/root";
 // components
 import { LogoSpinner } from "@/components/common/logo-spinner";
 // lib
+import { gardenAdminOrigin, gardenAppName, gardenMode, gardenOrgName } from "@/lib/garden-config";
 import { isStaleAssetError, recoverFromStaleAsset } from "@/lib/stale-asset-error";
 // local
 import { CustomErrorComponent } from "./error";
@@ -32,24 +33,17 @@ import { AppProvider } from "./provider";
 // fonts
 import "@fontsource/material-symbols-rounded";
 
-const gardenMode = process.env.VITE_GARDEN_AUTH_ENABLED === "1";
 const gardenWorkUrl = process.env.VITE_GARDEN_WORK_URL || "";
-const gardenAdminUrl = process.env.VITE_GARDEN_ADMIN_URL || "https://gardenchurch.web.app/admin";
-const APP_TITLE = gardenMode ? "The Garden Work" : "Plane | Simple, extensible, open-source project management tool.";
+const APP_TITLE = gardenMode ? gardenAppName : "Plane | Simple, extensible, open-source project management tool.";
 const APP_DESCRIPTION = gardenMode
-  ? "Projects, tasks, planning, and operational work for The Garden staff."
+  ? `Projects, tasks, planning, and operational work for ${gardenOrgName}.`
   : SITE_DESCRIPTION;
 
 function GardenEmbeddedNavigationBridge() {
   useEffect(() => {
     if (!gardenMode || window.parent === window) return undefined;
 
-    let parentOrigin: string;
-    try {
-      parentOrigin = new URL(gardenAdminUrl).origin;
-    } catch {
-      parentOrigin = "https://gardenchurch.web.app";
-    }
+    const parentOrigin = gardenAdminOrigin;
 
     const onDocumentClick = (event: MouseEvent) => {
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -124,10 +118,10 @@ export function Layout({ children }: { children: ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content={gardenMode ? "#40562E" : "#fff"} />
-        <meta name="application-name" content={gardenMode ? "The Garden Work" : "Plane"} />
+        <meta name="application-name" content={gardenMode ? gardenAppName : "Plane"} />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content={gardenMode ? "The Garden Work" : SITE_NAME} />
+        <meta name="apple-mobile-web-app-title" content={gardenMode ? gardenAppName : SITE_NAME} />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
         <Meta />
@@ -170,8 +164,8 @@ export const meta: Route.MetaFunction = () => {
     if (gardenWorkUrl) metadata.push({ property: "og:url", content: gardenWorkUrl });
     metadata.push(
       { property: "og:image", content: gardenMark },
-      { property: "og:image:alt", content: "The Garden Work" },
-      { name: "keywords", content: "The Garden, staff operations, projects, tasks, planning, work management" },
+      { property: "og:image:alt", content: gardenAppName },
+      { name: "keywords", content: `${gardenOrgName}, staff operations, projects, tasks, planning, work management` },
     );
     return metadata;
   }

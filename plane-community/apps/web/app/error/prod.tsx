@@ -11,7 +11,7 @@ import maintenanceModeLightModeImage from "@/app/assets/instance/maintenance-mod
 import gardenMark from "@/app/assets/garden-mark.svg?url";
 import DefaultLayout from "@/layouts/default-layout";
 
-const gardenMode = process.env.VITE_GARDEN_AUTH_ENABLED === "1";
+import { gardenAdminName, gardenAppName, gardenMode } from "@/lib/garden-config";
 
 const linkMap = [
   {
@@ -43,11 +43,11 @@ export function ProdErrorComponent({ onGoHome }: ProdErrorComponentProps) {
     return (
       <DefaultLayout>
         <div className="relative container mx-auto flex h-full w-full max-w-xl flex-col items-center justify-center gap-6 bg-surface-1 px-6 text-center">
-          <img src={gardenMark} className="h-20 w-20 object-contain" alt="The Garden Work" />
+          <img src={gardenMark} className="h-20 w-20 object-contain" alt={gardenAppName} />
           <div className="flex flex-col gap-2">
-            <h1 className="text-18 font-semibold text-primary">Garden Work hit a snag</h1>
+            <h1 className="text-18 font-semibold text-primary">{gardenAppName} hit a snag</h1>
             <p className="text-14 font-medium text-secondary">
-              Try refreshing the page. If the problem continues, return to Garden Admin and try again.
+              Try refreshing the page. If the problem continues, return to {gardenAdminName} and try again.
             </p>
           </div>
           <Button variant="primary" size="lg" onClick={onGoHome}>

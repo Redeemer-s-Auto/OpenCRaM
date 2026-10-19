@@ -1,8 +1,9 @@
 # Copyright (c) 2026 The Garden contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 
+import json
 import os
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from django.http import HttpResponseRedirect, JsonResponse
 from django.utils import timezone
@@ -62,6 +63,38 @@ def _request_guard(request):
         return JsonResponse({"ok": False, "error": "origin_not_allowed"}, status=403)
 
     return None
+
+
+def _launch_url() -> str:
+    """Optional HTTPS page that launches Work (GARDEN_LAUNCH_URL), e.g. a hub's /notes page."""
+    value = os.environ.get("GARDEN_LAUNCH_URL", "").strip()
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return ""
+    if parsed.scheme != "https" or not parsed.netloc or parsed.query or parsed.fragment:
+        return ""
+    return value
+
+
+def _launch_error_redirect(auth_error: JsonResponse):
+    """Send a top-level launch failure back to the launch page instead of a bare JSON page.
+
+    Only the short error code travels (as ?error=...), never the detail. With no
+    GARDEN_LAUNCH_URL configured the JSON error is returned unchanged.
+    """
+    launch_url = _launch_url()
+    if not launch_url:
+        return None
+    try:
+        code = json.loads(auth_error.content.decode("utf-8")).get("error", "")
+    except (UnicodeDecodeError, ValueError, AttributeError):
+        code = ""
+    code = code if isinstance(code, str) and code.replace("_", "").isalnum() else "launch_failed"
+    response = HttpResponseRedirect(f"{launch_url}?{urlencode({'error': code or 'launch_failed'})}")
+    response.status_code = 303
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 def _establish_session(request, token: str, *, missing_token_error: str):
@@ -202,7 +235,7 @@ class FirebaseMobileLaunchView(View):
             missing_token_error="missing_firebase_token",
         )
         if auth_error is not None:
-            return auth_error
+            return _launch_error_redirect(auth_error) or auth_error
 
         _, _, workspace, _ = result
         response = HttpResponseRedirect(f"/{workspace.slug}/")

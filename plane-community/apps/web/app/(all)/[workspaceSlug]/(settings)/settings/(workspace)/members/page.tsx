@@ -30,8 +30,8 @@ import { useUserPermissions } from "@/hooks/store/user";
 import type { Route } from "./+types/page";
 import { MembersWorkspaceSettingsHeader } from "./header";
 
+import { gardenAccessUrl, gardenAdminConfigured, gardenAdminName, gardenOrgName } from "@/lib/garden-config";
 const gardenMode = process.env.VITE_GARDEN_AUTH_ENABLED === "1";
-const gardenAdminUrl = (process.env.VITE_GARDEN_ADMIN_URL || "").replace(/\/$/, "");
 
 const WorkspaceMembersSettingsPage = observer(function WorkspaceMembersSettingsPage({ params }: Route.ComponentProps) {
   // states
@@ -102,13 +102,13 @@ const WorkspaceMembersSettingsPage = observer(function WorkspaceMembersSettingsP
         <PageHead title={pageTitle} />
         <section className="flex size-full items-start justify-center p-8">
           <div className="w-full max-w-2xl rounded-xl border border-subtle bg-layer-2 p-6">
-            <h4 className="text-h3-medium text-primary">Staff access is managed by The Garden</h4>
+            <h4 className="text-h3-medium text-primary">Staff access is managed by {gardenOrgName}</h4>
             <p className="mt-2 text-body-sm-regular text-tertiary">
-              Workspace and project membership come from Garden roles, departments, and access policy. Manage people there instead of creating a second permission system in Work.
+              Workspace membership comes from {gardenOrgName} roles and access policy. Manage people in {gardenAdminName} instead of creating a second permission system in Work.
             </p>
-            {gardenAdminUrl && (
+            {gardenAdminConfigured && (
               <a
-                href={`${gardenAdminUrl}/access`}
+                href={gardenAccessUrl}
                 target="_top"
                 className="mt-4 inline-flex rounded-md bg-accent-primary px-4 py-2 text-body-sm-medium text-on-color hover:opacity-90"
               >

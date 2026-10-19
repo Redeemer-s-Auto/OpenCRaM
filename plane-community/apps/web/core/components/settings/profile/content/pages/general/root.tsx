@@ -15,16 +15,7 @@ import { useUser } from "@/hooks/store/user";
 // local imports
 import { GeneralProfileSettingsForm } from "./form";
 
-const gardenMode = process.env.VITE_GARDEN_AUTH_ENABLED === "1";
-const gardenAdminUrl = process.env.VITE_GARDEN_ADMIN_URL || "https://gardenchurch.web.app/admin";
-
-function gardenProfileUrl() {
-  try {
-    return new URL("/profile", gardenAdminUrl).toString();
-  } catch {
-    return "https://gardenchurch.web.app/profile";
-  }
-}
+import { gardenMode, gardenOrgName, gardenProfileName, gardenProfileUrl } from "@/lib/garden-config";
 
 function gardenDisplayEmail(email: string | null | undefined) {
   const normalized = email?.trim();
@@ -45,7 +36,7 @@ export const GeneralProfileSettings = observer(function GeneralProfileSettings()
     const email = gardenDisplayEmail(currentUser.email);
     return (
       <>
-        <PageHead title="Garden profile" />
+        <PageHead title={`${gardenProfileName} profile`} />
         <div className="flex w-full flex-col gap-5">
           <div className="rounded-xl border border-subtle bg-surface-1 p-5 shadow-raised-100">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
@@ -62,22 +53,22 @@ export const GeneralProfileSettings = observer(function GeneralProfileSettings()
                   {email ? <div className="truncate text-13 text-secondary">{email}</div> : null}
                   <div className="mt-1 flex items-center gap-1.5 text-11 font-medium text-accent-primary">
                     <RefreshCw className="size-3" />
-                    Synced from The Garden
+                    Synced from {gardenOrgName}
                   </div>
                 </div>
               </div>
               <a
-                href={gardenProfileUrl()}
+                href={gardenProfileUrl}
                 target="_top"
                 className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-accent-primary px-4 py-2 text-13 font-medium text-on-color transition-colors hover:bg-accent-secondary"
               >
-                Edit Garden profile
+                Edit {gardenProfileName} profile
                 <ExternalLink className="size-3.5" />
               </a>
             </div>
           </div>
           <div className="rounded-xl border border-subtle bg-layer-1 p-4 text-13 leading-5 text-secondary">
-            Your name, display name, profile photo, email, and Work account status are managed by The Garden. Changes made in your Garden profile sync into Work automatically, so your identity stays consistent across staff systems.
+            Your name, display name, profile photo, email, and Work account status are managed by {gardenOrgName}. Changes made in your {gardenProfileName} profile sync into Work automatically, so your identity stays consistent across staff systems.
           </div>
         </div>
       </>

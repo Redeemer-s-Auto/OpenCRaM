@@ -17,6 +17,7 @@ import { Tooltip } from "@plane/propel/tooltip";
 import { AppSidebarItem } from "@/components/sidebar/sidebar-item";
 import { InboxIcon } from "@plane/propel/icons";
 import { GardenWorkIcon, isGardenWork } from "@/components/common/garden-work-icon";
+import { gardenOrgName } from "@/lib/garden-config";
 import useSWR from "swr";
 import { useWorkspaceNotifications } from "@/hooks/store/notifications";
 // local imports
@@ -54,7 +55,7 @@ export const TopNavigationRoot = observer(function TopNavigationRoot() {
     >
       {/* Workspace Menu */}
       <div className="flex flex-1 items-center gap-3 shrink-0">
-        {isGardenWork ? <span className="garden-work-brand"><GardenWorkIcon className="size-5" /><span>The Garden<span className="garden-work-brand-subtitle">WORKSPACE</span></span></span> : null}
+        {isGardenWork ? <span className="garden-work-brand"><GardenWorkIcon className="size-5" /><span>{gardenOrgName}<span className="garden-work-brand-subtitle">WORKSPACE</span></span></span> : null}
         <WorkspaceMenuRoot variant="top-navigation" />
       </div>
       {/* Power K Search */}

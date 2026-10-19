@@ -16,8 +16,7 @@ import { CheckIcon } from "@plane/propel/icons";
 import type { IWorkspace } from "@plane/types";
 import { cn, getFileURL, getUserRole } from "@plane/utils";
 
-const gardenMode = process.env.VITE_GARDEN_AUTH_ENABLED === "1";
-const gardenAdminUrl = (process.env.VITE_GARDEN_ADMIN_URL || "").replace(/\/$/, "");
+import { gardenAccessUrl, gardenAdminConfigured, gardenMode } from "@/lib/garden-config";
 
 type TProps = {
   workspace: IWorkspace;
@@ -104,9 +103,9 @@ const SidebarDropdownItem = observer(function SidebarDropdownItem(props: TProps)
                 </Link>
               )}
               {[EUserPermissions.ADMIN].includes(workspace?.role) &&
-                (gardenMode && gardenAdminUrl ? (
+                (gardenMode && gardenAdminConfigured ? (
                   <a
-                    href={`${gardenAdminUrl}/access`}
+                    href={gardenAccessUrl}
                     target="_top"
                     onClick={(e) => {
                       e.stopPropagation();

@@ -14,20 +14,18 @@ import DefaultLayout from "@/layouts/default-layout";
 // wrappers
 import { AuthenticationWrapper } from "@/lib/wrappers/authentication-wrapper";
 
-const gardenAuthEnabled = process.env.VITE_GARDEN_AUTH_ENABLED === "1";
-const gardenAdminUrl = (process.env.VITE_GARDEN_ADMIN_URL || "").replace(/\/$/, "");
-
-function gardenAdminOrigin() {
-  try {
-    return new URL(gardenAdminUrl).origin;
-  } catch {
-    return "https://gardenchurch.web.app";
-  }
-}
+import {
+  gardenAdminConfigured,
+  gardenAdminOrigin,
+  gardenAppName,
+  gardenLaunchUrl,
+  gardenMode as gardenAuthEnabled,
+  gardenOrgName,
+} from "@/lib/garden-config";
 
 function HomePage() {
   React.useEffect(() => {
-    if (!gardenAuthEnabled || !gardenAdminUrl) return;
+    if (!gardenAuthEnabled || !gardenAdminConfigured) return;
 
     // Garden Work normally runs inside /admin/work. If the embedded Work app
     // ever falls back to its root route, navigating the iframe itself to
@@ -35,11 +33,11 @@ function HomePage() {
     // Ask the existing outer Admin shell to re-establish the Work session
     // instead. Only top-level visits to the Work hostname redirect to Admin.
     if (window.parent !== window) {
-      window.parent.postMessage({ type: "garden:work-relaunch" }, gardenAdminOrigin());
+      window.parent.postMessage({ type: "garden:work-relaunch" }, gardenAdminOrigin);
       return;
     }
 
-    window.location.replace(`${gardenAdminUrl}/work`);
+    window.location.replace(gardenLaunchUrl);
   }, []);
 
   if (gardenAuthEnabled) {
@@ -47,8 +45,8 @@ function HomePage() {
       <DefaultLayout>
         <div className="flex min-h-screen items-center justify-center px-6 text-center">
           <div>
-            <p className="text-lg font-medium text-primary">Opening The Garden Work</p>
-            <p className="mt-2 text-sm text-secondary">Returning to your Garden staff session…</p>
+            <p className="text-lg font-medium text-primary">Opening {gardenAppName}</p>
+            <p className="mt-2 text-sm text-secondary">Returning to your {gardenOrgName} sign-in…</p>
           </div>
         </div>
       </DefaultLayout>

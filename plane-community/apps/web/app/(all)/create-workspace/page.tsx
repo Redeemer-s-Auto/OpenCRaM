@@ -19,7 +19,7 @@ import { useInstance } from "@/hooks/store/use-instance";
 import { useAppRouter } from "@/hooks/use-app-router";
 import { AuthenticationWrapper } from "@/lib/wrappers/authentication-wrapper";
 
-const gardenMode = process.env.VITE_GARDEN_AUTH_ENABLED === "1";
+import { gardenAppName, gardenMode, gardenOrgName } from "@/lib/garden-config";
 
 const CreateWorkspacePage = observer(function CreateWorkspacePage() {
   const { t } = useTranslation();
@@ -59,7 +59,7 @@ const CreateWorkspacePage = observer(function CreateWorkspacePage() {
             href="/"
           >
             {gardenMode ? (
-              <img src={gardenMark} className="h-9 w-9 object-contain" alt="The Garden Work" />
+              <img src={gardenMark} className="h-9 w-9 object-contain" alt={gardenAppName} />
             ) : (
               <PlaneLogo className="h-9 w-auto text-primary" />
             )}
@@ -77,11 +77,11 @@ const CreateWorkspacePage = observer(function CreateWorkspacePage() {
                 alt="Workspace creation disabled"
               />
               <div className="text-center text-16 font-medium">
-                {gardenMode ? "Workspaces are managed by The Garden" : t("workspace_creation.errors.creation_disabled.title")}
+                {gardenMode ? `Workspaces are managed by ${gardenOrgName}` : t("workspace_creation.errors.creation_disabled.title")}
               </div>
               <p className="text-center text-13 break-words text-tertiary">
                 {gardenMode
-                  ? "Garden Work uses the managed The Garden workspace."
+                  ? `${gardenAppName} uses the managed ${gardenOrgName} workspace.`
                   : t("workspace_creation.errors.creation_disabled.description")}
               </p>
               <div className="mt-6 flex gap-4">

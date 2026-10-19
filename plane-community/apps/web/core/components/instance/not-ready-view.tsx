@@ -12,7 +12,7 @@ import DefaultLayout from "@/layouts/default-layout";
 import { PlaneLockup } from "@plane/propel/icons";
 import { Button } from "@plane/propel/button";
 
-const gardenMode = process.env.VITE_GARDEN_AUTH_ENABLED === "1";
+import { gardenAdminName, gardenAppName, gardenMode } from "@/lib/garden-config";
 
 export function InstanceNotReady() {
   if (gardenMode) {
@@ -20,11 +20,11 @@ export function InstanceNotReady() {
       <DefaultLayout>
         <div className="relative z-10 flex h-screen w-screen items-center justify-center overflow-hidden bg-canvas px-8">
           <div className="flex max-w-md flex-col items-center gap-5 text-center">
-            <img src={gardenMark} className="h-20 w-20 object-contain" alt="The Garden Work" />
+            <img src={gardenMark} className="h-20 w-20 object-contain" alt={gardenAppName} />
             <div className="flex flex-col gap-2">
-              <h1 className="text-h2-semibold text-primary">The Garden Work</h1>
+              <h1 className="text-h2-semibold text-primary">{gardenAppName}</h1>
               <p className="text-body-md-regular text-secondary">
-                Work is getting ready. Refresh in a moment or return to Garden Admin.
+                Work is getting ready. Refresh in a moment or return to {gardenAdminName}.
               </p>
             </div>
           </div>

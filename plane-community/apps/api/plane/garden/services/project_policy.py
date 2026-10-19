@@ -14,6 +14,16 @@ def garden_workspace_slug() -> str:
     return os.environ.get("GARDEN_WORKSPACE_SLUG", "the-garden").strip() or "the-garden"
 
 
+def local_project_membership() -> bool:
+    """Whether Work admins manage project (board) membership inside Work.
+
+    True in roles mode (GARDEN_ACCESS_MODE=roles), where Firebase carries no
+    per-project mapping. In the default projection mode Firebase owns project
+    membership and this stays False.
+    """
+    return os.environ.get("GARDEN_ACCESS_MODE", "projection").strip().lower() == "roles"
+
+
 def is_garden_workspace(slug: str | None) -> bool:
     return garden_mode_enabled() and bool(slug) and slug == garden_workspace_slug()
 

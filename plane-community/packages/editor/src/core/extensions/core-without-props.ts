@@ -12,6 +12,7 @@ import { Underline } from "@tiptap/extension-underline";
 import { CoreEditorAdditionalExtensionsWithoutProps } from "@/plane-editor/extensions/core/without-props";
 // extensions
 import { CustomCalloutExtensionConfig } from "./callout/extension-config";
+import { CardLinkExtensionConfig } from "./card-link/extension-config";
 import { ColumnExtensionConfig, ColumnListExtensionConfig } from "./columns/extension-config";
 import {
   ToggleContentExtensionConfig,
@@ -70,6 +71,7 @@ export const CoreEditorExtensionsWithoutProps = [
   ToggleContentExtensionConfig,
   ColumnListExtensionConfig,
   ColumnExtensionConfig,
+  CardLinkExtensionConfig,
   CustomColorExtension,
   ...CoreEditorAdditionalExtensionsWithoutProps,
 ];

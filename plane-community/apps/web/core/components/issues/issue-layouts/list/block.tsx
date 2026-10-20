@@ -31,6 +31,8 @@ import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 import useIssuePeekOverviewRedirection from "@/hooks/use-issue-peek-overview-redirection";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 import { calculateIdentifierWidth } from "../utils";
+// card shortcuts: a shortcut card shows its target's live title
+import { ShortcutAwareTitle, shortcutAwareName } from "@/components/card-links/shortcut-title";
 import type { TRenderQuickActions } from "./list-view-types";
 
 interface IssueBlockProps {
@@ -262,13 +264,20 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
             </div>
 
             <Tooltip
-              tooltipContent={issue.name}
+              tooltipContent={shortcutAwareName(issue.id, issue.name)}
               isMobile={isMobile}
               position="top-start"
               disabled={isCurrentBlockDragging}
               renderByDefault={false}
             >
-              <p className="cursor-pointer truncate text-body-xs-medium text-primary">{issue.name}</p>
+              <p className="cursor-pointer truncate text-body-xs-medium text-primary">
+                <ShortcutAwareTitle
+                  workspaceSlug={workspaceSlug}
+                  projectId={issue.project_id}
+                  issueId={issue.id}
+                  name={issue.name}
+                />
+              </p>
             </Tooltip>
           </div>
           {!issue?.tempId && (

@@ -132,6 +132,7 @@ def snapshot_issue(issue, include_sub_items=True, visible=None):
     ``visible`` is an optional function ``(queryset) -> queryset`` that limits sub-cards
     to the ones the person saving can see, so a template never copies hidden cards.
     """
+    from plane.shortcuts.models import CardShortcut
     from plane.utils.custom_fields import values_for_issues
 
     counter = [0]
@@ -154,7 +155,12 @@ def snapshot_issue(issue, include_sub_items=True, visible=None):
             "sub_items": [],
         }
         if include_sub_items and depth < MAX_DEPTH:
-            children = Issue.issue_objects.filter(parent_id=card.id).order_by("sequence_id")
+            # Shortcut cards are pointers to cards elsewhere: a template does not copy them.
+            children = (
+                Issue.issue_objects.filter(parent_id=card.id)
+                .exclude(pk__in=CardShortcut.objects.values("issue_id"))
+                .order_by("sequence_id")
+            )
             if visible is not None:
                 children = visible(children)
             for child in children:

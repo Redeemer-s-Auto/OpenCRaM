@@ -17,6 +17,7 @@ import { useCommandPalette } from "@/hooks/store/use-command-palette";
 import useIssuePeekOverviewRedirection from "@/hooks/use-issue-peek-overview-redirection";
 import type { TCardNode } from "@/services/card-tree.service";
 import { cardTreeService } from "@/services/card-tree.service";
+import { ShortcutRowLabel, rememberShortcutRows, shortcutRowHref } from "@/components/card-links/shortcut-row";
 import { CardOpenModeToggle } from "./open-mode-toggle";
 
 type TTreeRow = TCardNode & { children: TTreeRow[] };
@@ -71,8 +72,14 @@ function PageRow(props: {
           }}
           className="flex min-w-0 flex-1 items-center gap-2"
         >
-          <FileText className="size-4 flex-shrink-0" style={{ color: row.state_color ?? undefined }} />
-          <span className="truncate text-13 text-primary">{row.name || "Untitled"}</span>
+          {row.shortcut ? (
+            <ShortcutRowLabel shortcut={row.shortcut} className="text-13 text-primary" iconClassName="size-4" />
+          ) : (
+            <>
+              <FileText className="size-4 flex-shrink-0" style={{ color: row.state_color ?? undefined }} />
+              <span className="truncate text-13 text-primary">{row.name || "Untitled"}</span>
+            </>
+          )}
           {hasChildren && <span className="flex-shrink-0 text-11 text-tertiary">{row.children.length}</span>}
         </a>
         <span className="hidden flex-shrink-0 text-11 text-tertiary sm:inline">
@@ -118,6 +125,7 @@ export const PageListLayout = observer(function PageListLayout() {
       cardTreeService
         .pageList(workspaceSlug, projectId, offset, limit)
         .then((page) => {
+          rememberShortcutRows(page.results);
           setCards((previous) => (offset === 0 ? page.results : [...(previous ?? []), ...page.results]));
           setNextOffset(page.next_offset);
           setFailed(false);
@@ -153,13 +161,17 @@ export const PageListLayout = observer(function PageListLayout() {
 
   const hrefFor = useCallback(
     (row: TCardNode) =>
-      generateWorkItemLink({
+      shortcutRowHref(
         workspaceSlug,
-        projectId: row.project_id,
-        issueId: row.id,
-        projectIdentifier: row.project_identifier,
-        sequenceId: row.sequence_id,
-      }),
+        row,
+        generateWorkItemLink({
+          workspaceSlug,
+          projectId: row.project_id,
+          issueId: row.id,
+          projectIdentifier: row.project_identifier,
+          sequenceId: row.sequence_id,
+        })
+      ),
     [workspaceSlug]
   );
 

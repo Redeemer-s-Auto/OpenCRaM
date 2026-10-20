@@ -4,13 +4,14 @@
  * See the LICENSE file for details.
  */
 
-import { forwardRef } from "react";
+import { forwardRef, useMemo } from "react";
 // plane imports
-import { RichTextEditorWithRef } from "@plane/editor";
+import { CardLinkExtension, RichTextEditorWithRef } from "@plane/editor";
 import type { EditorRefApi, IRichTextEditorProps, TFileHandler } from "@plane/editor";
 import type { MakeOptional, TSearchEntityRequestPayload, TSearchResponse } from "@plane/types";
 import { cn } from "@plane/utils";
 // components
+import { getCardLinkHandler } from "@/components/card-links/card-link-block";
 import { EditorMentionsRoot } from "@/components/editor/embeds/mentions";
 // hooks
 import { useEditorConfig, useEditorMention } from "@/hooks/editor";
@@ -50,8 +51,14 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
     workspaceId,
     projectId,
     disabledExtensions: additionalDisabledExtensions = [],
+    extensions: externalExtensions,
     ...rest
   } = props;
+  // "Link to card" blocks (card shortcuts): looked up live for the person viewing.
+  const extensions = useMemo(
+    () => [...(externalExtensions ?? []), CardLinkExtension(getCardLinkHandler(workspaceSlug))],
+    [externalExtensions, workspaceSlug]
+  );
   // store hooks
   const { getUserDetails } = useMember();
   // editor flaggings
@@ -98,6 +105,7 @@ export const RichTextEditor = forwardRef(function RichTextEditor(
       }}
       extendedEditorProps={{}}
       {...rest}
+      extensions={extensions}
       containerClassName={cn("relative pb-3 pl-3", containerClassName)}
     />
   );

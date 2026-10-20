@@ -12,6 +12,8 @@ import { EIssueServiceType } from "@plane/types";
 import { generateWorkItemLink } from "@plane/utils";
 // one-unit screens: a card opens as a full page unless the person chose the side peek
 import { getCardOpenMode } from "@/components/one-unit/card-open-mode";
+// card shortcuts: opening a shortcut card opens the card it points to
+import { getShortcutTarget, linkedCardHref } from "@/components/card-links/store";
 // hooks
 import { useIssueDetail } from "./store/use-issue-detail";
 import { useProject } from "./store/use-project";
@@ -45,6 +47,12 @@ const useIssuePeekOverviewRedirection = (isEpic: boolean = false) => {
       isArchived: !!archived_at,
     });
     if (workspaceSlug && project_id && id && !getIsIssuePeeked(id) && !tempId) {
+      const shortcut = getShortcutTarget(id);
+      if (shortcut) {
+        // Visible target: go there. Hidden or removed: the shortcut's own page says so.
+        router.push(shortcut.status === "visible" ? linkedCardHref(workspaceSlug, shortcut.card) : workItemLink);
+        return;
+      }
       if (isMobile || getCardOpenMode() === "page") {
         router.push(workItemLink);
       } else {

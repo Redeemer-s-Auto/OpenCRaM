@@ -75,6 +75,8 @@ CUSTOM_TAGS = {
     "label",
     "input",
     "image-component",
+    # "Link to card" block (OpenCRaM card shortcuts): the card id only
+    "card-link-component",
 }
 ALLOWED_TAGS = nh3.ALLOWED_TAGS | CUSTOM_TAGS
 
@@ -137,6 +139,7 @@ ATTRIBUTES = {
         "title",
     },
     "mention-component": {"id", "entity_identifier", "entity_name"},
+    "card-link-component": {"data-card-id"},
     "th": {
         "colspan",
         "rowspan",

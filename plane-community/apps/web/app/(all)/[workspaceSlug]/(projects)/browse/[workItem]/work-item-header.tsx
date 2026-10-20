@@ -22,6 +22,8 @@ import { CommonProjectBreadcrumbs } from "@/components/breadcrumbs/common";
 // one-unit screens: parent chain (may cross projects) and the open-as-page/peek choice
 import { cardAncestorCrumbs, useCardAncestors } from "@/components/one-unit/card-breadcrumb";
 import { CardOpenModeToggle } from "@/components/one-unit/open-mode-toggle";
+// card shortcuts: put a shortcut to this card on another board
+import { AddShortcutButton } from "@/components/card-links/add-shortcut";
 
 export const WorkItemDetailsHeader = observer(function WorkItemDetailsHeader() {
   // router
@@ -66,6 +68,12 @@ export const WorkItemDetailsHeader = observer(function WorkItemDetailsHeader() {
       </Header.LeftItem>
       <Header.RightItem>
         <CardOpenModeToggle className="hidden md:flex" />
+        <AddShortcutButton
+          className="hidden md:flex"
+          workspaceSlug={workspaceSlug.toString()}
+          issueId={issueId.toString()}
+          projectId={projectId.toString()}
+        />
         {projectId && issueId && (
           <IssueDetailQuickActions
             workspaceSlug={workspaceSlug?.toString()}

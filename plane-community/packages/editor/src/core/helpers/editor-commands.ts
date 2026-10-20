@@ -192,6 +192,11 @@ export const insertCallout = (editor: Editor, range?: Range) => {
   else editor.chain().focus().insertCallout().run();
 };
 
+export const insertCardLink = (editor: Editor, range?: Range) => {
+  if (range) editor.chain().focus().deleteRange(range).insertCardLink(null).run();
+  else editor.chain().focus().insertCardLink(null).run();
+};
+
 export const insertToggle = (editor: Editor, range?: Range) => {
   if (range) editor.chain().focus().deleteRange(range).insertToggle().run();
   else editor.chain().focus().insertToggle().run();

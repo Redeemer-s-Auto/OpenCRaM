@@ -26,4 +26,6 @@ export { ADDITIONAL_EXTENSIONS } from "@/plane-editor/constants/extensions";
 export * from "@/types";
 
 // additional exports
+export { CardLinkExtension, isCardId } from "./core/extensions/card-link";
+export type { TCardLinkHandler, TCardLinkRenderProps } from "./core/extensions/card-link";
 export { TrailingNode } from "./core/extensions/trailing-node";

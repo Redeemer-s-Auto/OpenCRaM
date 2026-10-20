@@ -79,6 +79,16 @@ def _page(queryset, offset, limit, fields):
     return {"results": rows, "total": total, "offset": offset, "limit": limit, "next_offset": next_offset}
 
 
+def _attach_shortcuts(rows, user, slug):
+    """``shortcut``: null, or where a shortcut card goes, worked out for ``user`` (plane.shortcuts)."""
+    from plane.shortcuts.service import shortcuts_for_cards
+
+    info = shortcuts_for_cards(user, slug, [row["id"] for row in rows])
+    for row in rows:
+        row["shortcut"] = info.get(str(row["id"]))
+    return rows
+
+
 def _mask_parents(rows, user):
     """``parent_id`` becomes null when the parent is out of reach (no hint that it exists)."""
     parent_ids = {str(row["parent_id"]) for row in rows if row.get("parent_id")}
@@ -127,6 +137,7 @@ class CardTreeEndpoint(BaseAPIView):
         cards = _annotate(cards, user).order_by("sort_order", "created_at")
         data = _page(cards, offset, limit, ROW_FIELDS)
         _mask_parents(data["results"], user)
+        _attach_shortcuts(data["results"], user, slug)
         return Response(data, status=status.HTTP_200_OK)
 
 
@@ -176,4 +187,5 @@ class ProjectPageListEndpoint(BaseAPIView):
         for row in data["results"]:
             row["updated_by_name"] = (row.get("updated_by_name") or "").strip()
         _mask_parents(data["results"], user)
+        _attach_shortcuts(data["results"], user, slug)
         return Response(data, status=status.HTTP_200_OK)

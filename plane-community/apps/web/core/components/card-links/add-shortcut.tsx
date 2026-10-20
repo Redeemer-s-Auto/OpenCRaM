@@ -108,8 +108,8 @@ const AddShortcutModal = observer(function AddShortcutModal(props: Omit<Props, "
         <div>
           <h3 className="text-16 font-medium text-primary">Add a shortcut</h3>
           <p className="text-13 text-tertiary">
-            Pick a board. A shortcut card appears there and opens this card. People who cannot see this card see
-            only &quot;Hidden card&quot;.
+            Pick a board. A shortcut card appears there and opens this card. People who cannot see this card see only
+            &quot;Hidden card&quot;.
           </p>
         </div>
         <div className="flex max-h-72 flex-col gap-0.5 overflow-y-auto" role="radiogroup">
@@ -117,9 +117,12 @@ const AddShortcutModal = observer(function AddShortcutModal(props: Omit<Props, "
           {boards.map((board) => (
             <label
               key={board.id}
-              className={cn("flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-13 hover:bg-layer-1-hover", {
-                "bg-layer-1-hover": chosen === board.id,
-              })}
+              className={cn(
+                "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-13 hover:bg-layer-1-hover",
+                {
+                  "bg-layer-1-hover": chosen === board.id,
+                }
+              )}
             >
               <input
                 type="radio"

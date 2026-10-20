@@ -67,21 +67,33 @@ export function CardLinkExtension(handler: TCardLinkHandler) {
               if (!text || /\s/.test(text) || !handler.isCardUrl?.(text)) return false;
               event.preventDefault();
               const at = editor.state.selection.from;
+              // The body may change during the look-up: never insert past its end.
+              const where = () => Math.min(at, editor.state.doc.content.size);
               void handler
                 .cardIdFromUrl?.(text)
                 .then((cardId) => {
                   if (isCardId(cardId)) {
-                    editor.chain().focus().insertContentAt(at, { type: name, attrs: { cardId } }).run();
+                    editor.chain().focus().insertContentAt(where(), { type: name, attrs: { cardId } }).run();
                   } else {
                     // Not a card this person can see: keep what they pasted, as a plain link.
                     editor
                       .chain()
                       .focus()
-                      .insertContentAt(at, { type: "text", text, marks: [{ type: "link", attrs: { href: text } }] })
+                      .insertContentAt(where(), {
+                        type: "text",
+                        text,
+                        marks: [{ type: "link", attrs: { href: text } }],
+                      })
                       .run();
                   }
                 })
-                .catch(() => editor.chain().focus().insertContentAt(at, text).run());
+                .catch(() => {
+                  try {
+                    editor.chain().focus().insertContentAt(where(), text).run();
+                  } catch {
+                    // the editor is gone; nothing to do
+                  }
+                });
               return true;
             },
           },

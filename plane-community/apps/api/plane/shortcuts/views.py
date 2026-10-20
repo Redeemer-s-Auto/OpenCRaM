@@ -17,10 +17,10 @@ from rest_framework.response import Response
 
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.views.base import BaseAPIView
-from plane.db.models import Issue, Project
+from plane.db.models import Project
 
 from . import service
-from .visibility import viewable_cards
+from .visibility import linkable_cards, viewable_cards
 
 
 def _not_found():
@@ -31,7 +31,8 @@ def _visible_card(request, slug, issue_id):
     issue_id = service.as_uuid(issue_id)
     if not issue_id:
         return None
-    return viewable_cards(request.user, Issue.objects.filter(workspace__slug=slug, pk=issue_id)).first()
+    # Drafts and intake cards are never link targets (and reach_q does not know draft ownership).
+    return viewable_cards(request.user, linkable_cards().filter(workspace__slug=slug, pk=issue_id)).first()
 
 
 class CardLinkResolveEndpoint(BaseAPIView):

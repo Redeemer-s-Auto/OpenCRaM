@@ -104,6 +104,11 @@ class TestLinkedFrom:
         backlinks(links, links.both_client, links.gamma_card, expect=404)
         backlinks(links, links.insider_client, links.beta_open, expect=404)
 
+    def test_someone_elses_draft_is_not_found(self, links):
+        draft = card(links, "A draft", project=links.beta, is_draft=True)
+        backlinks(links, links.both_client, draft, expect=404)
+        assert links.both_client.get(url(links, f"cards/{draft.id}/shortcut/")).status_code == 404
+
     def test_deleted_source_drops_out(self, links):
         links.source.delete()
         assert backlinks(links, links.both_client, links.beta_open).data["results"] == []

@@ -53,14 +53,19 @@ const CardLinkBlock = observer(function CardLinkBlock(props: TCardLinkRenderProp
   }
 
   return (
-    <div className={cn("group/card-link relative my-1 flex items-center", { "rounded-md ring-1 ring-accent-strong": selected })} contentEditable={false}>
+    <div
+      className={cn("group/card-link relative my-1 flex items-center", {
+        "rounded-md ring-1 ring-accent-strong": selected,
+      })}
+      contentEditable={false}
+    >
       <CardLinkChip workspaceSlug={workspaceSlug} resolution={resolution} />
       {editable && (
         <button
           type="button"
           aria-label="Remove link"
           onClick={onRemove}
-          className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded-sm bg-layer-1 p-0.5 text-placeholder hover:text-secondary group-hover/card-link:block"
+          className="absolute top-1/2 right-1 hidden -translate-y-1/2 rounded-sm bg-layer-1 p-0.5 text-placeholder group-hover/card-link:block hover:text-secondary"
         >
           <X className="size-3.5" />
         </button>

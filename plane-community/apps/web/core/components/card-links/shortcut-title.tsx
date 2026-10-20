@@ -29,7 +29,7 @@ export const ShortcutAwareTitle = observer(function ShortcutAwareTitle(props: Pr
   const target = getShortcutTarget(issueId);
   if (!target) return <span className={className}>{name}</span>;
   return (
-    <span className={cn("inline-flex min-w-0 max-w-full items-center gap-1", className)} data-shortcut-card={issueId}>
+    <span className={cn("inline-flex max-w-full min-w-0 items-center gap-1", className)} data-shortcut-card={issueId}>
       <CornerUpRight className="size-3.5 flex-shrink-0 text-placeholder" aria-label="Shortcut" />
       {target.status === "visible" ? (
         <span className="truncate">{target.card.name || "Untitled"}</span>

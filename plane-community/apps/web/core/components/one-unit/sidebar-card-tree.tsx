@@ -107,7 +107,7 @@ function TreeNode(props: { workspaceSlug: string; node: TCardNode; depth: number
             disabled={!canOpen}
             onClick={() => setOpen((value) => !value)}
             className={cn("grid size-4 flex-shrink-0 place-items-center rounded-sm text-placeholder", {
-              "invisible": !canOpen,
+              invisible: !canOpen,
               "hover:bg-layer-1": canOpen,
             })}
           >

@@ -90,11 +90,13 @@ export function rememberCard(card: TLinkedCard) {
 // ---------------------------------------------------------------------------
 
 const boardLoads = new Map<string, number>();
+// Many cards on one board ask at once (mount, tab focus): one request serves them all.
+const FORCE_DEDUPE_MS = 3_000;
 
 export function loadProjectShortcuts(workspaceSlug: string, projectId: string, force = false) {
   const key = `${workspaceSlug}/${projectId}`;
   const last = boardLoads.get(key);
-  if (!force && last && Date.now() - last < STALE_MS) return;
+  if (last && Date.now() - last < (force ? FORCE_DEDUPE_MS : STALE_MS)) return;
   boardLoads.set(key, Date.now());
   cardLinksService
     .projectShortcuts(workspaceSlug, projectId)

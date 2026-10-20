@@ -26,10 +26,7 @@ export type TLinkedCard = {
  * "hidden": the viewer may not see it - nothing else is sent.
  * "removed": the card was deleted.
  */
-export type TCardResolution =
-  | { status: "visible"; card: TLinkedCard }
-  | { status: "hidden" }
-  | { status: "removed" };
+export type TCardResolution = { status: "visible"; card: TLinkedCard } | { status: "hidden" } | { status: "removed" };
 
 export type TBacklink = TLinkedCard & { kind: "link" | "shortcut" };
 

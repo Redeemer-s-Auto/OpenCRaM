@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(plane-community/**)",
+      "Grep(plane-community/**)",
+      "Glob(plane-community/**)"
+    ]
+  }
+}

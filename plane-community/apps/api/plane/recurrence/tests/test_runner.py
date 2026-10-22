@@ -24,10 +24,9 @@ from plane.recurrence.tests.conftest import make_rule
 from plane.sharing.models import AccessLevel, ItemRestriction, ShareTarget
 from plane.utils.custom_fields import set_values, validate_values, values_for_issues
 
-from .conftest import make_issue, restrict
+from .conftest import NOW, make_issue, restrict
 
 UTC = dt.timezone.utc
-NOW = dt.datetime(2026, 10, 19, 6, 2, tzinfo=UTC)
 
 
 def copies_of(rule):
@@ -45,7 +44,7 @@ class TestIdempotency:
         assert rule.created_count == 1
         assert rule.next_run_at == dt.datetime(2026, 10, 20, 6, 0, tzinfo=UTC)
 
-    def test_beat_task_twice_makes_one_copy(self, cast, template):
+    def test_beat_task_twice_makes_one_copy(self, cast, template, frozen_clock):
         rule = make_rule(cast, template, next_run_at=dt.datetime(2026, 10, 1, 6, 0, tzinfo=UTC))
         tasks.run_due_repeats()
         tasks.run_due_repeats()
@@ -69,7 +68,7 @@ class TestIdempotency:
 
 @pytest.mark.unit
 class TestCatchUp:
-    def test_missed_days_make_one_copy_for_the_newest_slot(self, cast, template):
+    def test_missed_days_make_one_copy_for_the_newest_slot(self, cast, template, frozen_clock):
         rule = make_rule(cast, template, next_run_at=dt.datetime(2026, 10, 14, 6, 0, tzinfo=UTC))
         copy = tasks.run_rule(rule.id, NOW)
         assert copies_of(rule).count() == 1
@@ -78,7 +77,7 @@ class TestCatchUp:
         assert occurrence.issue_id == copy.id
         rule.refresh_from_db()
         assert rule.next_run_at == dt.datetime(2026, 10, 20, 6, 0, tzinfo=UTC)
-        # A second pass the same morning makes nothing more.
+        # A second pass the same morning (the beat job reads the frozen clock) makes nothing more.
         tasks.run_due_repeats()
         assert copies_of(rule).count() == 1
 
@@ -210,7 +209,7 @@ class TestStops:
         rule.refresh_from_db()
         assert rule.is_active is False and "deleted" in rule.stop_reason
 
-    def test_one_broken_rule_does_not_stop_the_others(self, cast, template, monkeypatch):
+    def test_one_broken_rule_does_not_stop_the_others(self, cast, template, monkeypatch, frozen_clock):
         other = make_issue(cast, "Other")
         bad = make_rule(cast, template)
         good = make_rule(cast, other)
@@ -222,7 +221,6 @@ class TestStops:
             return real(issue, delta, actor)
 
         monkeypatch.setattr(tasks, "make_copy", flaky)
-        monkeypatch.setattr(tasks.timezone, "now", lambda: NOW)
         assert tasks.run_due_repeats() == 1
         assert copies_of(good).count() == 1
         assert RepeatOccurrence.objects.filter(rule=bad).count() == 0  # rolled back, retried next run

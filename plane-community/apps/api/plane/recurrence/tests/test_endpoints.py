@@ -117,13 +117,13 @@ class TestValidation:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert not RepeatRule.objects.filter(issue=template).exists()
 
-    def test_monthly_last_day(self, cast, template):
+    def test_monthly_last_day(self, cast, template, frozen_clock):
         body = {"frequency": "monthly", "month_day": -1, "start_date": "2027-02-01", "timezone": "UTC"}
         response = cast.author_client.put(repeat_url(cast, template), body, format="json")
         assert response.status_code == 200
         assert response.data["rule"]["next_run_at"].startswith("2027-02-28T06:00")
 
-    def test_rule_with_no_dates_left_is_saved_stopped(self, cast, template):
+    def test_rule_with_no_dates_left_is_saved_stopped(self, cast, template, frozen_clock):
         body = {"frequency": "daily", "start_date": "2020-01-01", "end_date": "2020-01-02", "timezone": "UTC"}
         response = cast.author_client.put(repeat_url(cast, template), body, format="json")
         assert response.status_code == 200

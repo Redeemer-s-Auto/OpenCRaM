@@ -19,6 +19,20 @@ from plane.sharing.tests.conftest import (  # noqa: F401  (fixtures and helpers)
 
 UTC = dt.timezone.utc
 
+# The moment the repeat tests pretend it is. Code under test reads the clock through
+# ``django.utils.timezone.now``; tests that let it read the clock must use ``frozen_clock``
+# so they do not start failing once the real date passes the dates written in them.
+NOW = dt.datetime(2026, 10, 19, 6, 2, tzinfo=UTC)
+
+
+@pytest.fixture
+def frozen_clock(monkeypatch):
+    """Pin ``django.utils.timezone.now`` (used by tasks and services) to ``NOW``."""
+    from django.utils import timezone
+
+    monkeypatch.setattr(timezone, "now", lambda: NOW)
+    return NOW
+
 
 def make_rule(cast, issue, actor=None, **fields):
     values = dict(

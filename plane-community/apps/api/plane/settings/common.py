@@ -116,6 +116,7 @@ INSTALLED_APPS = [
     "plane.recurrence",
     "plane.relations",
     "plane.shortcuts",
+    "plane.blueprints",
     # Third-party things
     "rest_framework",
     "corsheaders",

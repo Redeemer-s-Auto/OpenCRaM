@@ -99,6 +99,10 @@ def source_board(user, workspace, project_id):
     """The board to capture from, if the person may save from it. 404 when hidden or missing."""
     from plane.utils.private_projects import is_hidden_from
 
+    try:
+        project_id = uuid.UUID(str(project_id))
+    except (TypeError, ValueError, AttributeError):
+        raise NotFound("Board not found.")
     project = Project.objects.filter(pk=project_id, workspace=workspace, archived_at__isnull=True).first()
     if project is None or is_hidden_from(user, project.id):
         raise NotFound("Board not found.")

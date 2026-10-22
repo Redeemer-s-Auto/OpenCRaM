@@ -403,6 +403,10 @@ class TestPermissions:
         Project.objects.filter(pk=cast.alpha.pk).update(is_private=True)
         save(cast, client=cast.outsider_client, expect=404)
 
+    def test_bad_board_id_answers_404_not_500(self, cast, board):
+        save(cast, project_id="not-a-board", expect=404)
+        save(cast, project_id=None, expect=404)
+
     def test_workspace_admin_can_save_any_board_they_can_see(self, cast, board):
         save(cast, client=cast.owner_client)
 

@@ -259,27 +259,97 @@ class TestExportImport:
         response = cast.owner_client.post(bp_url(cast, "import/"), {"document": doc}, format="json")
         assert response.status_code == 201 and response.data["name"] == "Call-back board (2)"
 
-    def test_sample_cards_never_leave_the_workspace(self, cast, board):
+    def test_sample_cards_are_left_out_by_default(self, cast, board):
         with_samples = save(cast, name="With samples", include_samples=True, include_repeat_rules=True)
         # Inside the workspace the blueprint keeps its sample cards ...
         assert with_samples["summary"]["sample_cards"] == 1
-        # ... but the exported file has none, and says so.
+        # ... but a plain export has none, says so, and carries no warning.
         doc = cast.author_client.get(bp_url(cast, f"{with_samples['id']}/export/")).json()
         assert doc["sample_cards"] == []
+        assert "warning" not in doc
         assert any("Sample cards were left out" in note for note in doc["notes"])
         text = json.dumps(doc)
         assert '"Sample card"' not in text and "Phone the client" not in text and "weekly" not in text
         # Exporting twice does not pile up the note; the stored blueprint is unchanged.
         from plane.blueprints.service import SAMPLES_NOT_EXPORTED
 
-        again = cast.author_client.get(bp_url(cast, f"{with_samples['id']}/export/")).json()
-        assert again["notes"].count(SAMPLES_NOT_EXPORTED) == 1
+        again = cast.author_client.get(bp_url(cast, f"{with_samples['id']}/export/?include_samples=0")).json()
+        assert again["sample_cards"] == [] and again["notes"].count(SAMPLES_NOT_EXPORTED) == 1
         stored = Blueprint.objects.get(pk=with_samples["id"]).spec
         assert len(stored["sample_cards"]) == 1 and SAMPLES_NOT_EXPORTED not in stored["notes"]
         # A blueprint without sample cards gets no such note.
         plain = save(cast, name="Plain")
         plain_doc = cast.author_client.get(bp_url(cast, f"{plain['id']}/export/")).json()
         assert plain_doc["sample_cards"] == [] and SAMPLES_NOT_EXPORTED not in plain_doc["notes"]
+        # Asking for sample cards on a blueprint that has none: no cards, no warning.
+        plain_doc = cast.author_client.get(bp_url(cast, f"{plain['id']}/export/?include_samples=1")).json()
+        assert plain_doc["sample_cards"] == [] and "warning" not in plain_doc
+
+    def test_export_with_sample_cards_carries_them_and_the_warning(self, cast, board):
+        from plane.blueprints.service import SAMPLE_EMAILS_REMOVED, SAMPLES_NOT_EXPORTED
+        from plane.db.models import Issue as IssueModel, User
+
+        saved = save(cast, name="With samples", include_samples=True, include_repeat_rules=True)
+        response = cast.author_client.get(bp_url(cast, f"{saved['id']}/export/?include_samples=1"))
+        assert response.status_code == 200
+        text = response.content.decode()
+        doc = json.loads(text)
+        # The cards are there, with the warning inside the file.
+        assert S.sample_card_titles(doc) == ["Sample card"]
+        assert "Phone the client" in doc["sample_cards"][0]["description_html"]
+        assert doc["sample_cards"][0]["repeat"]["frequency"] == "weekly"
+        assert doc["warning"] == S.SAMPLE_CARDS_WARNING
+        assert "Never include real client, team member, vehicle, money or shop records." in doc["warning"]
+        assert SAMPLES_NOT_EXPORTED not in doc["notes"]
+        # Still no ids, emails, people, mentions or images; hidden cards never go in.
+        assert S.find_ids(doc) == [] and S.find_emails(doc) == []
+        assert "person@example.org" not in text and SAMPLE_EMAILS_REMOVED in doc["notes"]
+        assert "mention-component" not in text and "image-component" not in text and "<img" not in text
+        assert "SECRETNAME" not in text and "Hidden card" not in text
+        for person in User.objects.all():
+            assert str(person.id) not in text
+            assert not person.email or person.email not in text
+        for card_id in IssueModel.all_objects.filter(workspace=cast.workspace).values_list("id", flat=True):
+            assert str(card_id) not in text
+        for source_id in (cast.workspace.id, cast.alpha.id, cast.beta.id):
+            assert str(source_id) not in text
+        beta_field = next(f for f in doc["fields"] if f["name"] == "Beta cards")
+        assert beta_field["settings"]["board_name"] is None
+        # The stored blueprint is unchanged, and the file is one this app accepts.
+        stored = Blueprint.objects.get(pk=saved["id"]).spec
+        assert "warning" not in stored and SAMPLE_EMAILS_REMOVED not in stored["notes"]
+        S.validate_document(doc)
+
+    def test_import_with_sample_cards_shows_the_warning_and_titles_first(self, cast, board, second_workspace):
+        saved = save(cast, name="With samples", include_samples=True, include_repeat_rules=True)
+        doc = cast.author_client.get(bp_url(cast, f"{saved['id']}/export/?include_samples=1")).json()
+        w = second_workspace
+        url = f"/api/workspaces/{w.workspace.slug}/blueprints/import/"
+        # Without a yes: refused, with the warning and the card titles; nothing is made.
+        for body in ({"document": doc}, {"document": doc, "accept_sample_cards": False}, doc):
+            response = w.client.post(url, body, format="json")
+            assert response.status_code == 400, response.data
+            assert list(response.data["sample_cards"]) == ["Sample card"]
+            assert str(response.data["warning"]) == S.SAMPLE_CARDS_WARNING
+            assert S.SAMPLE_CARDS_WARNING in str(response.data["error"])
+        assert not Blueprint.objects.filter(workspace=w.workspace).exists()
+        # With a yes: imported with its sample cards; the warning is not stored.
+        response = w.client.post(url, {"document": doc, "accept_sample_cards": True}, format="json")
+        assert response.status_code == 201, response.data
+        assert response.data["summary"]["sample_cards"] == 1
+        stored = Blueprint.objects.get(pk=response.data["id"]).spec
+        assert "warning" not in stored
+        result = use(cast, response.data["id"], client=w.client, slug=w.workspace.slug)
+        assert result["sample_cards_created"] == 1
+        card = Issue.issue_objects.get(project_id=result["project"]["id"])
+        assert card.name == "Sample card"
+
+    def test_import_refuses_a_bad_warning_field(self, cast, board, second_workspace):
+        saved = save(cast)
+        doc = cast.author_client.get(bp_url(cast, f"{saved['id']}/export/")).json()
+        url = f"/api/workspaces/{second_workspace.workspace.slug}/blueprints/import/"
+        response = second_workspace.client.post(url, {"document": {**doc, "warning": ["x"]}}, format="json")
+        assert response.status_code == 400
 
     def test_exported_file_holds_no_shop_data(self, cast, board):
         """The file a church gets: structure only. No card content, people, emails, ids or other boards' names."""

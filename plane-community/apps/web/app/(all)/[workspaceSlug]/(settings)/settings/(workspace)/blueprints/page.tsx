@@ -13,7 +13,14 @@ import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { cn } from "@plane/utils";
 // components
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
-import { BlueprintIcon, describeSummary, downloadBlueprint } from "@/components/blueprints/helpers";
+import {
+  BlueprintIcon,
+  SAMPLE_CARDS_WARNING,
+  describeSummary,
+  downloadBlueprint,
+  sampleCardTitles,
+  sampleCardsConfirmText,
+} from "@/components/blueprints/helpers";
 import { CountChip } from "@/components/common/count-chip";
 import { PageHead } from "@/components/core/page-title";
 import { SettingsContentWrapper } from "@/components/settings/content-wrapper";
@@ -42,6 +49,8 @@ const WorkspaceBlueprintsSettingsPage = observer(function WorkspaceBlueprintsSet
   // state
   const [draft, setDraft] = useState<TDraft | null>(null);
   const [busy, setBusy] = useState(false);
+  // "Include sample cards" in an export: off every time, never remembered.
+  const [exportSamples, setExportSamples] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   // data
   const { data: blueprints, mutate } = useSWR(`BOARD_BLUEPRINTS_${workspaceSlug}`, () =>
@@ -72,13 +81,15 @@ const WorkspaceBlueprintsSettingsPage = observer(function WorkspaceBlueprintsSet
     }
   };
 
-  const open = (blueprint: TBlueprint) =>
+  const open = (blueprint: TBlueprint) => {
+    setExportSamples(false);
     setDraft({
       id: blueprint.id,
       name: blueprint.name,
       description: blueprint.description,
       is_shared: blueprint.is_shared,
     });
+  };
 
   const save = () =>
     run(async () => {
@@ -106,7 +117,12 @@ const WorkspaceBlueprintsSettingsPage = observer(function WorkspaceBlueprintsSet
 
   const exportFile = (blueprint: TBlueprint) =>
     run(async () => {
-      const document = await blueprintService.exportDocument(workspaceSlug, blueprint.id);
+      const withSamples = exportSamples && blueprint.summary.sample_cards > 0;
+      setExportSamples(false); // never remembered, even if the export is cancelled
+      const document = await blueprintService.exportDocument(workspaceSlug, blueprint.id, withSamples);
+      const titles = withSamples ? sampleCardTitles(document) : [];
+      if (titles.length > 0 && !window.confirm(sampleCardsConfirmText(titles, "Download the file with these cards?")))
+        return;
       downloadBlueprint(blueprint.name, document);
     }, "Could not export the blueprint");
 
@@ -118,7 +134,10 @@ const WorkspaceBlueprintsSettingsPage = observer(function WorkspaceBlueprintsSet
       } catch {
         throw { error: "That file is not a blueprint (it is not valid JSON)." };
       }
-      const created = await blueprintService.importDocument(workspaceSlug, document);
+      const titles = sampleCardTitles(document);
+      if (titles.length > 0 && !window.confirm(sampleCardsConfirmText(titles, "Import the blueprint with these cards?")))
+        return;
+      const created = await blueprintService.importDocument(workspaceSlug, document, titles.length > 0);
       await mutate();
       open(created);
       setToast({
@@ -154,7 +173,8 @@ const WorkspaceBlueprintsSettingsPage = observer(function WorkspaceBlueprintsSet
               <p className="mt-1 max-w-xl text-body-xs-regular text-tertiary">
                 A blueprint is a saved board design: its fields, workflow, labels, views, layout and card templates. Use
                 one to start a new board the same way. Save one from a board&apos;s settings. Export a blueprint to
-                share it with another workspace; import one someone shared with you.
+                share it with another workspace; import one someone shared with you. An exported file holds the design
+                only, unless you tick &quot;Include sample cards&quot; when you export.
               </p>
             </div>
             <div className="flex gap-2">
@@ -308,10 +328,23 @@ const WorkspaceBlueprintsSettingsPage = observer(function WorkspaceBlueprintsSet
               )}
             </div>
             {selected.summary.sample_cards > 0 && selected.can_manage && (
-              <p className="text-caption-md-regular text-tertiary">
-                This blueprint holds {selected.summary.sample_cards} sample card(s). They stay in this workspace: an
-                exported file never includes them.
-              </p>
+              <label className="flex items-start gap-2 text-body-xs-regular text-secondary">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={exportSamples}
+                  onChange={(e) => setExportSamples(e.target.checked)}
+                />
+                <span>
+                  Include sample cards in the exported file ({selected.summary.sample_cards}). Off: the file holds the
+                  design only.
+                  {exportSamples && (
+                    <span className="mt-1 block text-danger-primary">
+                      {SAMPLE_CARDS_WARNING} You will see the card titles before the file downloads.
+                    </span>
+                  )}
+                </span>
+              </label>
             )}
             {versions && versions.length > 0 && (
               <div className="flex flex-col gap-1">

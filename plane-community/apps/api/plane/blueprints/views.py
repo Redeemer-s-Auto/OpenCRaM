@@ -158,7 +158,11 @@ class BlueprintVersionsEndpoint(BaseAPIView):
 
 
 class BlueprintExportEndpoint(BaseAPIView):
-    """GET -> the blueprint as a .json file: design only (no sample cards, ids or emails)."""
+    """GET [?include_samples=1] -> the blueprint as a .json file.
+
+    Design only by default. ``include_samples=1`` adds the sample cards (emails removed)
+    and a "warning" field; the screen asks the person to confirm first. Never ids or emails.
+    """
 
     @allow_permission(MEMBERS, level="WORKSPACE")
     def get(self, request, slug, pk):
@@ -167,7 +171,8 @@ class BlueprintExportEndpoint(BaseAPIView):
 
         blueprint = service.get_visible(request.user, _workspace(slug), pk)
         service.require_manage(request.user, blueprint)
-        doc = service.export_document(blueprint)
+        include_samples = str(request.query_params.get("include_samples", "")).lower() in ("1", "true", "yes")
+        doc = service.export_document(blueprint, include_samples=include_samples)
         filename = re.sub(r"[^A-Za-z0-9_-]+", "-", blueprint.name).strip("-") or "blueprint"
         response = HttpResponse(json.dumps(doc, indent=2, default=str), content_type="application/json")
         response["Content-Disposition"] = f'attachment; filename="{filename}.blueprint.json"'
@@ -175,14 +180,18 @@ class BlueprintExportEndpoint(BaseAPIView):
 
 
 class BlueprintImportEndpoint(BaseAPIView):
-    """POST {"document": {...}} (or the document itself) -> a new blueprint, version 1."""
+    """POST {"document": {...}, "accept_sample_cards"?: true} (or the document itself) -> a new
+    blueprint, version 1. A file with sample cards answers 400 with the warning and the card
+    titles until it is sent again with "accept_sample_cards": true."""
 
     @allow_permission(MEMBERS, level="WORKSPACE")
     def post(self, request, slug):
         workspace = _workspace(slug)
         body = request.data or {}
-        doc = body.get("document", body) if isinstance(body, dict) else body
-        blueprint = service.import_document(request.user, workspace, doc)
+        wrapped = isinstance(body, dict) and "document" in body
+        doc = body["document"] if wrapped else body
+        accept = wrapped and body.get("accept_sample_cards") is True
+        blueprint = service.import_document(request.user, workspace, doc, accept_sample_cards=accept)
         return Response(describe(request.user, blueprint), status=status.HTTP_201_CREATED)
 
 

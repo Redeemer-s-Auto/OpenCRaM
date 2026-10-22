@@ -26,7 +26,8 @@ Shape (``schema_version`` 1)::
       "layout": {"filters", "display_filters", "display_properties", "rich_filters"} | null,
       "templates": [{"name", "description", "data", "sort_order"}],
       "sample_cards": [<template data node> + optional "repeat": {...}],
-      "notes": ["what was left out and why"]
+      "notes": ["what was left out and why"],
+      "warning": SAMPLE_CARDS_WARNING   (exported files that carry sample cards only)
     }
 """
 
@@ -56,6 +57,13 @@ MAX_FIELDS = 200
 MAX_STATES = 100
 MAX_LABELS = 500
 MAX_TEMPLATES = 100
+
+# Said everywhere sample cards can leave the workspace in a file: next to the export
+# checkbox, in the confirm before download, inside the file, and on import.
+SAMPLE_CARDS_WARNING = (
+    "Sample card text goes into this file, and anyone who gets the file can read it. "
+    "Only include made-up example cards. Never include real client, team member, vehicle, money or shop records."
+)
 
 # Board settings a blueprint carries (features on/off and the private flag).
 BOARD_SETTINGS = {
@@ -548,6 +556,8 @@ def validate_document(doc):
     for field in fields:
         if field.get("field_type") not in {c[0] for c in CustomField.ALL_TYPE_CHOICES}:
             raise _err(f'Field "{field.get("name")}" has an unknown type.')
+    if "warning" in doc and not isinstance(doc["warning"], str):
+        raise _err('"warning" must be text.')
     board = doc.get("board") or {}
     if not isinstance(board, dict) or not isinstance(board.get("settings") or {}, dict):
         raise _err('"board" must be an object.')
@@ -560,6 +570,15 @@ def validate_document(doc):
     if emails:
         raise _err(f"The blueprint file holds an email address (at {emails[0]}). Remove it and try again.")
     return doc
+
+
+def sample_card_titles(doc):
+    """The titles of a document's sample cards, in order (what a person is warned about)."""
+    titles = []
+    for card in (doc or {}).get("sample_cards") or []:
+        name = " ".join(str(card.get("name") or "").split()) if isinstance(card, dict) else ""
+        titles.append(name or "(untitled card)")
+    return titles
 
 
 def summary(doc):

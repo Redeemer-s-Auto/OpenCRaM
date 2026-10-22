@@ -135,12 +135,17 @@ export class BlueprintService extends APIService {
     return this.unwrap(this.get(`${this.url(workspaceSlug)}${id}/versions/`));
   }
 
-  exportDocument(workspaceSlug: string, id: string): Promise<Record<string, unknown>> {
-    return this.unwrap(this.get(`${this.url(workspaceSlug)}${id}/export/`));
+  /** The file to download. Sample cards go in only when asked (the screen warns first). */
+  exportDocument(workspaceSlug: string, id: string, includeSamples = false): Promise<Record<string, unknown>> {
+    const query = includeSamples ? "?include_samples=1" : "";
+    return this.unwrap(this.get(`${this.url(workspaceSlug)}${id}/export/${query}`));
   }
 
-  importDocument(workspaceSlug: string, document: unknown): Promise<TBlueprint> {
-    return this.unwrap(this.post(`${this.url(workspaceSlug)}import/`, { document }));
+  /** A file with sample cards is refused unless `acceptSampleCards` (the person saw the warning and said yes). */
+  importDocument(workspaceSlug: string, document: unknown, acceptSampleCards = false): Promise<TBlueprint> {
+    return this.unwrap(
+      this.post(`${this.url(workspaceSlug)}import/`, { document, accept_sample_cards: acceptSampleCards })
+    );
   }
 
   use(workspaceSlug: string, id: string, data: TBlueprintUseData): Promise<TBlueprintUseResult> {

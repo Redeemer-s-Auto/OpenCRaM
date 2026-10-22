@@ -154,23 +154,53 @@ def _full_doc(blueprint):
     return doc
 
 
-SAMPLES_NOT_EXPORTED = "Sample cards were left out of this file: they are real cards and stay in their workspace."
+SAMPLES_NOT_EXPORTED = (
+    'Sample cards were left out of this file. To add them, tick "Include sample cards" when you export.'
+)
+SAMPLE_EMAILS_REMOVED = "Email addresses were removed from the sample cards in this file."
 
 
-def export_document(blueprint):
-    """The blueprint as a file to share with another workspace: design only, never shop data.
+def _travel_samples(cards):
+    """Sample cards made safe for a file: bodies cleaned again (no mentions, images, embeds
+    or ids) and every email address removed. Returns (cards, whether any email was removed)."""
+    cleaned = [S._travel_card(card) for card in cards if isinstance(card, dict)]
+    scrubbed = []
 
-    Sample cards are real cards (titles, page text, field values), so a file never
-    carries them, even when the blueprint holds some. The names of other boards a
-    relation field links to stay behind too (the person using the file picks a board
-    of their own). ``validate_document`` then refuses ids and email addresses
-    anywhere in the file.
+    def scrub(text):
+        if S.EMAIL_RE.search(text):
+            scrubbed.append(text)
+            return S.EMAIL_RE.sub("", text)
+        return text
+
+    return S._swap(cleaned, scrub), bool(scrubbed)
+
+
+def export_document(blueprint, include_samples=False):
+    """The blueprint as a file to share with another workspace.
+
+    By default the file is design only: sample cards are left out, even when the
+    blueprint holds some. With ``include_samples`` (the person ticked "Include sample
+    cards" and confirmed the warning) they go in, cleaned again, with every email
+    address removed, and the file carries a ``warning`` saying their text is readable
+    by anyone who gets the file. Cards hidden by sharing rules were never captured.
+    The names of other boards a relation field links to stay behind (the person using
+    the file picks a board of their own). ``validate_document`` then refuses ids and
+    email addresses anywhere in the file.
     """
     doc = _full_doc(blueprint)
-    notes = [n for n in doc.get("notes") or [] if n != SAMPLES_NOT_EXPORTED]
-    if doc.get("sample_cards"):
-        notes.append(SAMPLES_NOT_EXPORTED)
-    doc["sample_cards"] = []
+    doc.pop("warning", None)
+    notes = [n for n in doc.get("notes") or [] if n not in (SAMPLES_NOT_EXPORTED, SAMPLE_EMAILS_REMOVED)]
+    samples = [card for card in doc.get("sample_cards") or [] if isinstance(card, dict)]
+    if samples and include_samples:
+        samples, scrubbed = _travel_samples(samples)
+        if scrubbed:
+            notes.append(SAMPLE_EMAILS_REMOVED)
+        doc["sample_cards"] = samples
+        doc["warning"] = S.SAMPLE_CARDS_WARNING
+    else:
+        if samples:
+            notes.append(SAMPLES_NOT_EXPORTED)
+        doc["sample_cards"] = []
     doc["notes"] = notes
     fields = []
     for field in doc.get("fields") or []:
@@ -180,6 +210,9 @@ def export_document(blueprint):
         fields.append(field)
     doc["fields"] = fields
     S.validate_document(doc)  # never hand out a file this app would refuse (ids, emails)
+    emails = S.find_emails(doc)
+    if emails:  # validate_document does not look inside sample cards
+        raise ValidationError({"error": f"The file would hold an email address (at {emails[0]}). It was not made."})
     return doc
 
 
@@ -249,10 +282,25 @@ def recapture(user, blueprint, project, data):
     return blueprint
 
 
-def import_document(user, workspace, doc):
+def import_document(user, workspace, doc, accept_sample_cards=False):
+    """Make a blueprint from a file. A file that carries sample cards is refused until the
+    person has seen the warning and the card titles and says yes (``accept_sample_cards``)."""
     doc = S.validate_document(doc)
+    titles = S.sample_card_titles(doc)
+    if titles and not accept_sample_cards:
+        raise ValidationError(
+            {
+                "error": f"This file holds {len(titles)} sample card(s). Check them before you import. "
+                + S.SAMPLE_CARDS_WARNING,
+                "warning": S.SAMPLE_CARDS_WARNING,
+                "sample_cards": titles,
+                "needs_confirmation": "sample_cards",
+            }
+        )
     name = free_name(workspace, doc.get("name") or "Imported blueprint")
-    stored = {k: v for k, v in doc.items() if k not in ("name", "description", "logo_props", "version")}
+    stored = {
+        k: v for k, v in doc.items() if k not in ("name", "description", "logo_props", "version", "warning")
+    }
     with transaction.atomic():
         blueprint = Blueprint.objects.create(
             workspace=workspace,

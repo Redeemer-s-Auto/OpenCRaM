@@ -18,6 +18,32 @@ export function BlueprintIcon({ logo, size = 16 }: { logo?: TLogoProps | Record<
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
+/** Shown wherever sample cards can leave the workspace in a file. Same text as the server's warning. */
+export const SAMPLE_CARDS_WARNING =
+  "Sample card text goes into this file, and anyone who gets the file can read it. " +
+  "Only include made-up example cards. Never include real client, team member, vehicle, money or shop records.";
+
+/** Titles of the sample cards in a blueprint document (an export or a file picked to import). */
+export const sampleCardTitles = (document: unknown): string[] => {
+  const cards = (document as { sample_cards?: unknown } | null)?.sample_cards;
+  if (!Array.isArray(cards)) return [];
+  return cards.map((card) => {
+    const name = (card as { name?: unknown } | null)?.name;
+    return (typeof name === "string" && name.trim()) || "(untitled card)";
+  });
+};
+
+/** The confirm text listing the sample cards a file holds, with the warning. */
+export const sampleCardsConfirmText = (titles: string[], question: string): string =>
+  [
+    `This file holds ${plural(titles.length, "sample card")}:`,
+    ...titles.map((title) => `  - ${title}`),
+    "",
+    SAMPLE_CARDS_WARNING,
+    "",
+    question,
+  ].join("\n");
+
 /** "6 fields, 4 states, 2 views, 1 template, 3 sample cards" */
 export const describeSummary = (summary: TBlueprintSummary): string => {
   const parts = [

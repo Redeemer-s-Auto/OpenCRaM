@@ -122,9 +122,11 @@ export const SaveBlueprintModal = observer(function SaveBlueprintModal(props: TM
             Include this board&apos;s cards as sample cards (titles, page text, field values; at most 50).
             {includeSamples && (
               <span className="mt-1 block text-danger-primary">
-                Sample cards are real content from this board. Anyone who can use this blueprint can read them. They
-                stay in this workspace: an exported file never includes them. Cards hidden by sharing rules are never
-                included; people, mentions and images are removed.
+                Sample cards are real content from this board. Anyone who can use this blueprint can read them. An
+                exported file leaves them out unless someone ticks &quot;Include sample cards&quot; when exporting; then
+                anyone who gets the file can read them. Only include made-up example cards. Never include real client,
+                team member, vehicle, money or shop records. Cards hidden by sharing rules are never included; people,
+                mentions and images are removed.
               </span>
             )}
           </span>

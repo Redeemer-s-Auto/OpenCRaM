@@ -12,6 +12,7 @@ import { cn } from "@plane/utils";
 import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
 import type { TCardNode, TCardPage } from "@/services/card-tree.service";
 import { cardTreeService } from "@/services/card-tree.service";
+import { ShortcutRowLabel, rememberShortcutRows, shortcutRowHref } from "@/components/card-links/shortcut-row";
 import { CARD_TREE_PAGE_SIZE } from "./flags";
 
 const MAX_DEPTH = 8;
@@ -30,6 +31,7 @@ function useLevel(load: TLoader, enabled: boolean) {
       setBusy(true);
       load(offset, limit)
         .then((page) => {
+          rememberShortcutRows(page.results);
           setRows((previous) => (offset === 0 ? page.results : [...(previous ?? []), ...page.results]));
           setNextOffset(page.next_offset);
           setFailed(false);
@@ -87,7 +89,7 @@ function TreeNode(props: { workspaceSlug: string; node: TCardNode; depth: number
   const { workItem } = useParams();
   const [open, setOpen] = useState(false);
   const identifier = `${node.project_identifier}-${node.sequence_id}`;
-  const href = `/${workspaceSlug}/browse/${identifier}/`;
+  const href = shortcutRowHref(workspaceSlug, node, `/${workspaceSlug}/browse/${identifier}/`);
   const canOpen = node.child_count > 0 && depth < MAX_DEPTH;
   const loadChildren = useCallback(
     (offset: number, limit?: number) => cardTreeService.children(workspaceSlug, node.id, offset, limit),
@@ -105,15 +107,25 @@ function TreeNode(props: { workspaceSlug: string; node: TCardNode; depth: number
             disabled={!canOpen}
             onClick={() => setOpen((value) => !value)}
             className={cn("grid size-4 flex-shrink-0 place-items-center rounded-sm text-placeholder", {
-              "invisible": !canOpen,
+              invisible: !canOpen,
               "hover:bg-layer-1": canOpen,
             })}
           >
             <ChevronRightIcon className={cn("size-3 transition-transform", { "rotate-90": open })} />
           </button>
-          <Link href={href} className="flex min-w-0 flex-1 items-center gap-1.5" title={node.name}>
-            <FileText className="size-3.5 flex-shrink-0" style={{ color: node.state_color ?? undefined }} />
-            <span className="truncate text-12">{node.name || "Untitled"}</span>
+          <Link
+            href={href}
+            className="flex min-w-0 flex-1 items-center gap-1.5"
+            title={node.shortcut ? undefined : node.name}
+          >
+            {node.shortcut ? (
+              <ShortcutRowLabel shortcut={node.shortcut} className="text-12" />
+            ) : (
+              <>
+                <FileText className="size-3.5 flex-shrink-0" style={{ color: node.state_color ?? undefined }} />
+                <span className="truncate text-12">{node.name || "Untitled"}</span>
+              </>
+            )}
           </Link>
         </div>
       </SidebarNavItem>

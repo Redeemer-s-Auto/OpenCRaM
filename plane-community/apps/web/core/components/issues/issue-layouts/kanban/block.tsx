@@ -31,6 +31,8 @@ import { useKanbanView } from "@/hooks/store/use-kanban-view";
 import { useProject } from "@/hooks/store/use-project";
 import useIssuePeekOverviewRedirection from "@/hooks/use-issue-peek-overview-redirection";
 import { usePlatformOS } from "@/hooks/use-platform-os";
+// card shortcuts: a shortcut card shows its target's live title
+import { ShortcutAwareTitle, shortcutAwareName } from "@/components/card-links/shortcut-title";
 // local components
 import type { TRenderQuickActions } from "../list/list-view-types";
 import { IssueProperties } from "../properties/all-properties";
@@ -70,6 +72,7 @@ const KanbanIssueDetailsBlock = observer(function KanbanIssueDetailsBlock(props:
   const [isMenuActive, setIsMenuActive] = useState(false);
   // hooks
   const { isMobile } = usePlatformOS();
+  const { workspaceSlug } = useParams();
 
   const customActionButton = (
     // oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions
@@ -120,9 +123,14 @@ const KanbanIssueDetailsBlock = observer(function KanbanIssueDetailsBlock(props:
         </div>
       </div>
 
-      <Tooltip tooltipContent={issue.name} isMobile={isMobile} renderByDefault={false}>
+      <Tooltip tooltipContent={shortcutAwareName(issue.id, issue.name)} isMobile={isMobile} renderByDefault={false}>
         <div className="line-clamp-1 w-full text-body-sm-medium text-primary">
-          <span>{issue.name}</span>
+          <ShortcutAwareTitle
+            workspaceSlug={workspaceSlug?.toString()}
+            projectId={issue.project_id}
+            issueId={issue.id}
+            name={issue.name}
+          />
         </div>
       </Tooltip>
 

@@ -20,7 +20,8 @@ TYPES = ("created_time", "last_edited_time", "created_by", "last_edited_by")
 @pytest.fixture
 def audit(cast):
     fields = {t: cast.field(cast.alpha, name=t.replace("_", " ").title(), field_type=t) for t in TYPES}
-    return fields
+    # Ids come back as UUID objects; values are keyed by the id as text.
+    return {t: {**f, "id": str(f["id"])} for t, f in fields.items()}
 
 
 def card_values(cast, client, card):
@@ -45,7 +46,7 @@ def test_last_edited_time_moves_when_a_field_value_changes(cast, audit):
     amount = cast.field(cast.alpha, name="Amount", field_type="number")
     card = cast.card(cast.alpha, "A card", author=cast.admin)
     before = card_values(cast, cast.member_client, card)[audit["last_edited_time"]["id"]]
-    cast.patch(card, {amount["id"]: 5}, client=cast.member_client)
+    cast.patch(card, {str(amount["id"]): 5}, client=cast.member_client)
     after = card_values(cast, cast.member_client, card)[audit["last_edited_time"]["id"]]
     assert datetime.datetime.fromisoformat(after) > datetime.datetime.fromisoformat(before)
 

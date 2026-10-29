@@ -17,7 +17,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 # Django imports
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.validators import URLValidator
+from django.core.validators import EmailValidator, URLValidator
 from django.db import transaction
 from django.db.models import Case, F, IntegerField, OuterRef, Q, Subquery, Value, When
 from django.utils import timezone
@@ -49,6 +49,7 @@ _FILTER_KEY_RE = re.compile(r"^customfield_(?P<id>[0-9a-fA-F-]{36})(?:__(?P<look
 _RELATIVE_DATE_RE = re.compile(r"^@today(?:(?P<sign>[+-])(?P<days>\d{1,4}))?$")
 
 _url_validator = URLValidator(schemes=["http", "https"])
+_email_validator = EmailValidator()
 
 
 # ---------------------------------------------------------------------------
@@ -56,11 +57,12 @@ _url_validator = URLValidator(schemes=["http", "https"])
 # ---------------------------------------------------------------------------
 
 
-def clean_options(field_type, options, existing=None):
+def clean_options(field_type, options, existing=None, status=False):
     """Validate an option list for select, multi_select and label fields.
 
     Each option is ``{"id", "name", "color"}``. A missing id gets a new one.
     Ids of ``existing`` options are kept so values stay linked after a rename.
+    A status field's options also carry a ``group``: todo, in_progress or complete.
     """
     if field_type not in CustomField.OPTION_TYPES:
         return []
@@ -92,7 +94,13 @@ def clean_options(field_type, options, existing=None):
         color = str(option.get("color") or "")[:32]
         seen_ids.add(option_id)
         seen_names.add(name.lower())
-        cleaned.append({"id": option_id, "name": name, "color": color})
+        entry = {"id": option_id, "name": name, "color": color}
+        if status:
+            group = option.get("group") or "todo"
+            if group not in CustomField.STATUS_GROUPS:
+                raise ValidationError({"options": f"A status group must be one of: {', '.join(CustomField.STATUS_GROUPS)}."})
+            entry["group"] = group
+        cleaned.append(entry)
     return cleaned
 
 
@@ -107,6 +115,11 @@ def clean_settings(field_type, settings):
     if field_type in CustomField.AUDIT_TYPES:
         return {}
     cleaned = {}
+    fmt = settings.get("format")
+    if fmt:
+        if fmt not in CustomField.FORMATS_BY_TYPE.get(field_type, set()):
+            raise ValidationError({"settings": f"A {field_type} field cannot have the format '{fmt}'."})
+        cleaned["format"] = fmt
     if field_type == FT.DATE:
         cleaned["include_time"] = bool(settings.get("include_time", False))
     if field_type == FT.PERSON:
@@ -219,6 +232,30 @@ def _to_list(raw):
     return [raw]
 
 
+_PHONE_RE = re.compile(r"^\+?[\d\s().\-]+(?:\s*(?:x|ext\.?|#)\s*\d{1,8})?$", re.IGNORECASE)
+
+
+def _clean_phone(text, err):
+    """A phone number as typed, if it looks like one: 7 to 15 digits, with + ( ) - . spaces and an extension."""
+    if not _PHONE_RE.match(text):
+        raise err("Must be a phone number, like (512) 555-0134 or +1 512 555 0134 x12.")
+    main = re.split(r"x|ext|#", text, maxsplit=1, flags=re.IGNORECASE)[0]
+    if not 7 <= len(re.sub(r"\D", "", main)) <= 15:
+        raise err("A phone number has 7 to 15 digits.")
+    return text
+
+
+def _clean_email(text, err):
+    text = text.strip().lower()
+    if len(text) > 254:
+        raise err("Email addresses can be at most 254 characters.")
+    try:
+        _email_validator(text)
+    except DjangoValidationError:
+        raise err("Must be an email address.")
+    return text
+
+
 def clean_value(field, raw, new_label_options=None):
     """Return ``(value, typed_columns)`` for one field, or raise ValidationError.
 
@@ -245,6 +282,11 @@ def clean_value(field, raw, new_label_options=None):
                 raise err(f"Long text can be at most {LONG_TEXT_MAX} characters.")
         if not text:
             return None, {}
+        fmt = (field.settings or {}).get("format") if t == FT.TEXT else None
+        if fmt == "phone":
+            text = _clean_phone(text, err)
+        elif fmt == "email":
+            text = _clean_email(text, err)
         return text, {"value_text": text}
 
     if t == FT.URL:

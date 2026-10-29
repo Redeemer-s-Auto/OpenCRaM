@@ -23,7 +23,7 @@ import { usePlatformOS } from "@/hooks/use-platform-os";
 import {
   effectiveFieldType,
   formatCustomFieldValue,
-  getFieldTypeDetails,
+  getFieldDetails,
   isAuditPersonField,
   isEmptyValue,
   linkedCards,
@@ -99,7 +99,7 @@ const CardFaceValue = observer(function CardFaceValue(props: {
   const { isMobile } = usePlatformOS();
   const { getUserDetails } = useMember();
   const value = issue.custom_fields?.[field.id];
-  const Icon = getFieldTypeDetails(field.field_type).icon;
+  const Icon = getFieldDetails(field).icon;
   const text = formatCustomFieldValue(field, value, (userId) => getUserDetails(userId)?.display_name);
   const save = (next: TCustomFieldValue) =>
     updateIssue?.(issue.project_id, issue.id, buildCustomFieldsPayload(issue.custom_fields, field.id, next));

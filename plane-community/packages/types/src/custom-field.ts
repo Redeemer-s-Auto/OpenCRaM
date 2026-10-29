@@ -22,15 +22,30 @@ export type TCustomFieldType =
   | "created_time"
   | "last_edited_time"
   | "created_by"
-  | "last_edited_by";
+  | "last_edited_by"
+  // Short names the server turns into number, text and dropdown fields with a format (see settings.format).
+  | "percent"
+  | "phone"
+  | "email"
+  | "status";
+
+/** What a number, text or dropdown field is shown and checked as. Set when the field is made. */
+export type TCustomFieldFormat = "percent" | "phone" | "email" | "status";
+
+/** Where a status option sits: not started, under way, or finished. */
+export type TCustomFieldStatusGroup = "todo" | "in_progress" | "complete";
 
 export type TCustomFieldOption = {
   id: string;
   name: string;
   color: string;
+  /** status fields only */
+  group?: TCustomFieldStatusGroup;
 };
 
 export type TCustomFieldSettings = {
+  /** number: percent. text: phone or email. dropdown: status. Fixed after the field is made. */
+  format?: TCustomFieldFormat;
   /** date: also store a time */
   include_time?: boolean;
   /** person: allow more than one person */

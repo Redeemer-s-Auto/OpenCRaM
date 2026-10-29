@@ -12,7 +12,7 @@ import type { IIssueDisplayProperties, TIssue } from "@plane/types";
 import { ControlLink } from "@plane/ui";
 import { cn, generateWorkItemLink, getFileURL } from "@plane/utils";
 // components
-import { formatCustomFieldValue, getFieldTypeDetails } from "@/components/custom-fields/helpers";
+import { formatCustomFieldValue, getFieldDetails } from "@/components/custom-fields/helpers";
 import { isCustomFieldColumnShown, useSpreadsheetCustomFields } from "@/components/custom-fields/spreadsheet-columns";
 import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // hooks
@@ -110,7 +110,7 @@ export const GalleryCard = observer(function GalleryCard(props: Props) {
       {shownFields.length > 0 && (
         <dl className="flex flex-col gap-0.5 px-3 pt-1.5 text-caption-md-regular">
           {shownFields.map(({ field, text }) => {
-            const Icon = getFieldTypeDetails(field.field_type).icon;
+            const Icon = getFieldDetails(field).icon;
             return (
               <div key={field.id} className="flex min-w-0 items-center gap-1.5 text-secondary" title={field.name}>
                 <Icon className="size-3 shrink-0 text-placeholder" />

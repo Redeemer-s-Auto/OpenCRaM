@@ -77,7 +77,23 @@ class CustomFieldSerializer(BaseSerializer):
             raise serializers.ValidationError("This project already has a field with this name.")
         return value
 
+    # Names for the formats: made as base type + settings["format"] (see CustomField.TYPE_ALIASES).
+    DEFAULT_STATUS_OPTIONS = [
+        {"name": "Not started", "group": "todo", "color": "#9ca3af"},
+        {"name": "In progress", "group": "in_progress", "color": "#3b82f6"},
+        {"name": "Done", "group": "complete", "color": "#22c55e"},
+    ]
+
     def validate(self, attrs):
+        alias = CustomField.TYPE_ALIASES.get(attrs.get("field_type"))
+        if alias:
+            attrs["field_type"] = alias[0]
+            attrs["settings"] = {**(attrs.get("settings") or {}), "format": alias[1]}
+        if self.instance is not None and "settings" in attrs:
+            # The format is part of what the field is: it cannot change after it is made.
+            kept = (self.instance.settings or {}).get("format")
+            settings = {k: v for k, v in (attrs["settings"] or {}).items() if k != "format"}
+            attrs["settings"] = {**settings, "format": kept} if kept else settings
         if self.instance is not None and "field_type" in attrs and attrs["field_type"] != self.instance.field_type:
             raise serializers.ValidationError({"field_type": "The type of a field cannot change after it is made."})
         field_type = attrs.get("field_type") or (self.instance and self.instance.field_type)
@@ -85,7 +101,11 @@ class CustomFieldSerializer(BaseSerializer):
             raise serializers.ValidationError({"field_type": "A field needs a type."})
         if "options" in attrs or self.instance is None:
             existing = self.instance.options if self.instance is not None else None
-            attrs["options"] = clean_options(field_type, attrs.get("options"), existing)
+            fmt = (attrs.get("settings") or (self.instance.settings if self.instance else None) or {}).get("format")
+            options = attrs.get("options")
+            if fmt == "status" and self.instance is None and not options:
+                options = self.DEFAULT_STATUS_OPTIONS
+            attrs["options"] = clean_options(field_type, options, existing, status=fmt == "status")
         if "settings" in attrs or self.instance is None:
             attrs["settings"] = clean_settings(field_type, attrs.get("settings"))
         if field_type in CustomField.LINKED_TYPES and ("settings" in attrs or self.instance is None):

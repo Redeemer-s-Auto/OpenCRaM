@@ -48,6 +48,13 @@ type Props = {
 
 type TDraftOption = Omit<TCustomFieldOption, "id"> & { id?: string };
 
+const STATUS_STARTERS: TDraftOption[] = [
+  { name: "Not started", color: "#9ca3af", group: "todo" },
+  { name: "In progress", color: "#3b82f6", group: "in_progress" },
+  { name: "Done", color: "#22c55e", group: "complete" },
+];
+const STATUS_GROUP_LABELS = { todo: "Not started", in_progress: "In progress", complete: "Done" } as const;
+
 const errorMessage = (error: unknown) => {
   if (!error || typeof error !== "object") return "Something went wrong. Try again.";
   const values = Object.values(error as Record<string, unknown>).flat();
@@ -87,7 +94,7 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
     if (!isOpen) return;
     setName(field?.name ?? "");
     setDescription(field?.description ?? "");
-    setFieldType(field?.field_type ?? "text");
+    setFieldType(field?.settings?.format ?? field?.field_type ?? "text");
     setOptions(field?.options ?? []);
     setIncludeTime(!!field?.settings?.include_time);
     setMultiple(!!field?.settings?.multiple);
@@ -121,7 +128,12 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
       .map((f) => ({ value: f.id, label: f.name })),
   ];
 
-  const hasOptions = OPTION_FIELD_TYPES.includes(fieldType);
+  const hasOptions = OPTION_FIELD_TYPES.includes(fieldType) || fieldType === "status";
+  // A new status field starts with the usual three steps. They can be renamed, moved or removed.
+  useEffect(() => {
+    if (isOpen && !isEdit && fieldType === "status" && options.length === 0)
+      setOptions(STATUS_STARTERS.map((o) => ({ ...o })));
+  }, [isOpen, isEdit, fieldType, options.length]);
   const removedOptions = isEdit ? (field?.options ?? []).filter((o) => !options.some((d) => d.id === o.id)) : [];
 
   const moveOption = (index: number, delta: number) => {
@@ -468,6 +480,26 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
                   placeholder={`Option ${index + 1}`}
                   className="grow"
                 />
+                {fieldType === "status" && (
+                  <select
+                    value={option.group ?? "todo"}
+                    onChange={(e) =>
+                      setOptions(
+                        options.map((o, i) =>
+                          i === index ? { ...o, group: e.target.value as TCustomFieldOption["group"] } : o
+                        )
+                      )
+                    }
+                    className="rounded-sm border border-subtle bg-transparent px-1 py-1 text-caption-md-regular"
+                    aria-label="Status group"
+                  >
+                    {Object.entries(STATUS_GROUP_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <button type="button" onClick={() => moveOption(index, -1)} aria-label="Move up" className="text-tertiary hover:text-primary">
                   <ArrowUp className="size-3.5" />
                 </button>
@@ -492,7 +524,11 @@ export const CustomFieldFormModal = observer(function CustomFieldFormModal(props
               onClick={() =>
                 setOptions([
                   ...options,
-                  { name: "", color: DEFAULT_OPTION_COLORS[options.length % DEFAULT_OPTION_COLORS.length] },
+                  {
+                    name: "",
+                    color: DEFAULT_OPTION_COLORS[options.length % DEFAULT_OPTION_COLORS.length],
+                    ...(fieldType === "status" ? { group: "todo" as const } : {}),
+                  },
                 ])
               }
             >

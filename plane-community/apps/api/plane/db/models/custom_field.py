@@ -56,6 +56,18 @@ class CustomField(ProjectBaseModel):
     CREATED_BY = "created_by"
     LAST_EDITED_BY = "last_edited_by"
     AUDIT_TYPES = {CREATED_TIME, LAST_EDITED_TIME, CREATED_BY, LAST_EDITED_BY}
+    # Percent, phone, email and status are stored as the number, text and dropdown types with
+    # ``settings["format"]`` set, so filters, sort, rollups and the API treat them like their base
+    # type. The field API also accepts the short names below and turns them into base type + format.
+    TYPE_ALIASES = {
+        "percent": ("number", "percent"),
+        "phone": ("text", "phone"),
+        "email": ("text", "email"),
+        "status": ("select", "status"),
+    }
+    FORMATS_BY_TYPE = {"number": {"percent"}, "text": {"phone", "email"}, "select": {"status"}}
+    # Status options sit in one of these groups, in the order work moves.
+    STATUS_GROUPS = ("todo", "in_progress", "complete")
     ALL_TYPE_CHOICES = [
         *FieldType.choices,
         (RELATION, "Relation"),
@@ -64,6 +76,10 @@ class CustomField(ProjectBaseModel):
         (LAST_EDITED_TIME, "Last edited time"),
         (CREATED_BY, "Created by"),
         (LAST_EDITED_BY, "Last edited by"),
+        ("percent", "Percent"),
+        ("phone", "Phone"),
+        ("email", "Email"),
+        ("status", "Status"),
     ]
 
     name = models.CharField(max_length=255)

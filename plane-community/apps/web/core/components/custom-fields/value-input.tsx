@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { observer } from "mobx-react";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Mail, Phone } from "lucide-react";
 import type { TCustomField, TCustomFieldValue } from "@plane/types";
 import { Checkbox, CustomSearchSelect, Input, TextArea } from "@plane/ui";
 import { cn, renderFormattedPayloadDate } from "@plane/utils";
@@ -41,17 +41,23 @@ type Props = {
 
 const textClass = "text-body-xs-regular";
 
+// Same rules as the server, loosely: the server has the final say.
+const PHONE_PATTERN = /^\+?[\d\s().-]{7,}(?:\s*(?:x|ext\.?|#)\s*\d{1,8})?$/i;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /** Text box that saves on blur or Enter and reverts on Escape. */
 function CommitInput(props: {
   initial: string;
   placeholder: string;
   disabled?: boolean;
-  inputMode?: "text" | "decimal" | "url";
+  inputMode?: "text" | "decimal" | "url" | "tel" | "email";
+  /** shown after the text when the box is not being typed in, like a % sign */
+  suffix?: string;
   validate?: (text: string) => boolean;
   onCommit: (text: string) => void;
   className?: string;
 }) {
-  const { initial, placeholder, disabled, inputMode = "text", validate, onCommit, className } = props;
+  const { initial, placeholder, disabled, inputMode = "text", validate, onCommit, className, suffix } = props;
   const [text, setText] = useState(initial);
   const [invalid, setInvalid] = useState(false);
   useEffect(() => setText(initial), [initial]);
@@ -63,7 +69,7 @@ function CommitInput(props: {
     onCommit(text);
   };
 
-  return (
+  const input = (
     <Input
       value={text}
       onChange={(e) => setText(e.target.value)}
@@ -82,6 +88,13 @@ function CommitInput(props: {
       mode="true-transparent"
       className={cn("w-full rounded-sm px-2 py-1 hover:bg-layer-transparent-hover", textClass, className)}
     />
+  );
+  if (!suffix) return input;
+  return (
+    <div className="flex w-full items-center">
+      {input}
+      {text !== "" && <span className={cn("shrink-0 pr-2 text-tertiary", textClass)}>{suffix}</span>}
+    </div>
   );
 }
 
@@ -121,7 +134,32 @@ export const CustomFieldValueInput = observer(function CustomFieldValueInput(pro
   }
 
   switch (field.field_type) {
-    case "text":
+    case "text": {
+      const format = field.settings?.format;
+      if (format === "phone" || format === "email") {
+        const text = typeof value === "string" ? value : "";
+        return (
+          <div className="flex w-full items-center gap-1">
+            <CommitInput
+              initial={text}
+              placeholder={variant === "cell" ? "" : format === "phone" ? "(512) 555-0134" : "name@example.com"}
+              disabled={disabled}
+              inputMode={format === "phone" ? "tel" : "email"}
+              validate={(entered) => entered.trim() === "" || (format === "phone" ? PHONE_PATTERN : EMAIL_PATTERN).test(entered.trim())}
+              onCommit={(entered) => onChange(entered.trim() === "" ? null : entered.trim())}
+            />
+            {text && (
+              <a
+                href={format === "phone" ? `tel:${text.replace(/[^\d+]/g, "")}` : `mailto:${text}`}
+                className="shrink-0 text-tertiary hover:text-primary"
+                aria-label={format === "phone" ? "Call" : "Write an email"}
+              >
+                {format === "phone" ? <Phone className="size-3.5" /> : <Mail className="size-3.5" />}
+              </a>
+            )}
+          </div>
+        );
+      }
       return (
         <CommitInput
           initial={(value as string) ?? ""}
@@ -130,6 +168,7 @@ export const CustomFieldValueInput = observer(function CustomFieldValueInput(pro
           onCommit={(text) => onChange(text.trim() === "" ? null : text)}
         />
       );
+    }
 
     case "long_text":
       return (
@@ -152,7 +191,8 @@ export const CustomFieldValueInput = observer(function CustomFieldValueInput(pro
       return (
         <CommitInput
           initial={value === null || value === undefined ? "" : String(value)}
-          placeholder={placeholder}
+          placeholder={field.settings?.format === "percent" && variant !== "cell" ? "0%" : placeholder}
+          suffix={field.settings?.format === "percent" ? "%" : undefined}
           disabled={disabled}
           inputMode="decimal"
           validate={(text) => parseNumber(text) !== undefined}

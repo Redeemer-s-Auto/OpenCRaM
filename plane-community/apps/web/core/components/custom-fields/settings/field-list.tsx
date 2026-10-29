@@ -19,7 +19,7 @@ import { SettingsHeading } from "@/components/settings/heading";
 import { useCustomField } from "@/hooks/store/use-custom-field";
 import { useUserPermissions } from "@/hooks/store/user";
 // local
-import { getFieldTypeDetails } from "../helpers";
+import { getFieldDetails } from "../helpers";
 import { OptionChip } from "../value-input";
 import { DeleteCustomFieldModal } from "./delete-field-modal";
 import { CustomFieldFormModal } from "./field-form-modal";
@@ -94,7 +94,7 @@ export const ProjectSettingsCustomFieldList = observer(function ProjectSettingsC
           </div>
         ) : (
           fields.map((field, index) => {
-            const type = getFieldTypeDetails(field.field_type);
+            const type = getFieldDetails(field);
             return (
               <div
                 key={field.id}

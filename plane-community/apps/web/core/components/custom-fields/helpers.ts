@@ -12,11 +12,15 @@ import {
   CalendarDays,
   CheckSquare,
   CircleChevronDown,
+  CircleDot,
   Clock,
   DollarSign,
   Hash,
   Link2,
+  Mail,
   PencilLine,
+  Percent,
+  Phone,
   ListChecks,
   Sigma,
   Tag,
@@ -48,6 +52,10 @@ export const CUSTOM_FIELD_TYPES: { type: TCustomFieldType; label: string; icon: 
   { type: "formula", label: "Formula", icon: Sigma, hint: "Worked out from other fields, like Notion formulas" },
   { type: "relation", label: "Relation", icon: ArrowLeftRight, hint: "Link to cards on any board, like Notion relations" },
   { type: "rollup", label: "Rollup", icon: Layers, hint: "Count, sum or show values from linked cards" },
+  { type: "percent", label: "Percent", icon: Percent, hint: "A number shown with a % sign" },
+  { type: "phone", label: "Phone", icon: Phone, hint: "A phone number you can tap to call" },
+  { type: "email", label: "Email", icon: Mail, hint: "An email address you can tap to write to" },
+  { type: "status", label: "Status", icon: CircleDot, hint: "Not started, in progress, done. Add as many as you need" },
   { type: "created_time", label: "Created time", icon: Clock, hint: "When the card was made. Filled in for you" },
   { type: "last_edited_time", label: "Last edited time", icon: PencilLine, hint: "When the card was last changed. Filled in for you" },
   { type: "created_by", label: "Created by", icon: UserPlus, hint: "Who made the card. Filled in for you" },
@@ -114,6 +122,10 @@ export const OPTION_FIELD_TYPES: TCustomFieldType[] = ["select", "multi_select",
 
 export const getFieldTypeDetails = (type: TCustomFieldType) =>
   CUSTOM_FIELD_TYPES.find((t) => t.type === type) ?? CUSTOM_FIELD_TYPES[0];
+
+/** The type a field shows as in menus: percent, phone, email and status are stored as number, text and dropdown. */
+export const fieldDisplayType = (field: TCustomField): TCustomFieldType => field.settings?.format ?? field.field_type;
+export const getFieldDetails = (field: TCustomField) => getFieldTypeDetails(fieldDisplayType(field));
 
 export const DEFAULT_OPTION_COLORS = [
   "#EE0000",
@@ -221,7 +233,7 @@ export const formatCustomFieldValue = (
     case "money":
       return formatMoney(value as number);
     case "number":
-      return (value as number).toLocaleString("en-US", { maximumFractionDigits: 6 });
+      return `${(value as number).toLocaleString("en-US", { maximumFractionDigits: 6 })}${field.settings?.format === "percent" ? "%" : ""}`;
     case "checkbox":
       return value ? "Yes" : "No";
     case "date": {

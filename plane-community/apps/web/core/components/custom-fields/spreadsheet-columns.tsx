@@ -20,7 +20,7 @@ import { useCustomField } from "@/hooks/store/use-custom-field";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // local
 import { AddCustomFieldButton } from "./add-field-button";
-import { getFieldTypeDetails, isLinkedField } from "./helpers";
+import { getFieldDetails, isLinkedField } from "./helpers";
 import { buildCustomFieldsPayload } from "./issue-properties";
 import { CustomFieldValueInput } from "./value-input";
 
@@ -56,7 +56,7 @@ export const CustomFieldHeaderColumns = observer(function CustomFieldHeaderColum
           const ascending = `custom_field__${field.id}` as TIssueOrderByOptions;
           const descending = `-custom_field__${field.id}` as TIssueOrderByOptions;
           const active = displayFilters.order_by === ascending || displayFilters.order_by === descending;
-          const Icon = getFieldTypeDetails(field.field_type).icon;
+          const Icon = getFieldDetails(field).icon;
           return (
             <th
               key={field.id}

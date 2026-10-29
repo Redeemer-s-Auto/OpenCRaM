@@ -13,7 +13,7 @@ import { useCustomField } from "@/hooks/store/use-custom-field";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // local
 import { AddCustomFieldButton } from "./add-field-button";
-import { getFieldTypeDetails } from "./helpers";
+import { getFieldDetails } from "./helpers";
 import type { TCustomFieldInputValue } from "./value-input";
 import { CustomFieldValueInput } from "./value-input";
 
@@ -71,7 +71,7 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
       {fields.map((field) => (
         <SidebarPropertyListItem
           key={field.id}
-          icon={getFieldTypeDetails(field.field_type).icon}
+          icon={getFieldDetails(field).icon}
           label={field.name}
           childrenClassName="min-w-0"
         >

@@ -380,7 +380,7 @@ class Applier:
             spec = f
             if f.ext_id in self.used_fallback:
                 spec = f.fallback
-            if spec is None or spec.field_type in ("formula", "rollup") or f.mirror_of:
+            if spec is None or spec.field_type in ("formula", "rollup", "created_time") or f.mirror_of:
                 continue
             if f.field_type == "relation" and spec is f and not include_relations:
                 continue
@@ -392,7 +392,7 @@ class Applier:
                 if clear:  # emptied in Notion since the last run: empty it here too
                     out[field["id"]] = None
                 continue
-            if spec.field_type == "select":
+            if spec.field_type in ("select", "status"):
                 v = self._option_id(b, spec.ext_id, v)
             elif spec.field_type == "multi_select":
                 v = [x for x in (self._option_id(b, spec.ext_id, n) for n in v) if x]

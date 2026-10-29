@@ -168,6 +168,16 @@ class TestRichText(unittest.TestCase):
         rich = [{"type": "text", "plain_text": "x", "href": "https://example.org/?a=1&b=2"}]
         self.assertIn('href="https://example.org/?a=1&amp;b=2"', to_html(rich, resolve=lambda p: "nope"))
 
+    def test_date_mention_becomes_a_date_chip(self):
+        rich = [{"type": "mention", "plain_text": "Oct 30, 2026 2:30 PM", "mention": {"type": "date", "date": {"start": "2026-10-30T14:30:00.000-05:00", "end": None}}}]
+        out = to_html(rich)
+        self.assertIn('data-type="date-mention" data-date="2026-10-30" data-time="14:30" data-mention-id="', out)
+        self.assertIn(">Oct 30, 2026 2:30 PM</span>", out)
+        day = [{"type": "mention", "plain_text": "Oct 30, 2026", "mention": {"type": "date", "date": {"start": "2026-10-30", "end": None}}}]
+        self.assertNotIn("data-time", to_html(day))
+        span = [{"type": "mention", "plain_text": "Oct 30 to Nov 2", "mention": {"type": "date", "date": {"start": "2026-10-30", "end": "2026-11-02"}}}]
+        self.assertEqual(to_html(span), "Oct 30 to Nov 2")
+
     def test_javascript_text_is_escaped(self):
         rich = [{"type": "text", "plain_text": "<script>alert(1)</script>"}]
         self.assertEqual(to_html(rich), "&lt;script&gt;alert(1)&lt;/script&gt;")
@@ -251,15 +261,16 @@ class TestPlan(unittest.TestCase):
         self.assertEqual(t["Due end"], "date")
         self.assertEqual(t["Checked"], "checkbox")
         self.assertEqual(t["Link"], "url")
-        self.assertEqual(t["Mail"], "text")
-        self.assertEqual(t["Phone"], "text")
+        self.assertEqual(t["Mail"], "email")
+        self.assertEqual(t["Phone"], "phone")
         self.assertEqual(t["Owner"], "person")
         self.assertEqual(t["Owner from Notion"], "text")
         self.assertEqual(t["Project"], "relation")
         self.assertEqual(t["Total"], "formula")
         self.assertEqual(t["Next"], "formula")
         self.assertEqual(t["Odd"], "text")  # .map() does not translate -> frozen
-        self.assertEqual(t["Made"], "text")
+        self.assertEqual(t["Made"], "created_time")
+        self.assertEqual(t["Done pct"], "percent")
         self.assertNotIn("Press", t)  # button: nothing to copy
         self.assertNotIn("Status", t)  # status -> card state
 
@@ -486,6 +497,28 @@ class TestApply(unittest.TestCase):
         self.assertIn("did not make it private", str(ctx.exception))
         self.assertEqual(len(fake.projects), 1)
         self.assertEqual(fake.cards, {})  # nothing landed on a board everyone can see
+
+    def test_newer_field_types_are_made_and_audit_fields_get_no_values(self):
+        fake = FakeNotes()
+        ap, result, _ = self.run_import(fake)
+        self.assertEqual(result["errors"], [])
+        tasks_pid = ap.projects["11111111111111111111111111111111"]["id"]
+        got = {f["name"]: f for f in fake.fields[tasks_pid]}
+        self.assertEqual((got["Mail"]["field_type"], got["Mail"]["settings"]["format"]), ("text", "email"))
+        self.assertEqual(got["Phone"]["settings"]["format"], "phone")
+        self.assertEqual(got["Done pct"]["settings"]["format"], "percent")
+        self.assertEqual(got["Made"]["field_type"], "created_time")
+        sent = [c for c in fake.cards.values() if c["project"] == tasks_pid]
+        self.assertTrue(all(got["Made"]["id"] not in (c.get("custom_fields") or {}) for c in sent))
+
+    def test_old_server_without_the_newer_field_types_uses_text_and_number(self):
+        fake = FakeNotes(support_new_types=False)
+        ap, result, _ = self.run_import(fake)
+        self.assertEqual(result["errors"], [])
+        tasks_pid = ap.projects["11111111111111111111111111111111"]["id"]
+        got = {f["name"]: f["field_type"] for f in fake.fields[tasks_pid]}
+        self.assertEqual((got["Mail"], got["Phone"], got["Made"], got["Done pct"]), ("text", "text", "text", "number"))
+        self.assertTrue(any("became a frozen value" in w for w in result["warnings"]))
 
     def test_old_server_without_templates_warns(self):
         fake = FakeNotes(support_templates=False)

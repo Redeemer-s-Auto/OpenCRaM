@@ -6,6 +6,14 @@ Copies Notion databases and pages into Notes boards and cards. Python 3.10+, sta
 - Plain pages become cards on a "Docs" board; sub-pages become sub-cards.
 - Properties become custom fields; status becomes the card state; formulas, relations and
   rollups are rebuilt when Notes can do the same thing, otherwise a frozen copy is kept.
+- Percent, email and phone properties, a second status property and created time become the matching
+  Notes field types (an older Notes server that refuses them gets a plain number or text field instead).
+  Last edited time, created by and last edited by stay text: Notes works those out from the card, so they
+  would show the import, not Notion. Created time is worked out from the card's creation time, which the
+  import sets from Notion.
+- A single-date date mention in text becomes a Notes date chip (no reminder is made). A date range stays text.
+- Synced blocks are copied as plain content, and linked database views are left as a placeholder line:
+  the importer talks to the v1 API, which cannot make a synced block or a live view.
 - Images and files stored in Notion are downloaded and re-uploaded (Notion's links expire).
 - Anything with no Notes equivalent becomes a visible placeholder line and is counted in the report.
 - Re-runnable: everything carries `external_source="notion"` and the Notion id, so a second run

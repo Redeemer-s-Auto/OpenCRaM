@@ -33,6 +33,15 @@ STATUS_GROUP = {
     "complete": "completed",
     "done": "completed",
 }
+# Notion status groups -> the groups of a Notes status field
+STATUS_FIELD_GROUP = {
+    "to-do": "todo",
+    "to do": "todo",
+    "not started": "todo",
+    "in progress": "in_progress",
+    "complete": "complete",
+    "done": "complete",
+}
 # Notion select colors -> hex for Notes options
 COLORS = {
     "default": "#9ca3af",
@@ -320,15 +329,20 @@ class Planner:
             if fmt in ("dollar",):
                 b.came_over["money property"] += 1
                 return FieldSpec(ext, name, "money", pname, t)
+            plain_number = FieldSpec(
+                ext, name, "number", pname, t, settings={"decimals": 2}, note="percent" if fmt == "percent" else ""
+            )
             if fmt == "percent":
-                b.changed["percent number (shown as a plain number, 50 = 50%)"] += 1
-            elif fmt not in ("number", "number_with_commas"):
+                b.came_over["percent property"] += 1
+                # an older Notes server refuses the percent type: the plain number is the fallback (50 = 50%)
+                return FieldSpec(
+                    ext, name, "percent", pname, t, settings={"decimals": 2}, note="percent", fallback=plain_number
+                )
+            if fmt not in ("number", "number_with_commas"):
                 b.changed[f"number format '{fmt}' (shown as a plain number)"] += 1
             else:
                 b.came_over["number property"] += 1
-            return FieldSpec(
-                ext, name, "number", pname, t, settings={"decimals": 2}, note="percent" if fmt == "percent" else ""
-            )
+            return plain_number
         if t in ("select", "multi_select"):
             opts = (p.get(t) or {}).get("options") or []
             b.came_over[f"{t.replace('_', '-')} property"] += 1
@@ -343,15 +357,36 @@ class Planner:
                 ],
             )
         if t == "status":  # a second status property
-            opts = (p.get("status") or {}).get("options") or []
-            b.changed["second status property (became a select field)"] += 1
-            return FieldSpec(
+            st = p.get("status") or {}
+            opts = st.get("options") or []
+            group_of = {}
+            for g in st.get("groups") or []:
+                for oid in g.get("option_ids") or []:
+                    group_of[oid] = STATUS_FIELD_GROUP.get((g.get("name") or "").lower(), "todo")
+            b.came_over["second status property (a Notes status field)"] += 1
+            as_select = FieldSpec(
                 ext,
                 name,
                 "select",
                 pname,
                 t,
                 options=[{"name": o["name"][:255], "color": COLORS.get(o.get("color") or "default")} for o in opts],
+            )
+            return FieldSpec(
+                ext,
+                name,
+                "status",
+                pname,
+                t,
+                options=[
+                    {
+                        "name": o["name"][:255],
+                        "color": COLORS.get(o.get("color") or "default"),
+                        "group": group_of.get(o.get("id"), "todo"),
+                    }
+                    for o in opts
+                ],
+                fallback=as_select,
             )
         if t == "date":
             has_time = any(_has_time((v.get("date") or {}).get("start")) for v in values)
@@ -381,8 +416,9 @@ class Planner:
             b.came_over["URL property"] += 1
             return FieldSpec(ext, name, "url", pname, t)
         if t in ("email", "phone_number"):
-            b.changed[f"{'email' if t == 'email' else 'phone'} property (became a text field)"] += 1
-            return FieldSpec(ext, name, "text", pname, t)
+            kind = "email" if t == "email" else "phone"
+            b.came_over[f"{kind} property"] += 1
+            return FieldSpec(ext, name, kind, pname, t, fallback=FieldSpec(ext, name, "text", pname, t))
         if t in ("people", "created_by", "last_edited_by"):
             if t != "people":
                 b.changed[f"{t.replace('_', ' ')} (kept in a text field)"] += 1
@@ -400,8 +436,14 @@ class Planner:
                     note="people not matched to a Notes member",
                 ),
             ]
-        if t in ("created_time", "last_edited_time"):
-            b.changed[f"{t.replace('_', ' ')} (kept in a text field)"] += 1
+        if t == "created_time":
+            # Notes works this out from the card, and the import sets the card's creation time from Notion
+            b.came_over["created time property (a Notes created time field)"] += 1
+            return FieldSpec(
+                ext, name, "created_time", pname, t, fallback=FieldSpec(ext, name, "text", pname, t, role="snapshot")
+            )
+        if t == "last_edited_time":  # Notes would show the time of the import, so the Notion time stays as text
+            b.changed["last edited time (kept in a text field)"] += 1
             return FieldSpec(ext, name, "text", pname, t, role="snapshot")
         if t == "files":
             b.changed["files property (files became card attachments)"] += 1
@@ -743,7 +785,7 @@ class Planner:
             return people or None
         if f.field_type == "relation":
             return [norm(x.get("id")) for x in prop.get("relation") or []]
-        if f.role == "snapshot":
+        if f.role == "snapshot" or t == "created_time":  # created time: only the text fallback is ever written
             return _snapshot_value(f, prop, self)
         if t == "rich_text":
             text = plain(prop.get("rich_text"))

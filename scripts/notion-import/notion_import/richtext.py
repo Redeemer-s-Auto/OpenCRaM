@@ -16,6 +16,24 @@ def esc(text: str) -> str:
     return html.escape(text or "", quote=True)
 
 
+def _date_chip(date: dict, text: str) -> Optional[str]:
+    """A Notion date mention as a Notes date chip. A date range stays plain text. No reminder is made."""
+    import re
+    import uuid
+
+    start = date.get("start") or ""
+    if date.get("end") or not re.match(r"^\d{4}-\d{2}-\d{2}", start):
+        return None
+    day = start[:10]
+    when = re.match(r"^\d{4}-\d{2}-\d{2}T(\d{2}:\d{2})", start)
+    time_attr = f' data-time="{when.group(1)}"' if when else ""
+    mention_id = uuid.uuid5(uuid.NAMESPACE_URL, f"notion-date:{start}")
+    return (
+        f'<span data-type="date-mention" data-date="{day}"{time_attr} data-mention-id="{mention_id}">'
+        f"{esc(text or day)}</span>"
+    )
+
+
 def _notion_page_id_from_url(url: str) -> Optional[str]:
     """Pull a 32-hex page id out of a notion.so / notion.site / app.notion.com link."""
     import re
@@ -62,6 +80,10 @@ def to_html(
                 text = "@" + name
                 href = None
             elif mtype == "date":
+                chip = _date_chip((m.get("date") or {}), text)
+                if chip:
+                    out.append(chip)
+                    continue
                 href = None
             elif mtype in ("link_preview", "link_mention"):
                 href = href or (m.get(mtype) or {}).get("url") or (m.get(mtype) or {}).get("href")

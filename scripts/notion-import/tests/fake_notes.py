@@ -16,8 +16,17 @@ def _id():
     return str(uuid.uuid4())
 
 
+ALIASES = {
+    "percent": ("number", "percent"),
+    "phone": ("text", "phone"),
+    "email": ("text", "email"),
+    "status": ("select", "status"),
+}
+NEW_TYPES = {*ALIASES, "created_time"}
+
+
 class FakeNotes:
-    def __init__(self, members=None, rate_limit_every=0, support_private=True, support_templates=True):
+    def __init__(self, members=None, rate_limit_every=0, support_private=True, support_templates=True, support_new_types=True):
         self.projects = {}
         self.states = {}
         self.fields = {}
@@ -35,6 +44,7 @@ class FakeNotes:
         self.rate_limit_every = rate_limit_every
         self.support_private = support_private
         self.support_templates = support_templates
+        self.support_new_types = support_new_types  # False: an older server that refuses the newer field types
         self.n = 0
         self.hidden_projects = set()  # projects the API key's user cannot see
         self.fail_uploads = 0  # how many storage uploads fail before they work
@@ -191,14 +201,23 @@ class FakeNotes:
                 "percent_checked",
             ):
                 return 400, {"settings": "bad function"}
+            settings = dict(d.get("settings") or {})
+            field_type = d["field_type"]
+            if field_type in NEW_TYPES:
+                if not self.support_new_types:
+                    return 400, {"field_type": "Unknown field type."}
+                # the real server stores the short names as base type + settings["format"]
+                field_type, fmt = ALIASES.get(field_type, (field_type, None))
+                if fmt:
+                    settings["format"] = fmt
             f = {
                 "id": _id(),
                 "name": d["name"],
-                "field_type": d["field_type"],
+                "field_type": field_type,
                 "external_source": d.get("external_source"),
                 "external_id": d.get("external_id"),
                 "options": [{"id": _id(), **o} for o in d.get("options") or []],
-                "settings": dict(d.get("settings") or {}),
+                "settings": settings,
             }
             self.fields[pid].append(f)
             if f["field_type"] == "relation" and f["settings"].get("two_way"):
@@ -228,6 +247,8 @@ class FakeNotes:
                 return {"custom_fields": {fid: "unknown field"}}
             if patch and f["name"] in self.refuse_field_names:
                 return {"custom_fields": {fid: "refused"}}
+            if f["field_type"] == "created_time":  # worked out by the server, never written
+                return {"custom_fields": {fid: "cannot be set"}}
             if v is None:
                 continue
             ids = {o["id"] for o in f["options"]}

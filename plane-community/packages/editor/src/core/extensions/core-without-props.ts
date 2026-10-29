@@ -13,6 +13,7 @@ import { CoreEditorAdditionalExtensionsWithoutProps } from "@/plane-editor/exten
 // extensions
 import { CustomCalloutExtensionConfig } from "./callout/extension-config";
 import { ColumnExtensionConfig, ColumnListExtensionConfig } from "./columns/extension-config";
+import { InlineViewExtensionConfig } from "./inline-view/extension-config";
 import {
   ToggleContentExtensionConfig,
   ToggleExtensionConfig,
@@ -70,6 +71,7 @@ export const CoreEditorExtensionsWithoutProps = [
   ToggleContentExtensionConfig,
   ColumnListExtensionConfig,
   ColumnExtensionConfig,
+  InlineViewExtensionConfig,
   CustomColorExtension,
   ...CoreEditorAdditionalExtensionsWithoutProps,
 ];

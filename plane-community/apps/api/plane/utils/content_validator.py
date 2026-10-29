@@ -113,6 +113,8 @@ ATTRIBUTES = {
         # toggle and column blocks (OpenCRaM)
         "data-open",
         "data-columns",
+        # live view block (OpenCRaM): its settings as JSON
+        "data-view-config",
     },
     "a": {"href", "target"},
     # editor node/tag attributes

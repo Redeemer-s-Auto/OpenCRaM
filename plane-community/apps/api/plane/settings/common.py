@@ -115,6 +115,7 @@ INSTALLED_APPS = [
     "plane.sharing",
     "plane.recurrence",
     "plane.relations",
+    "plane.inline_views",
     # Third-party things
     "rest_framework",
     "corsheaders",

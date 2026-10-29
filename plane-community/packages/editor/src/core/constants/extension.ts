@@ -27,6 +27,7 @@ export enum CORE_EXTENSIONS {
   HISTORY = "history",
   HORIZONTAL_RULE = "horizontalRule",
   IMAGE = "image",
+  INLINE_VIEW = "inlineViewComponent",
   ITALIC = "italic",
   LIST_ITEM = "listItem",
   MARKDOWN_CLIPBOARD = "markdownClipboard",
@@ -83,4 +84,5 @@ export const BLOCK_NODE_TYPES = [
   // Layout nodes
   CORE_EXTENSIONS.TOGGLE,
   CORE_EXTENSIONS.COLUMN_LIST,
+  CORE_EXTENSIONS.INLINE_VIEW,
 ];

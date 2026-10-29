@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/", include("plane.recurrence.urls")),
     path("api/", include("plane.one_unit.urls")),
     path("api/", include("plane.relations.urls")),
+    path("api/", include("plane.inline_views.urls")),
     path("api/public/", include("plane.space.urls")),
     path("api/instances/", include("plane.license.urls")),
     path("api/v1/", include("plane.api.urls")),

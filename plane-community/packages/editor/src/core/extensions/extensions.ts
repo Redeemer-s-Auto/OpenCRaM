@@ -28,6 +28,7 @@ import {
   CustomTextAlignExtension,
   CustomTypographyExtension,
   ImageExtension,
+  InlineViewExtension,
   ListKeymap,
   Table,
   TableCell,
@@ -131,6 +132,7 @@ export const CoreEditorExtensions = (args: TArguments): Extensions => {
     ToggleContentExtension,
     ColumnListExtension,
     ColumnExtension,
+    InlineViewExtension,
     UtilityExtension({
       disabledExtensions,
       flaggedExtensions,

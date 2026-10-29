@@ -15,6 +15,7 @@ import type { EFileAssetType, TNameDescriptionLoader } from "@plane/types";
 import { getDescriptionPlaceholderI18n } from "@plane/utils";
 // components
 import { RichTextEditor } from "@/components/editor/rich-text";
+import { InlineViewHostProvider } from "@/components/inline-views";
 // hooks
 import { useEditorAsset } from "@/hooks/store/use-editor-asset";
 import { useWorkspace } from "@/hooks/store/use-workspace";
@@ -229,6 +230,7 @@ export const DescriptionInput = observer(function DescriptionInput(props: Props)
       name="description_html"
       control={control}
       render={({ field: { onChange } }) => (
+        <InlineViewHostProvider value={{ workspaceSlug, projectId, issueId: entityId }}>
         <RichTextEditor
           key={entityId}
           editable={!disabled}
@@ -291,6 +293,7 @@ export const DescriptionInput = observer(function DescriptionInput(props: Props)
             }
           }}
         />
+        </InlineViewHostProvider>
       )}
     />
   );

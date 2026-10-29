@@ -115,6 +115,8 @@ ATTRIBUTES = {
         "data-columns",
         # live view block (OpenCRaM): its settings as JSON
         "data-view-config",
+        # synced block (OpenCRaM): the id of the shared text
+        "data-synced-id",
     },
     "a": {"href", "target"},
     # editor node/tag attributes

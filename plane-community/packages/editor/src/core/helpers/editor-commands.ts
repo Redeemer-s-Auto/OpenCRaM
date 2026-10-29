@@ -202,6 +202,11 @@ export const insertInlineView = (editor: Editor, range?: Range) => {
   else editor.chain().focus().insertInlineView().run();
 };
 
+export const insertSyncedBlock = (editor: Editor, range?: Range) => {
+  if (range) editor.chain().focus().deleteRange(range).insertSyncedBlock().run();
+  else editor.chain().focus().insertSyncedBlock().run();
+};
+
 export const insertColumns = (editor: Editor, count: 2 | 3, range?: Range) => {
   if (range) editor.chain().focus().deleteRange(range).insertColumns(count).run();
   else editor.chain().focus().insertColumns(count).run();

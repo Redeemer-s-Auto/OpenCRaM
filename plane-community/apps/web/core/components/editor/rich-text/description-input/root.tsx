@@ -16,6 +16,7 @@ import { getDescriptionPlaceholderI18n } from "@plane/utils";
 // components
 import { RichTextEditor } from "@/components/editor/rich-text";
 import { InlineViewHostProvider } from "@/components/inline-views";
+import "@/components/synced-blocks";
 // hooks
 import { useEditorAsset } from "@/hooks/store/use-editor-asset";
 import { useWorkspace } from "@/hooks/store/use-workspace";

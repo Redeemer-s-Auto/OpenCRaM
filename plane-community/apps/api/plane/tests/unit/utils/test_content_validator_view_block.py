@@ -29,3 +29,13 @@ def test_script_next_to_a_view_block_is_still_removed():
     ok, _, cleaned = validate_html_content(BLOCK + "<script>alert(1)</script>")
     if ok:
         assert cleaned is not None and "<script" not in cleaned
+
+
+@pytest.mark.unit
+def test_synced_block_keeps_its_id():
+    html = '<div data-block-type="synced-block" data-synced-id="3f2a1c9e-0000-4000-8000-000000000001"></div>'
+    ok, error, cleaned = validate_html_content(html)
+    assert ok, error
+    result = cleaned if cleaned is not None else html
+    assert 'data-block-type="synced-block"' in result
+    assert 'data-synced-id="3f2a1c9e-0000-4000-8000-000000000001"' in result

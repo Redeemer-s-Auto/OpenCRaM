@@ -14,6 +14,7 @@ import { CoreEditorAdditionalExtensionsWithoutProps } from "@/plane-editor/exten
 import { CustomCalloutExtensionConfig } from "./callout/extension-config";
 import { ColumnExtensionConfig, ColumnListExtensionConfig } from "./columns/extension-config";
 import { InlineViewExtensionConfig } from "./inline-view/extension-config";
+import { SyncedBlockExtensionConfig } from "./synced-block/extension-config";
 import {
   ToggleContentExtensionConfig,
   ToggleExtensionConfig,
@@ -72,6 +73,7 @@ export const CoreEditorExtensionsWithoutProps = [
   ColumnListExtensionConfig,
   ColumnExtensionConfig,
   InlineViewExtensionConfig,
+  SyncedBlockExtensionConfig,
   CustomColorExtension,
   ...CoreEditorAdditionalExtensionsWithoutProps,
 ];

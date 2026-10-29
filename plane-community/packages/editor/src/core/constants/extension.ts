@@ -38,6 +38,7 @@ export enum CORE_EXTENSIONS {
   SIDE_MENU = "editorSideMenu",
   SLASH_COMMANDS = "slash-command",
   STRIKETHROUGH = "strike",
+  SYNCED_BLOCK = "syncedBlockComponent",
   TABLE = "table",
   TABLE_CELL = "tableCell",
   TABLE_HEADER = "tableHeader",
@@ -85,4 +86,5 @@ export const BLOCK_NODE_TYPES = [
   CORE_EXTENSIONS.TOGGLE,
   CORE_EXTENSIONS.COLUMN_LIST,
   CORE_EXTENSIONS.INLINE_VIEW,
+  CORE_EXTENSIONS.SYNCED_BLOCK,
 ];

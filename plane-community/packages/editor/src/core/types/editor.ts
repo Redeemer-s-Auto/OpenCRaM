@@ -67,6 +67,7 @@ export type TEditorCommands =
   | "columns-2"
   | "columns-3"
   | "inline-view"
+  | "synced-block"
   | "attachment"
   | "emoji"
   | "external-embed"

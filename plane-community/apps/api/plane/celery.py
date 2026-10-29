@@ -56,6 +56,11 @@ app.conf.beat_schedule = {
         "task": "plane.recurrence.tasks.run_due_repeats",
         "schedule": crontab(minute="*/5"),
     },
+    # Date reminders: notify the people whose reminder is due (plane.reminders)
+    "check-every-minute-to-send-date-reminders": {
+        "task": "plane.reminders.tasks.send_due_reminders",
+        "schedule": crontab(minute="*"),
+    },
     # Occurs once every day
     "check-every-day-to-delete-hard-delete": {
         "task": "plane.bgtasks.deletion_task.hard_delete",

@@ -39,3 +39,16 @@ def test_synced_block_keeps_its_id():
     result = cleaned if cleaned is not None else html
     assert 'data-block-type="synced-block"' in result
     assert 'data-synced-id="3f2a1c9e-0000-4000-8000-000000000001"' in result
+
+
+@pytest.mark.unit
+def test_date_mention_keeps_its_date_time_and_id():
+    html = (
+        '<p>Call <span data-type="date-mention" data-date="2030-01-01" data-time="14:30" '
+        'data-mention-id="3f2a1c9e-0000-4000-8000-000000000002">Jan 1, 2030 2:30 PM</span></p>'
+    )
+    ok, error, cleaned = validate_html_content(html)
+    assert ok, error
+    result = cleaned if cleaned is not None else html
+    for needle in ['data-type="date-mention"', 'data-date="2030-01-01"', 'data-time="14:30"', 'data-mention-id="3f2a1c9e-0000-4000-8000-000000000002"']:
+        assert needle in result, (needle, result)

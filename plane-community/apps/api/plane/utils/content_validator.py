@@ -117,6 +117,10 @@ ATTRIBUTES = {
         "data-view-config",
         # synced block (OpenCRaM): the id of the shared text
         "data-synced-id",
+        # date mention with reminder (OpenCRaM): the date, the time, and the id a reminder hangs on
+        "data-date",
+        "data-time",
+        "data-mention-id",
     },
     "a": {"href", "target"},
     # editor node/tag attributes

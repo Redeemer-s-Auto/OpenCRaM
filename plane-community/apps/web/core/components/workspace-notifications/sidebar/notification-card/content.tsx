@@ -87,6 +87,11 @@ export const BASE_NOTIFICATION_CONTENT_MAP: TNotificationContentMap = {
     value: renderCommentBox ? null : sanitizeCommentForNotification(newValue),
     showConnector: false,
   }),
+  reminder: ({ newValue }) => ({
+    action: "Reminder:",
+    value: newValue,
+    showConnector: false,
+  }),
   archived_at: ({ newValue }) => ({
     action: newValue === "restore" ? "restored the work item" : "archived the work item",
     value: null,

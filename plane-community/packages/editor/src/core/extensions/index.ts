@@ -8,6 +8,7 @@ export * from "./callout";
 export * from "./columns";
 export * from "./inline-view";
 export * from "./synced-block";
+export * from "./date-mention";
 export * from "./toggle";
 export * from "./code";
 export * from "./code-inline";

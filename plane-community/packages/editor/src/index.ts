@@ -24,6 +24,8 @@ export { registerInlineViewRenderer, parseInlineViewConfig } from "./core/extens
 export type { TInlineViewConfig, TInlineViewRenderProps } from "./core/extensions/inline-view";
 export { registerSyncedBlockRenderer } from "./core/extensions/synced-block";
 export type { TSyncedBlockRenderProps } from "./core/extensions/synced-block";
+export { registerDateMentionRenderer, formatDateMentionLabel } from "./core/extensions/date-mention";
+export type { TDateMentionRenderProps } from "./core/extensions/date-mention";
 export { ADDITIONAL_EXTENSIONS } from "@/plane-editor/constants/extensions";
 
 // types

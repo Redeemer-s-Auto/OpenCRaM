@@ -117,6 +117,7 @@ INSTALLED_APPS = [
     "plane.relations",
     "plane.inline_views",
     "plane.synced_blocks",
+    "plane.reminders",
     # Third-party things
     "rest_framework",
     "corsheaders",

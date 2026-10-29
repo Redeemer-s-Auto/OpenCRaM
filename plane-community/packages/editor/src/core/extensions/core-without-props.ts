@@ -15,6 +15,7 @@ import { CustomCalloutExtensionConfig } from "./callout/extension-config";
 import { ColumnExtensionConfig, ColumnListExtensionConfig } from "./columns/extension-config";
 import { InlineViewExtensionConfig } from "./inline-view/extension-config";
 import { SyncedBlockExtensionConfig } from "./synced-block/extension-config";
+import { DateMentionExtensionConfig } from "./date-mention/extension-config";
 import {
   ToggleContentExtensionConfig,
   ToggleExtensionConfig,
@@ -74,6 +75,7 @@ export const CoreEditorExtensionsWithoutProps = [
   ColumnExtensionConfig,
   InlineViewExtensionConfig,
   SyncedBlockExtensionConfig,
+  DateMentionExtensionConfig,
   CustomColorExtension,
   ...CoreEditorAdditionalExtensionsWithoutProps,
 ];

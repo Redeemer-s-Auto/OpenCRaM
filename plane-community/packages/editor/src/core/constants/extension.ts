@@ -15,6 +15,7 @@ export enum CORE_EXTENSIONS {
   COLUMN = "columnComponent",
   COLUMN_LIST = "columnListComponent",
   CUSTOM_COLOR = "customColor",
+  DATE_MENTION = "dateMention",
   CUSTOM_IMAGE = "imageComponent",
   CUSTOM_LINK = "link",
   DOCUMENT = "doc",

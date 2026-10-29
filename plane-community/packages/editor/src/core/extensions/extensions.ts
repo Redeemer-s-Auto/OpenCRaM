@@ -30,6 +30,7 @@ import {
   ImageExtension,
   InlineViewExtension,
   SyncedBlockExtension,
+  DateMentionExtension,
   ListKeymap,
   Table,
   TableCell,
@@ -135,6 +136,7 @@ export const CoreEditorExtensions = (args: TArguments): Extensions => {
     ColumnExtension,
     InlineViewExtension,
     SyncedBlockExtension,
+    DateMentionExtension,
     UtilityExtension({
       disabledExtensions,
       flaggedExtensions,

@@ -28,6 +28,8 @@ import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifi
 import { WorkItemPreviewCard } from "../../preview-card";
 import type { TRenderQuickActions } from "../list/list-view-types";
 import type { CalendarStoreType } from "./base-calendar-root";
+// card shortcuts: a shortcut card shows its target's live title
+import { ShortcutAwareTitle } from "@/components/card-links/shortcut-title";
 
 type Props = {
   issue: TIssue;
@@ -140,7 +142,14 @@ export const CalendarIssueBlock = observer(
                         displayProperties={issuesFilter?.issueFilters?.displayProperties}
                       />
                     )}
-                    <div className="truncate text-13 font-medium md:text-11 md:font-regular">{issue.name}</div>
+                    <div className="truncate text-13 font-medium md:text-11 md:font-regular">
+                      <ShortcutAwareTitle
+                        workspaceSlug={workspaceSlug?.toString()}
+                        projectId={issue.project_id}
+                        issueId={issue.id}
+                        name={issue.name}
+                      />
+                    </div>
                   </div>
                   {/* Wrapper exists only to stop clicks reaching the ControlLink; the
                       quick-action menu inside carries its own interactive semantics. */}

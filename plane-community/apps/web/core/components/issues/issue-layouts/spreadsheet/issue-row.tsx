@@ -36,6 +36,8 @@ import type { TRenderQuickActions } from "../list/list-view-types";
 import { isIssueNew } from "../utils";
 import { CustomFieldCells } from "@/components/custom-fields/spreadsheet-columns";
 import { IssueColumn } from "./issue-column";
+// card shortcuts: a shortcut card shows its target's live title
+import { ShortcutAwareTitle, shortcutAwareName } from "@/components/card-links/shortcut-title";
 
 interface Props {
   displayProperties: IIssueDisplayProperties;
@@ -359,12 +361,17 @@ const IssueRowDetails = observer(function IssueRowDetails(props: IssueRowDetails
               <div className="my-auto flex h-full w-full items-center justify-between gap-2 truncate">
                 <div className="line-clamp-1 w-full text-14 text-primary">
                   <div className="w-full overflow-hidden">
-                    <Tooltip tooltipContent={issueDetail.name} isMobile={isMobile}>
+                    <Tooltip tooltipContent={shortcutAwareName(issueDetail.id, issueDetail.name)} isMobile={isMobile}>
                       <div
                         className="h-full w-full cursor-pointer truncate pr-4 text-left text-13 text-primary focus:outline-none"
                         tabIndex={-1}
                       >
-                        {issueDetail.name}
+                        <ShortcutAwareTitle
+                          workspaceSlug={workspaceSlug?.toString()}
+                          projectId={issueDetail.project_id}
+                          issueId={issueDetail.id}
+                          name={issueDetail.name}
+                        />
                       </div>
                     </Tooltip>
                   </div>

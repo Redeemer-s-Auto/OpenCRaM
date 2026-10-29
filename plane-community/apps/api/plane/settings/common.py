@@ -118,6 +118,8 @@ INSTALLED_APPS = [
     "plane.inline_views",
     "plane.synced_blocks",
     "plane.reminders",
+    "plane.shortcuts",
+    "plane.blueprints",
     # Third-party things
     "rest_framework",
     "corsheaders",

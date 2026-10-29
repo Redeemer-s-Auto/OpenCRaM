@@ -12,6 +12,7 @@ import { Underline } from "@tiptap/extension-underline";
 import { CoreEditorAdditionalExtensionsWithoutProps } from "@/plane-editor/extensions/core/without-props";
 // extensions
 import { CustomCalloutExtensionConfig } from "./callout/extension-config";
+import { CardLinkExtensionConfig } from "./card-link/extension-config";
 import { ColumnExtensionConfig, ColumnListExtensionConfig } from "./columns/extension-config";
 import { InlineViewExtensionConfig } from "./inline-view/extension-config";
 import { SyncedBlockExtensionConfig } from "./synced-block/extension-config";
@@ -76,6 +77,7 @@ export const CoreEditorExtensionsWithoutProps = [
   InlineViewExtensionConfig,
   SyncedBlockExtensionConfig,
   DateMentionExtensionConfig,
+  CardLinkExtensionConfig,
   CustomColorExtension,
   ...CoreEditorAdditionalExtensionsWithoutProps,
 ];

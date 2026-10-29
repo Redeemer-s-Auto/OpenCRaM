@@ -5,6 +5,7 @@
  */
 
 export * from "./callout";
+export * from "./card-link";
 export * from "./columns";
 export * from "./inline-view";
 export * from "./synced-block";

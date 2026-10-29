@@ -25,6 +25,7 @@ from plane.app.serializers import IssueCreateSerializer
 from plane.db.models import CustomField, Issue, IssueAssignee, IssueLabel
 from plane.sharing.models import ItemRestriction, ItemShare
 from plane.sharing.visibility import hidden_issue_ids
+from plane.shortcuts.models import CardShortcut
 from plane.utils.custom_fields import validate_values, values_for_issues
 
 logger = logging.getLogger("plane.recurrence")
@@ -192,6 +193,8 @@ def _copy_tree(source, copy, delta, actor, hidden, depth, budget):
     children = (
         Issue.issue_objects.filter(parent_id=source.id, project_id=source.project_id)
         .exclude(id__in=hidden)
+        # Shortcut cards point at cards elsewhere: a repeat does not copy them.
+        .exclude(id__in=CardShortcut.objects.values("issue_id"))
         .select_related("project", "project__workspace")
         .order_by("sequence_id")
     )

@@ -8,6 +8,7 @@ import { observer } from "mobx-react";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 // components
+import { BoardBlueprintSection } from "@/components/blueprints/board-blueprint-section";
 import { PageHead } from "@/components/core/page-title";
 import { ProjectDetailsForm } from "@/components/project/form";
 import { ProjectDetailsFormLoader } from "@/components/project/form-loader";
@@ -28,6 +29,9 @@ function ProjectSettingsPage({ params }: Route.ComponentProps) {
   const { allowPermissions } = useUserPermissions();
   // derived values
   const isAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.PROJECT, workspaceSlug, projectId);
+  // Board blueprints: board admins and workspace admins can save this board's design.
+  const canSaveBlueprint =
+    isAdmin || allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE, workspaceSlug);
 
   const pageTitle = currentProjectDetails?.name ? `${currentProjectDetails?.name} - General Settings` : undefined;
 
@@ -44,6 +48,13 @@ function ProjectSettingsPage({ params }: Route.ComponentProps) {
           />
         ) : (
           <ProjectDetailsFormLoader />
+        )}
+        {currentProjectDetails && (
+          <BoardBlueprintSection
+            workspaceSlug={workspaceSlug}
+            project={currentProjectDetails}
+            canSave={canSaveBlueprint}
+          />
         )}
         {isAdmin && <GeneralProjectSettingsControlSection projectId={projectId} />}
       </div>

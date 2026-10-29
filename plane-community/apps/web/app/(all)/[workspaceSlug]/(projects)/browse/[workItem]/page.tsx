@@ -29,6 +29,8 @@ import { ProjectAuthWrapper } from "@/layouts/auth-layout/project-wrapper";
 // plane web imports
 import { useWorkItemProperties } from "@/hooks/use-issue-properties";
 import { WorkItemDetailRoot } from "@/components/browse/workItem-detail";
+// card shortcuts: a shortcut card's page opens the card it points to
+import { ShortcutGate } from "@/components/card-links/shortcut-gate";
 
 import type { Route } from "./+types/page";
 
@@ -129,12 +131,14 @@ export const IssueDetailsPage = observer(function IssueDetailsPage({ params }: R
       <PageHead title={pageTitle} />
       {workspaceSlug && projectId && issueId && (
         <ProjectAuthWrapper workspaceSlug={workspaceSlug} projectId={projectId}>
-          <WorkItemDetailRoot
-            workspaceSlug={workspaceSlug.toString()}
-            projectId={projectId.toString()}
-            issueId={issueId.toString()}
-            issue={issue}
-          />
+          <ShortcutGate workspaceSlug={workspaceSlug.toString()} issueId={issueId.toString()}>
+            <WorkItemDetailRoot
+              workspaceSlug={workspaceSlug.toString()}
+              projectId={projectId.toString()}
+              issueId={issueId.toString()}
+              issue={issue}
+            />
+          </ShortcutGate>
         </ProjectAuthWrapper>
       )}
     </>

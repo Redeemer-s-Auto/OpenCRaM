@@ -5,6 +5,7 @@
 
 import { API_BASE_URL } from "@plane/constants";
 import { APIService } from "@/services/api.service";
+import type { TCardResolution } from "@/services/card-links.service";
 
 /** One card as the sidebar tree and the page list show it. Only cards the viewer may see come back. */
 export type TCardNode = {
@@ -21,6 +22,8 @@ export type TCardNode = {
   /** visible children only */
   child_count: number;
   updated_by_name?: string;
+  /** card shortcuts: null for a normal card, else where the shortcut goes (worked out for the viewer) */
+  shortcut?: TCardResolution | null;
 };
 
 export type TCardPage = {

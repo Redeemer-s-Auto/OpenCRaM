@@ -26,12 +26,15 @@ import {
   ListTodo,
   MessageSquareText,
   MinusSquare,
+  SquareArrowOutUpRight,
   Smile,
   Table,
   TextQuote,
 } from "lucide-react";
 // constants
+import type { Editor } from "@tiptap/core";
 import { COLORS_LIST } from "@/constants/common";
+import { CORE_EXTENSIONS } from "@/constants/extension";
 // helpers
 import {
   insertTableCommand,
@@ -44,6 +47,7 @@ import {
   toggleBackgroundColor,
   insertImage,
   insertCallout,
+  insertCardLink,
   insertColumns,
   insertInlineView,
   insertSyncedBlock,
@@ -67,7 +71,7 @@ export type TSlashCommandSection = {
 
 export const getSlashCommandFilteredSections =
   (args: TExtensionProps) =>
-  ({ query }: { query: string }): TSlashCommandSection[] => {
+  ({ query, editor }: { query: string; editor?: Editor }): TSlashCommandSection[] => {
     const { additionalOptions: externalAdditionalOptions, disabledExtensions, flaggedExtensions } = args;
     const SLASH_COMMAND_SECTIONS: TSlashCommandSection[] = [
       {
@@ -353,6 +357,20 @@ export const getSlashCommandFilteredSections =
     ];
 
     const internalAdditionalOptions: TSlashCommandAdditionalOption[] = [];
+    // "Link to card" only where the app supplied the block (card bodies).
+    if (editor?.schema.nodes[CORE_EXTENSIONS.CARD_LINK]) {
+      internalAdditionalOptions.push({
+        commandKey: "card-link",
+        key: "card-link",
+        title: "Link to card",
+        icon: <SquareArrowOutUpRight className="size-3.5" />,
+        description: "Show another card here; its title stays up to date.",
+        searchTerms: ["link", "card", "page", "mention", "reference", "shortcut"],
+        command: ({ editor, range }: CommandProps) => insertCardLink(editor, range),
+        section: "general",
+        pushAfter: "callout",
+      });
+    }
     if (!disabledExtensions?.includes("image")) {
       internalAdditionalOptions.push({
         commandKey: "image",

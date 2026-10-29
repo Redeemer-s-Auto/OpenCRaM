@@ -23,6 +23,8 @@ import { usePlatformOS } from "@/hooks/use-platform-os";
 // local imports
 import type { TRenderQuickActions } from "../list/list-view-types";
 import { IssueProperties } from "../properties/all-properties";
+// card shortcuts: a shortcut card shows its target's live title
+import { ShortcutAwareTitle } from "@/components/card-links/shortcut-title";
 
 type Props = {
   issue: TIssue & { cover_image?: string | null };
@@ -103,7 +105,14 @@ export const GalleryCard = observer(function GalleryCard(props: Props) {
               displayProperties={displayProperties}
             />
           )}
-          <span className="line-clamp-2 text-body-sm-medium text-primary">{issue.name}</span>
+          <span className="line-clamp-2 text-body-sm-medium text-primary">
+            <ShortcutAwareTitle
+              workspaceSlug={workspaceSlug?.toString()}
+              projectId={issue.project_id}
+              issueId={issue.id}
+              name={issue.name}
+            />
+          </span>
         </div>
       </ControlLink>
 

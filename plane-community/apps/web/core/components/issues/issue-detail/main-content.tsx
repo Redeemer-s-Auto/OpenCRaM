@@ -12,6 +12,7 @@ import type { EditorRefApi } from "@plane/editor";
 import type { TNameDescriptionLoader } from "@plane/types";
 import { EFileAssetType, EIssueServiceType } from "@plane/types";
 // components
+import { CardBacklinks } from "@/components/card-links/backlinks";
 import { DescriptionVersionsRoot } from "@/components/core/description-versions";
 import { DescriptionInput } from "@/components/editor/rich-text/description-input";
 import { IssueTypeSwitcher } from "@/components/issues/issue-type-switcher";
@@ -170,6 +171,8 @@ export const IssueMainContent = observer(function IssueMainContent(props: Props)
         renderWidgetModals={!isPeekModeActive}
         issueServiceType={EIssueServiceType.ISSUES}
       />
+
+      <CardBacklinks workspaceSlug={workspaceSlug} issueId={issueId} />
 
       {windowSize[0] < 768 && (
         <PeekOverviewProperties

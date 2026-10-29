@@ -104,6 +104,8 @@ def clean_settings(field_type, settings):
         # Relation and rollup settings need the board and the user; the field serializer
         # checks them with plane.relations.service.
         return dict(settings)
+    if field_type in CustomField.AUDIT_TYPES:
+        return {}
     cleaned = {}
     if field_type == FT.DATE:
         cleaned["include_time"] = bool(settings.get("include_time", False))
@@ -422,8 +424,8 @@ def validate_values(project_id, data, current=None):
         if field is None:
             errors[str(key)] = "This field does not exist on this project or is archived."
             continue
-        if field.field_type in (FT.FORMULA, CustomField.ROLLUP):
-            # Formulas and rollups are worked out by the server. A client sending one back is ignored.
+        if field.field_type in (FT.FORMULA, CustomField.ROLLUP) or field.field_type in CustomField.AUDIT_TYPES:
+            # Formulas, rollups and audit fields are worked out by the server. A client sending one back is ignored.
             continue
         try:
             if field.field_type == CustomField.RELATION:
@@ -751,6 +753,58 @@ def values_for_issues(issue_ids, user=None):
 
     for issue_id, values in linked_values(issue_ids, user).items():
         result.setdefault(issue_id, {}).update(values)
+    for issue_id, values in audit_values(issue_ids).items():
+        result.setdefault(issue_id, {}).update(values)
+    return result
+
+
+# Created / last edited fields read these columns of the card.
+AUDIT_COLUMNS = {
+    CustomField.CREATED_TIME: "created_at",
+    CustomField.LAST_EDITED_TIME: "updated_at",
+    CustomField.CREATED_BY: "created_by_id",
+    CustomField.LAST_EDITED_BY: "updated_by_id",
+}
+# What the sort uses: people sort by name, not by id.
+AUDIT_SORT = {
+    CustomField.CREATED_TIME: "created_at",
+    CustomField.LAST_EDITED_TIME: "updated_at",
+    CustomField.CREATED_BY: "created_by__display_name",
+    CustomField.LAST_EDITED_BY: "updated_by__display_name",
+}
+
+
+def audit_values(issue_ids):
+    """``{issue_id: {field_id: value}}`` for created/last edited fields on these cards.
+
+    Times are ISO date-times. People are a one-item list of user ids (the shape of a person
+    field), or None when the card has no such person (made by a background job, say).
+    """
+    from plane.db.models import Issue
+
+    fields = list(
+        CustomField.objects.filter(
+            field_type__in=list(CustomField.AUDIT_TYPES),
+            archived_at__isnull=True,
+            project_id__in=Issue.objects.filter(pk__in=issue_ids).values("project_id"),
+        ).values_list("id", "project_id", "field_type")
+    )
+    if not fields:
+        return {}
+    cards = Issue.objects.filter(pk__in=issue_ids).values(
+        "id", "project_id", "created_at", "updated_at", "created_by_id", "updated_by_id"
+    )
+    result = {}
+    for card in cards:
+        for field_id, project_id, field_type in fields:
+            if project_id != card["project_id"]:
+                continue
+            raw = card[AUDIT_COLUMNS[field_type]]
+            if field_type in (CustomField.CREATED_BY, CustomField.LAST_EDITED_BY):
+                value = [str(raw)] if raw else None
+            else:
+                value = raw.isoformat() if raw else None
+            result.setdefault(str(card["id"]), {})[str(field_id)] = value
     return result
 
 
@@ -793,6 +847,10 @@ _LOOKUPS_BY_TYPE = {
     FT.MULTI_SELECT: {"exact", "in", "isnull"},
     FT.LABEL: {"exact", "in", "isnull"},
     FT.PERSON: {"exact", "in", "isnull"},
+    CustomField.CREATED_TIME: {"exact", "gt", "gte", "lt", "lte", "range"},
+    CustomField.LAST_EDITED_TIME: {"exact", "gt", "gte", "lt", "lte", "range"},
+    CustomField.CREATED_BY: {"exact", "in", "isnull"},
+    CustomField.LAST_EDITED_BY: {"exact", "in", "isnull"},
 }
 
 
@@ -849,6 +907,28 @@ def _has_value_q(field, **conditions):
     return Q(pk__in=CustomFieldValue.objects.filter(field_id=field.id, **conditions).values("issue_id"))
 
 
+def _audit_filter_q(field, lookup, raw):
+    """Filter on the card's own created/updated columns."""
+    column = AUDIT_COLUMNS[field.field_type]
+    if field.field_type in (CustomField.CREATED_BY, CustomField.LAST_EDITED_BY):
+        if lookup == "isnull":
+            return Q(**{f"{column}__isnull": _as_bool(raw)})
+        ids = _split_list(raw)
+        try:
+            ids = [uuid.UUID(i) for i in ids]
+        except ValueError:
+            raise ValidationError({"message": "People are filtered by id.", "code": "invalid_filter_value"})
+        return Q(**{f"{column}__in": ids}) if ids else Q()
+    # Times compare by calendar day, in the server's time zone.
+    day = column.replace("_at", "_at__date")
+    if lookup == "range":
+        bounds = _split_list(raw)
+        if len(bounds) != 2:
+            raise ValidationError({"message": "A range needs two dates.", "code": "invalid_filter_value"})
+        return Q(**{f"{day}__range": [_resolve_date(b) for b in bounds]})
+    return Q(**{f"{day}__{lookup}" if lookup != "exact" else day: _resolve_date(raw)})
+
+
 def build_filter_q(key, raw, fields_by_id):
     """Build a Q on Issue for one custom field filter key."""
     field_id, lookup = parse_filter_key(key)
@@ -862,6 +942,8 @@ def build_filter_q(key, raw, fields_by_id):
         )
 
     t = effective_type(field)
+    if t in CustomField.AUDIT_TYPES:
+        return _audit_filter_q(field, lookup, raw)
     if lookup == "isnull":
         exists = _has_value_q(field)
         return ~exists if _as_bool(raw) else exists
@@ -964,7 +1046,9 @@ def order_queryset(issue_queryset, order_by):
 
     values = CustomFieldValue.objects.filter(issue_id=OuterRef("pk"), field_id=field.id)
     t = effective_type(field)
-    if t in (FT.NUMBER, FT.MONEY):
+    if t in CustomField.AUDIT_TYPES:
+        expression = F(AUDIT_SORT[t])
+    elif t in (FT.NUMBER, FT.MONEY):
         expression = Subquery(values.values("value_number")[:1])
     elif t == FT.DATE:
         uses_time = (field.settings or {}).get("include_time") and field.field_type != FT.FORMULA

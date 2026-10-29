@@ -20,7 +20,14 @@ import { useCustomField } from "@/hooks/store/use-custom-field";
 import { useMember } from "@/hooks/store/use-member";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // local
-import { effectiveFieldType, formatCustomFieldValue, getFieldTypeDetails, isEmptyValue, linkedCards } from "./helpers";
+import {
+  effectiveFieldType,
+  formatCustomFieldValue,
+  getFieldTypeDetails,
+  isAuditPersonField,
+  isEmptyValue,
+  linkedCards,
+} from "./helpers";
 import { buildCustomFieldsPayload } from "./issue-properties";
 import { OptionChip } from "./value-input";
 
@@ -159,7 +166,7 @@ const CardFaceValue = observer(function CardFaceValue(props: {
     );
   }
 
-  if (field.field_type === "person") {
+  if (field.field_type === "person" || isAuditPersonField(field)) {
     const ids = (Array.isArray(value) ? value : []) as string[];
     return withTooltip(
       <span className={cn(chipClass, "px-1")}>

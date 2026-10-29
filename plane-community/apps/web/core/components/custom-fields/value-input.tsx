@@ -14,7 +14,15 @@ import { cn, renderFormattedPayloadDate } from "@plane/utils";
 import { DateDropdown } from "@/components/dropdowns/date";
 import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
 // local
-import { formatCustomFieldValue, formatMoney, parseMoney, parseNumber, toLocalDateTimeInput } from "./helpers";
+import { AuditValue } from "./audit-value";
+import {
+  formatCustomFieldValue,
+  formatMoney,
+  isAuditField,
+  parseMoney,
+  parseNumber,
+  toLocalDateTimeInput,
+} from "./helpers";
 import { RelationInput } from "./relation-input";
 
 /** A new label typed on a card. The server turns it into an option. */
@@ -95,6 +103,9 @@ export const CustomFieldValueInput = observer(function CustomFieldValueInput(pro
       />
     );
   }
+
+  // Created / last edited fields come from the card: show them, no editing.
+  if (isAuditField(field)) return <AuditValue field={field} value={value} variant={variant} />;
 
   // Formulas and rollups are worked out by the server: show the result, no editing.
   if (field.field_type === "formula" || field.field_type === "rollup") {

@@ -12,14 +12,18 @@ import {
   CalendarDays,
   CheckSquare,
   CircleChevronDown,
+  Clock,
   DollarSign,
   Hash,
   Link2,
+  PencilLine,
   ListChecks,
   Sigma,
   Tag,
   Type,
   User,
+  UserCheck,
+  UserPlus,
 } from "lucide-react";
 import type {
   TCustomField,
@@ -44,7 +48,17 @@ export const CUSTOM_FIELD_TYPES: { type: TCustomFieldType; label: string; icon: 
   { type: "formula", label: "Formula", icon: Sigma, hint: "Worked out from other fields, like Notion formulas" },
   { type: "relation", label: "Relation", icon: ArrowLeftRight, hint: "Link to cards on any board, like Notion relations" },
   { type: "rollup", label: "Rollup", icon: Layers, hint: "Count, sum or show values from linked cards" },
+  { type: "created_time", label: "Created time", icon: Clock, hint: "When the card was made. Filled in for you" },
+  { type: "last_edited_time", label: "Last edited time", icon: PencilLine, hint: "When the card was last changed. Filled in for you" },
+  { type: "created_by", label: "Created by", icon: UserPlus, hint: "Who made the card. Filled in for you" },
+  { type: "last_edited_by", label: "Last edited by", icon: UserCheck, hint: "Who last changed the card. Filled in for you" },
 ];
+
+/** Filled in by the server from the card itself. Shown and sorted, never typed in. */
+export const AUDIT_FIELD_TYPES: TCustomFieldType[] = ["created_time", "last_edited_time", "created_by", "last_edited_by"];
+export const isAuditField = (field: TCustomField) => AUDIT_FIELD_TYPES.includes(field.field_type);
+export const isAuditPersonField = (field: TCustomField) =>
+  field.field_type === "created_by" || field.field_type === "last_edited_by";
 
 /** Relation and rollup values depend on who is looking; they cannot be sorted or filtered. */
 export const LINKED_FIELD_TYPES: TCustomFieldType[] = ["relation", "rollup"];
@@ -190,6 +204,18 @@ export const formatCustomFieldValue = (
       default:
         return typeof value === "number" ? value.toLocaleString("en-US", { maximumFractionDigits: 6 }) : String(value);
     }
+  }
+  if (field.field_type === "created_time" || field.field_type === "last_edited_time") {
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime())
+      ? String(value)
+      : date.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+  }
+  if (isAuditPersonField(field)) {
+    return (Array.isArray(value) ? (value as string[]) : [])
+      .map((id) => getPersonName?.(id))
+      .filter(Boolean)
+      .join(", ");
   }
   switch (effectiveFieldType(field)) {
     case "money":

@@ -48,7 +48,23 @@ class CustomField(ProjectBaseModel):
     RELATION = "relation"
     ROLLUP = "rollup"
     LINKED_TYPES = {RELATION, ROLLUP}
-    ALL_TYPE_CHOICES = [*FieldType.choices, (RELATION, "Relation"), (ROLLUP, "Rollup")]
+    # Created time, last edited time, created by, last edited by: read from the card itself, never
+    # stored in CustomFieldValue, never written by a client. Same reason as above for staying out of
+    # FieldType.choices (no db migration).
+    CREATED_TIME = "created_time"
+    LAST_EDITED_TIME = "last_edited_time"
+    CREATED_BY = "created_by"
+    LAST_EDITED_BY = "last_edited_by"
+    AUDIT_TYPES = {CREATED_TIME, LAST_EDITED_TIME, CREATED_BY, LAST_EDITED_BY}
+    ALL_TYPE_CHOICES = [
+        *FieldType.choices,
+        (RELATION, "Relation"),
+        (ROLLUP, "Rollup"),
+        (CREATED_TIME, "Created time"),
+        (LAST_EDITED_TIME, "Last edited time"),
+        (CREATED_BY, "Created by"),
+        (LAST_EDITED_BY, "Last edited by"),
+    ]
 
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")

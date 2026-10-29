@@ -51,7 +51,11 @@ export const SyncedBlockExtension = SyncedBlockExtensionConfig.extend({
       insertSyncedBlock:
         () =>
         ({ commands }) =>
-          commands.insertContent({ type: this.name, attrs: { [SYNCED_BLOCK_ID_ATTRIBUTE]: "" } }),
+          // a paragraph after the block keeps a place to type below it
+          commands.insertContent([
+            { type: this.name, attrs: { [SYNCED_BLOCK_ID_ATTRIBUTE]: "" } },
+            { type: "paragraph" },
+          ]),
     };
   },
 });

@@ -52,7 +52,11 @@ export const InlineViewExtension = InlineViewExtensionConfig.extend({
       insertInlineView:
         () =>
         ({ commands }) =>
-          commands.insertContent({ type: this.name, attrs: { [INLINE_VIEW_CONFIG_ATTRIBUTE]: "{}" } }),
+          // a paragraph after the block keeps a place to type below it
+          commands.insertContent([
+            { type: this.name, attrs: { [INLINE_VIEW_CONFIG_ATTRIBUTE]: "{}" } },
+            { type: "paragraph" },
+          ]),
     };
   },
 });

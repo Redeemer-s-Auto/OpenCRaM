@@ -22,7 +22,12 @@ export function EditorContentWrapper(props: Props) {
   return (
     <div
       tabIndex={tabIndex}
-      onFocus={() => editor?.chain().focus(undefined, { scrollIntoView: false }).run()}
+      onFocus={(event) => {
+        // focus inside a block that holds its own editor (a synced block) is that editor's, not this one's
+        const inner = (event.target as HTMLElement).closest?.(".ProseMirror");
+        if (inner && inner !== editor?.view.dom) return;
+        editor?.chain().focus(undefined, { scrollIntoView: false }).run();
+      }}
       className={className}
     >
       <EditorContent editor={editor} id={id} />

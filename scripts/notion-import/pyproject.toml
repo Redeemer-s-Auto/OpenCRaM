@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+# long, plain-language report text and editor HTML snippets read better unbroken
+"notion_import/report.py" = ["E501"]
+"notion_import/blocks.py" = ["E501"]

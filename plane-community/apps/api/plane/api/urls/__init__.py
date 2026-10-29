@@ -16,6 +16,7 @@ from .invite import urlpatterns as invite_patterns
 from .sticky import urlpatterns as sticky_patterns
 from .garden import urlpatterns as garden_patterns
 from .custom_field import urlpatterns as custom_field_patterns
+from .issue_template import urlpatterns as issue_template_patterns
 
 urlpatterns = [
     *asset_patterns,
@@ -32,4 +33,5 @@ urlpatterns = [
     *sticky_patterns,
     *garden_patterns,
     *custom_field_patterns,
+    *issue_template_patterns,
 ]

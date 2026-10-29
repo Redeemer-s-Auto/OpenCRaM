@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+# never commit credentials, snapshots (they hold page contents and downloaded files) or reports
+*token*
+*.key
+*api-key*
+snapshot*/
+snap*/
+files/
+*.snapshot.json
+snapshot.json
+inventory.json
+*-report.md
+*-report.json
+notes-state.json

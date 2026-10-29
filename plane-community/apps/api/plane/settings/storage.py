@@ -22,7 +22,12 @@ class S3Storage(S3Boto3Storage):
 
     """S3 storage class to generate presigned URLs for S3 objects"""
 
-    def __init__(self, request=None):
+    def __init__(self, request=None, is_server=False):
+        # ``is_server`` is passed by the public API asset views (plane/api/views/asset.py), which
+        # crashed with a TypeError while this signature lacked it, so every /api/v1/.../assets/
+        # upload returned 500. Upload links go to the client, so they keep using the request's
+        # host here, the same as the app's asset views.
+        self.is_server = is_server
         # Get the AWS credentials and bucket name from the environment
         self.aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
         # Use the AWS_SECRET_ACCESS_KEY environment variable for the secret key

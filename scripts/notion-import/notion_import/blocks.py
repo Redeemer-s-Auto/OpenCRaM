@@ -61,7 +61,11 @@ class Renderer:
                 if t == "user":
                     self.changed["@mention of a person (kept as plain text)"] += 1
                 elif t == "date":
-                    self.changed["@date mention or reminder (kept as plain text, no reminder)"] += 1
+                    d = (r.get("mention") or {}).get("date") or {}
+                    if d.get("end"):
+                        self.changed["@date range mention (kept as plain text)"] += 1
+                    else:
+                        self.changed["@date mention (became a date chip, no reminder)"] += 1
                 elif t == "template_mention":
                     self.changed["template mention (kept as plain text)"] += 1
             elif r.get("type") == "equation":

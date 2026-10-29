@@ -123,7 +123,7 @@ export const DateMentionChip = observer(function DateMentionChip(props: TDateMen
       </button>
       {open && (
         <span
-          className="absolute left-0 top-full z-20 mt-1 flex w-64 flex-col gap-2 rounded-md border border-subtle bg-surface-1 p-3 text-body-xs-regular shadow-lg"
+          className="shadow-lg absolute top-full left-0 z-20 mt-1 flex w-64 flex-col gap-2 rounded-md border border-subtle bg-surface-1 p-3 text-body-xs-regular"
           contentEditable={false}
         >
           <label className="flex flex-col gap-1">
@@ -140,7 +140,11 @@ export const DateMentionChip = observer(function DateMentionChip(props: TDateMen
             <span className="flex items-center justify-between text-tertiary">
               Time (optional)
               {time && editable && (
-                <button type="button" className="text-11 hover:underline" onClick={() => changeWhen({ date, time: "" })}>
+                <button
+                  type="button"
+                  className="text-11 hover:underline"
+                  onClick={() => changeWhen({ date, time: "" })}
+                >
                   No time
                 </button>
               )}
@@ -168,7 +172,9 @@ export const DateMentionChip = observer(function DateMentionChip(props: TDateMen
                 ))}
               </select>
               {!time && <span className="text-11 text-tertiary">A date with no time reminds at 9:00 AM.</span>}
-              {mine?.sent_at && <span className="text-11 text-tertiary">Reminder sent. Pick a time to set it again.</span>}
+              {mine?.sent_at && (
+                <span className="text-11 text-tertiary">Reminder sent. Pick a time to set it again.</span>
+              )}
               {mine?.stopped && <span className="text-11 text-danger-primary">Stopped: {mine.stop_reason}</span>}
             </label>
           ) : (

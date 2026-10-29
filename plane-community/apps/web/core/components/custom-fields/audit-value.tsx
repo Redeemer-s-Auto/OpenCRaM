@@ -24,7 +24,10 @@ export const AuditValue = observer(function AuditValue(props: Props) {
   const { getUserDetails } = useMember();
   const text = formatCustomFieldValue(field, value, (userId) => getUserDetails(userId)?.display_name);
   return (
-    <span className={cn("block w-full truncate px-2 py-1 text-body-xs-regular", !text && "text-placeholder")} title={text}>
+    <span
+      className={cn("block w-full truncate px-2 py-1 text-body-xs-regular", !text && "text-placeholder")}
+      title={text}
+    >
       {text || (variant === "cell" ? "" : "Empty")}
     </span>
   );

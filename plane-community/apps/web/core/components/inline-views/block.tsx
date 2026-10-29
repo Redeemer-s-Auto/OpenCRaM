@@ -93,7 +93,11 @@ export const InlineViewBlock = observer(function InlineViewBlock(props: TInlineV
   };
 
   const createProjectId =
-    config.source?.type === "project" ? config.source.project_id : config.source?.type === "children" ? host?.projectId : undefined;
+    config.source?.type === "project"
+      ? config.source.project_id
+      : config.source?.type === "children"
+        ? host?.projectId
+        : undefined;
   const addCard = async () => {
     const name = newName.trim();
     if (!name || !workspaceSlug || !createProjectId) return;
@@ -136,7 +140,12 @@ export const InlineViewBlock = observer(function InlineViewBlock(props: TInlineV
         ) : (
           <span className="min-w-0 flex-1 truncate text-body-sm-medium">{config.title || "Live view"}</span>
         )}
-        <span className="text-11 text-tertiary">{sourceLabel(config.source, getPartialProjectById(config.source?.type === "project" ? config.source.project_id : undefined)?.name)}</span>
+        <span className="text-11 text-tertiary">
+          {sourceLabel(
+            config.source,
+            getPartialProjectById(config.source?.type === "project" ? config.source.project_id : undefined)?.name
+          )}
+        </span>
         <div className="flex rounded-md border border-subtle">
           {LAYOUTS.map((l) => (
             <button
@@ -149,7 +158,11 @@ export const InlineViewBlock = observer(function InlineViewBlock(props: TInlineV
             </button>
           ))}
         </div>
-        <button type="button" className="text-11 text-secondary hover:underline" onClick={() => setShowSettings((v) => !v)}>
+        <button
+          type="button"
+          className="text-11 text-secondary hover:underline"
+          onClick={() => setShowSettings((v) => !v)}
+        >
           {showSettings ? "Done" : "Settings"}
         </button>
         {editable && (
@@ -165,14 +178,18 @@ export const InlineViewBlock = observer(function InlineViewBlock(props: TInlineV
             <span className="w-24 text-tertiary">Cards from</span>
             <select
               className="rounded-sm border border-subtle bg-surface-1 px-1.5 py-0.5"
-              value={config.source?.type === "project" ? `p:${config.source.project_id}` : config.source?.type ?? ""}
+              value={config.source?.type === "project" ? `p:${config.source.project_id}` : (config.source?.type ?? "")}
               onChange={(e) => {
                 const v = e.target.value;
-                if (v.startsWith("p:")) change({ source: { type: "project", project_id: v.slice(2) }, filters: {}, group_by: "state" });
+                if (v.startsWith("p:"))
+                  change({ source: { type: "project", project_id: v.slice(2) }, filters: {}, group_by: "state" });
                 else if (v === "children" && host.issueId)
                   change({ source: { type: "children", parent_id: host.issueId }, filters: {} });
                 else if (v === "linked" && host.issueId && relationFields[0])
-                  change({ source: { type: "linked", issue_id: host.issueId, field_id: relationFields[0].id }, filters: {} });
+                  change({
+                    source: { type: "linked", issue_id: host.issueId, field_id: relationFields[0].id },
+                    filters: {},
+                  });
               }}
             >
               <option value="" disabled>
@@ -191,7 +208,13 @@ export const InlineViewBlock = observer(function InlineViewBlock(props: TInlineV
                 className="rounded-sm border border-subtle bg-surface-1 px-1.5 py-0.5"
                 value={config.source.field_id}
                 onChange={(e) =>
-                  change({ source: { type: "linked", issue_id: (config.source as { issue_id: string }).issue_id, field_id: e.target.value } })
+                  change({
+                    source: {
+                      type: "linked",
+                      issue_id: (config.source as { issue_id: string }).issue_id,
+                      field_id: e.target.value,
+                    },
+                  })
                 }
               >
                 {relationFields.map((f) => (
@@ -252,7 +275,9 @@ export const InlineViewBlock = observer(function InlineViewBlock(props: TInlineV
                 key={p.key}
                 type="button"
                 className={chip(!!config.filters?.priority?.includes(p.key))}
-                onClick={() => change({ filters: { ...config.filters, priority: toggle(config.filters?.priority, p.key) } })}
+                onClick={() =>
+                  change({ filters: { ...config.filters, priority: toggle(config.filters?.priority, p.key) } })
+                }
               >
                 {p.label}
               </button>
@@ -298,7 +323,9 @@ export const InlineViewBlock = observer(function InlineViewBlock(props: TInlineV
 
       <div className="px-2 py-2">
         {!config.source ? (
-          <p className="px-1 py-2 text-body-xs-regular text-tertiary">Open Settings and pick where the cards come from.</p>
+          <p className="px-1 py-2 text-body-xs-regular text-tertiary">
+            Open Settings and pick where the cards come from.
+          </p>
         ) : error ? (
           <p className="px-1 py-2 text-body-xs-regular text-danger-primary">This view could not be loaded.</p>
         ) : !data ? (

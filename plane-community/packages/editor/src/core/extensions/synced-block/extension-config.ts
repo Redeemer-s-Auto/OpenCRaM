@@ -36,7 +36,9 @@ export const SyncedBlockExtensionConfig = Node.create({
       [SYNCED_BLOCK_ID_ATTRIBUTE]: {
         default: "",
         parseHTML: (element) => element.getAttribute(SYNCED_BLOCK_ID_ATTRIBUTE) ?? "",
-        renderHTML: (attributes) => ({ [SYNCED_BLOCK_ID_ATTRIBUTE]: String(attributes[SYNCED_BLOCK_ID_ATTRIBUTE] ?? "") }),
+        renderHTML: (attributes) => ({
+          [SYNCED_BLOCK_ID_ATTRIBUTE]: String(attributes[SYNCED_BLOCK_ID_ATTRIBUTE] ?? ""),
+        }),
       },
     };
   },

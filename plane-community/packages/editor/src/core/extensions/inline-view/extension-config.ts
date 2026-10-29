@@ -36,7 +36,9 @@ export const InlineViewExtensionConfig = Node.create({
       [INLINE_VIEW_CONFIG_ATTRIBUTE]: {
         default: "{}",
         parseHTML: (element) => element.getAttribute(INLINE_VIEW_CONFIG_ATTRIBUTE) ?? "{}",
-        renderHTML: (attributes) => ({ [INLINE_VIEW_CONFIG_ATTRIBUTE]: String(attributes[INLINE_VIEW_CONFIG_ATTRIBUTE]) }),
+        renderHTML: (attributes) => ({
+          [INLINE_VIEW_CONFIG_ATTRIBUTE]: String(attributes[INLINE_VIEW_CONFIG_ATTRIBUTE]),
+        }),
       },
     };
   },

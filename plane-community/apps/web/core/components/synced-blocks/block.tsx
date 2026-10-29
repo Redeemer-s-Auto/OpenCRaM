@@ -126,7 +126,8 @@ const SharedText = observer(function SharedText(props: {
       latest.current = html;
       onSaved(saved);
     } catch (e) {
-      const message = (e as { error?: string })?.error === "read_only" ? "You cannot edit this block." : "The change was not saved.";
+      const message =
+        (e as { error?: string })?.error === "read_only" ? "You cannot edit this block." : "The change was not saved.";
       setToast({ type: TOAST_TYPE.ERROR, title: "Could not save block", message });
     }
   }, [workspaceSlug, block.id, onSaved]);
@@ -261,7 +262,9 @@ export const SyncedBlockView = observer(function SyncedBlockView(props: TSyncedB
               className="text-11 text-danger-primary hover:underline"
               title="Delete the shared text. Every copy goes empty."
               onClick={() => {
-                if (!window.confirm("Delete this synced block everywhere? Every page that shows it will lose the text."))
+                if (
+                  !window.confirm("Delete this synced block everywhere? Every page that shows it will lose the text.")
+                )
                   return;
                 service
                   .remove(slug as string, id)

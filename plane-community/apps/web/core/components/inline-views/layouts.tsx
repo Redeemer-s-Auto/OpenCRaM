@@ -45,13 +45,22 @@ export const shownFields = (data: TInlineViewResult, config: TViewConfig, projec
 export const allFields = (data: TInlineViewResult): TCustomField[] =>
   Object.values(data.projects).flatMap((project) => project.fields);
 
-function Name(props: { card: TInlineViewCard; workspaceSlug: string; editable: boolean; onPatch: TLayoutProps["onPatch"] }) {
+function Name(props: {
+  card: TInlineViewCard;
+  workspaceSlug: string;
+  editable: boolean;
+  onPatch: TLayoutProps["onPatch"];
+}) {
   const { card, workspaceSlug, editable, onPatch } = props;
   const [text, setText] = useState<string | null>(null);
   if (text === null)
     return (
-      <span className="flex items-center gap-1.5 min-w-0">
-        <a href={cardHref(workspaceSlug, card)} className="truncate text-body-xs-medium hover:underline" title={card.name}>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <a
+          href={cardHref(workspaceSlug, card)}
+          className="truncate text-body-xs-medium hover:underline"
+          title={card.name}
+        >
           {card.name || "Untitled"}
         </a>
         {editable && (
@@ -86,12 +95,16 @@ function Name(props: { card: TInlineViewCard; workspaceSlug: string; editable: b
   );
 }
 
-function StateCell(props: { card: TInlineViewCard; data: TInlineViewResult; editable: boolean; onPatch: TLayoutProps["onPatch"] }) {
+function StateCell(props: {
+  card: TInlineViewCard;
+  data: TInlineViewResult;
+  editable: boolean;
+  onPatch: TLayoutProps["onPatch"];
+}) {
   const { card, data, editable, onPatch } = props;
   const states = data.projects[card.project_id]?.states ?? [];
   const current = states.find((s) => s.id === card.state_id);
-  if (!editable)
-    return <span className="text-body-xs-regular">{current?.name ?? ""}</span>;
+  if (!editable) return <span className="text-body-xs-regular">{current?.name ?? ""}</span>;
   return (
     <select
       className="w-full rounded-sm bg-transparent px-1 py-0.5 text-body-xs-regular hover:bg-layer-transparent-hover"
@@ -110,8 +123,7 @@ function StateCell(props: { card: TInlineViewCard; data: TInlineViewResult; edit
 function PriorityCell(props: { card: TInlineViewCard; editable: boolean; onPatch: TLayoutProps["onPatch"] }) {
   const { card, editable, onPatch } = props;
   const value = card.priority ?? "none";
-  if (!editable)
-    return <span className="text-body-xs-regular capitalize">{value}</span>;
+  if (!editable) return <span className="text-body-xs-regular capitalize">{value}</span>;
   return (
     <select
       className="w-full rounded-sm bg-transparent px-1 py-0.5 text-body-xs-regular hover:bg-layer-transparent-hover"
@@ -167,7 +179,7 @@ export function TableLayout(props: TLayoutProps) {
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-left">
         <thead>
-          <tr className="border-b border-subtle text-11 uppercase text-tertiary">
+          <tr className="border-b border-subtle text-11 text-tertiary uppercase">
             <th className="px-2 py-1 font-medium">Name</th>
             <th className="px-2 py-1 font-medium">State</th>
             <th className="px-2 py-1 font-medium">Priority</th>
@@ -255,7 +267,10 @@ export function GalleryLayout(props: TLayoutProps) {
 type TColumn = { key: string; label: string; color?: string; patch: (card: TInlineViewCard) => TCardPatch | null };
 
 /** Board columns for the chosen grouping. Cards in none of them land in "No value". */
-const boardColumns = (data: TInlineViewResult, config: TViewConfig): { columns: TColumn[]; pick: (c: TInlineViewCard) => string } => {
+const boardColumns = (
+  data: TInlineViewResult,
+  config: TViewConfig
+): { columns: TColumn[]; pick: (c: TInlineViewCard) => string } => {
   const groupBy = config.group_by ?? "state";
   if (groupBy === "priority") {
     return {
@@ -317,7 +332,10 @@ export function BoardLayout(props: TLayoutProps) {
       {shown.map((column) => (
         <div
           key={column.key}
-          className={cn("w-64 shrink-0 rounded-md bg-layer-1 p-2", over === column.key && "outline outline-1 outline-accent-primary")}
+          className={cn(
+            "w-64 shrink-0 rounded-md bg-layer-1 p-2",
+            over === column.key && "outline-accent-primary outline outline-1"
+          )}
           onDragOver={(e) => {
             if (!editable) return;
             e.preventDefault();

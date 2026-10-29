@@ -7,7 +7,12 @@
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import type { NodeViewProps } from "@tiptap/react";
 // local imports
-import { DateMentionExtensionConfig, formatDateMentionLabel, newMentionId, todayAsDateString } from "./extension-config";
+import {
+  DateMentionExtensionConfig,
+  formatDateMentionLabel,
+  newMentionId,
+  todayAsDateString,
+} from "./extension-config";
 import { getDateMentionRenderer } from "./renderer-registry";
 
 function DateMentionNodeView(props: NodeViewProps) {

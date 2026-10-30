@@ -25,6 +25,7 @@ import { ERowVariant, Row } from "@plane/ui";
 import { cn, generateRandomColor, hslToHex } from "@plane/utils";
 // components
 import { EditorMentionsRoot } from "@/components/editor/embeds/mentions";
+import { InlineViewHostProvider } from "@/components/inline-views";
 import { getPageLinkHandler } from "@/components/page-links/page-link-block";
 // hooks
 import { useEditorMention } from "@/hooks/editor";
@@ -242,6 +243,7 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
   if (isPageLoading) return <PageContentLoader className={blockWidthClassName} />;
 
   return (
+    <InlineViewHostProvider value={{ workspaceSlug, projectId }}>
     <Row
       className="vertical-scrollbar relative flex scrollbar-md size-full flex-col overflow-x-hidden overflow-y-auto duration-200"
       variant={ERowVariant.HUGGING}
@@ -312,5 +314,6 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
         </div>
       </div>
     </Row>
+    </InlineViewHostProvider>
   );
 });

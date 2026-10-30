@@ -16,6 +16,16 @@ export enum EUserProjectRoles {
   GUEST = 5,
 }
 
+export type TProjectSection = "private" | "teamspace" | "workspace";
+
+export type TProjectTeamspaceDetail = {
+  id: string;
+  name: string;
+  slug: string;
+  position: number;
+  is_default: boolean;
+};
+
 export interface IPartialProject {
   id: string;
   name: string;
@@ -35,6 +45,14 @@ export interface IPartialProject {
   is_private?: boolean;
   /** The project this one sits inside (sidebar tree). Null at top level, or when the parent is hidden from you. */
   parent_id?: string | null;
+  /** Sidebar section the board sits in, worked out by the server. A child follows its parent. */
+  section?: TProjectSection;
+  teamspace_id?: string | null;
+  /** Set when the board is in someone's Private area: only they see it (plus "Private Readers", unless sealed). */
+  private_owner_id?: string | null;
+  is_sealed?: boolean;
+  /** The teamspace header the sidebar draws; null outside a teamspace. */
+  teamspace_detail?: TProjectTeamspaceDetail | null;
   project_lead?: IUserLite | string | null;
   network?: number;
   // Timestamps
@@ -63,6 +81,8 @@ export interface IProject extends IPartialProject {
   members?: string[];
   timezone?: string;
   next_work_item_sequence?: number;
+  /** Write-only, on create: put the new board in my own Private area. */
+  private?: boolean;
 }
 
 export type TProjectAnalyticsCountParams = {

@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
+from django.utils.text import slugify
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -10,7 +11,7 @@ from rest_framework.response import Response
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.views.base import BaseAPIView
 from plane.db.models import Issue, Page, Project, User, Workspace
-from plane.sharing.board_access import MAX_BOARD_DEPTH, group_includes_transitively
+from plane.sharing.board_access import MAX_BOARD_DEPTH, group_includes_transitively, user_teamspace_ids
 from plane.sharing.models import (
     AccessGroup,
     AccessGroupInclude,
@@ -18,6 +19,7 @@ from plane.sharing.models import (
     AccessLevel,
     ProjectShare,
     ProjectShareExclusion,
+    Teamspace,
 )
 from plane.sharing.services import can_manage_sharing, is_workspace_admin, read_sharing, write_sharing
 
@@ -219,6 +221,119 @@ class AccessGroupIncludeEndpoint(AccessGroupIncludeViews, BaseAPIView):
     pass
 
 
+def _teamspace_payload(teamspace):
+    return {
+        "id": str(teamspace.id),
+        "name": teamspace.name,
+        "slug": teamspace.slug,
+        "group_id": str(teamspace.group_id) if teamspace.group_id else None,
+        "group_name": teamspace.group.name if teamspace.group_id else None,
+        "is_default": teamspace.is_default,
+        "position": teamspace.position,
+        "board_count": getattr(teamspace, "board_count", None),
+    }
+
+
+def _teamspace_slug(workspace, raw, name, exclude_pk=None):
+    value = slugify(raw or name)[:64]
+    if not value:
+        raise ValidationError({"slug": "Slug is required."})
+    taken = Teamspace.objects.filter(workspace=workspace, slug=value).exclude(pk=exclude_pk).exists()
+    if taken:
+        raise ValidationError({"slug": "A teamspace with this slug already exists."})
+    return value
+
+
+class TeamspaceViews:
+    """Teamspaces: sidebar sections that hold boards.
+
+    GET returns only the teamspaces the caller belongs to (default ones, and those whose
+    group they act as) - workspace admins included: belonging, not role. POST / PATCH /
+    DELETE are for workspace admins. Body: ``name`` (required), ``slug`` (from the name
+    when absent), ``group_id`` (null = no group), ``is_default``, ``position``. Deleting
+    a teamspace leaves its boards in the workspace section.
+    """
+
+    def _mine(self, request, slug):
+        return (
+            Teamspace.objects.filter(workspace__slug=slug, id__in=user_teamspace_ids(request.user, slug=slug))
+            .select_related("group")
+            .annotate(
+                board_count=Count(
+                    "projects",
+                    filter=Q(projects__deleted_at__isnull=True, projects__archived_at__isnull=True),
+                    distinct=True,
+                )
+            )
+            .order_by("position", "name")
+        )
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    def get(self, request, slug, teamspace_id=None):
+        if teamspace_id:
+            teamspace = self._mine(request, slug).filter(pk=teamspace_id).first()
+            if teamspace is None:
+                return Response({"error": "Teamspace not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(_teamspace_payload(teamspace))
+        return Response([_teamspace_payload(row) for row in self._mine(request, slug)])
+
+    def _apply(self, request, workspace, teamspace):
+        data = request.data
+        # The id is a uuid default, so "new" is the ORM's adding flag, not an empty pk.
+        new = teamspace._state.adding
+        if "name" in data or new:
+            name = (data.get("name") or "").strip()
+            if not name:
+                raise ValidationError({"name": "Name is required."})
+            teamspace.name = name
+        if "slug" in data or new:
+            teamspace.slug = _teamspace_slug(workspace, data.get("slug"), teamspace.name, exclude_pk=teamspace.pk)
+        if "group_id" in data:
+            group_id = data.get("group_id")
+            teamspace.group = _group_in_workspace(workspace.slug, group_id) if group_id else None
+        if "is_default" in data:
+            teamspace.is_default = bool(data.get("is_default"))
+        if "position" in data:
+            try:
+                teamspace.position = int(data.get("position"))
+            except (TypeError, ValueError):
+                raise ValidationError({"position": "Must be a whole number."})
+        elif new:
+            last = Teamspace.objects.filter(workspace=workspace).aggregate(last=Max("position"))["last"]
+            teamspace.position = (last + 1) if last is not None else 0
+        teamspace.save()
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def post(self, request, slug):
+        workspace = Workspace.objects.get(slug=slug)
+        teamspace = Teamspace(workspace=workspace, created_by=request.user)
+        with transaction.atomic():
+            self._apply(request, workspace, teamspace)
+        return Response(
+            _teamspace_payload(Teamspace.objects.select_related("group").get(pk=teamspace.pk)),
+            status=status.HTTP_201_CREATED,
+        )
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def patch(self, request, slug, teamspace_id):
+        workspace = Workspace.objects.get(slug=slug)
+        teamspace = Teamspace.objects.filter(workspace=workspace, pk=teamspace_id).first()
+        if teamspace is None:
+            return Response({"error": "Teamspace not found."}, status=status.HTTP_404_NOT_FOUND)
+        with transaction.atomic():
+            self._apply(request, workspace, teamspace)
+        return Response(_teamspace_payload(Teamspace.objects.select_related("group").get(pk=teamspace.pk)))
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def delete(self, request, slug, teamspace_id):
+        Teamspace.objects.filter(workspace__slug=slug, pk=teamspace_id).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TeamspaceEndpoint(TeamspaceViews, BaseAPIView):
+    pass
+
+
 def _board(slug, project_id):
     return Project.objects.get(workspace__slug=slug, pk=project_id)
 
@@ -234,7 +349,7 @@ def _board_sharing(project):
     while ancestor_id and ancestor_id not in visited and len(visited) <= MAX_BOARD_DEPTH:
         visited.add(ancestor_id)
         ancestor = Project.objects.filter(pk=ancestor_id).first()
-        if ancestor is None or ancestor.is_private:
+        if ancestor is None or ancestor.is_private or ancestor.private_owner_id:
             break
         for row in ancestor.group_exclusions.all():
             decided.add(row.group_id)
@@ -275,7 +390,7 @@ class ProjectGroupShareViews:
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def post(self, request, slug, project_id):
         project = _board(slug, project_id)
-        if project.is_private:
+        if project.is_private or project.private_owner_id:
             return Response(
                 {"error": "A private board cannot be shared. Turn off Private first."},
                 status=status.HTTP_400_BAD_REQUEST,

@@ -7,6 +7,16 @@ from plane.sharing import v1_views
 
 urlpatterns = [
     path(
+        "workspaces/<str:slug>/teamspaces/",
+        v1_views.TeamspaceAPIEndpoint.as_view(http_method_names=["get", "post"]),
+        name="api-teamspaces",
+    ),
+    path(
+        "workspaces/<str:slug>/teamspaces/<uuid:teamspace_id>/",
+        v1_views.TeamspaceAPIEndpoint.as_view(http_method_names=["get", "patch", "delete"]),
+        name="api-teamspace",
+    ),
+    path(
         "workspaces/<str:slug>/access-groups/",
         v1_views.AccessGroupAPIEndpoint.as_view(http_method_names=["get", "post"]),
         name="api-access-groups",

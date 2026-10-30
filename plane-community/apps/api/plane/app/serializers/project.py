@@ -25,22 +25,57 @@ from plane.db.models import (
 from plane.utils.content_validator import (
     validate_html_content,
 )
+from plane.sharing import placement as board_placement
 from plane.utils.project_tree import ProjectParentIdField, clean_parent_id
+
+# Where a board sits (plane.sharing.placement): the FKs are exposed as ids, never as nested rows.
+PLACEMENT_EXCLUDE = ["parent", "teamspace", "private_owner"]
 
 
 class ProjectSerializer(BaseSerializer):
     workspace_detail = WorkspaceLiteSerializer(source="workspace", read_only=True)
     inbox_view = serializers.BooleanField(read_only=True, source="intake_view")
     parent_id = ProjectParentIdField()
+    # Placement: teamspace_id / private_owner_id for workspace admins, is_sealed also for the owner,
+    # private=true on create for "my own private board". Read back: section + teamspace_detail.
+    teamspace_id = serializers.UUIDField(required=False, allow_null=True)
+    private_owner_id = serializers.UUIDField(required=False, allow_null=True)
+    is_sealed = serializers.BooleanField(required=False)
+    private = serializers.BooleanField(required=False, write_only=True)
+    section = serializers.SerializerMethodField()
+    teamspace_detail = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         # "parent" is replaced by parent_id, which hides a parent the user cannot see.
-        exclude = ["parent"]
+        exclude = PLACEMENT_EXCLUDE
         read_only_fields = ["workspace", "deleted_at"]
+
+    def get_section(self, obj):
+        return board_placement.section_of(obj.teamspace_id, obj.private_owner_id)
+
+    def get_teamspace_detail(self, obj):
+        return board_placement.teamspace_detail_of(obj.teamspace if obj.teamspace_id else None)
 
     def validate_parent_id(self, parent_id):
         return clean_parent_id(parent_id, self.instance, self.context["workspace_id"], self.context.get("user"))
+
+    def apply_placement(self, actor=None, instance=None):
+        """Write the placement ``validate`` worked out (if any) to the board and the boards inside it.
+
+        Views call this on create AFTER they add the creator's membership, so a board put
+        in someone else's Private area ends up with that person as its only member.
+        """
+        placement = getattr(self, "_placement", None)
+        instance = instance if instance is not None else self.instance
+        if placement and instance is not None:
+            board_placement.apply_placement(instance, placement, actor=actor)
+            self._placement = None
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        self.apply_placement(actor=self.context.get("user"), instance=instance)
+        return instance
 
     def validate_name(self, name):
         project_id = self.instance.id if self.instance else None
@@ -91,6 +126,9 @@ class ProjectSerializer(BaseSerializer):
             if not is_valid:
                 raise serializers.ValidationError({"error": "html content is not valid"})
 
+        self._placement = board_placement.clean_placement(
+            data, self.instance, self.context["workspace_id"], self.context.get("user")
+        )
         return data
 
     def create(self, validated_data):
@@ -128,6 +166,17 @@ class ProjectListSerializer(DynamicBaseSerializer):
     inbox_view = serializers.BooleanField(read_only=True, source="intake_view")
     next_work_item_sequence = serializers.SerializerMethodField()
     parent_id = ProjectParentIdField(read_only=True)
+    teamspace_id = serializers.UUIDField(read_only=True)
+    private_owner_id = serializers.UUIDField(read_only=True)
+    is_sealed = serializers.BooleanField(read_only=True)
+    section = serializers.SerializerMethodField()
+    teamspace_detail = serializers.SerializerMethodField()
+
+    def get_section(self, obj):
+        return board_placement.section_of(obj.teamspace_id, obj.private_owner_id)
+
+    def get_teamspace_detail(self, obj):
+        return board_placement.teamspace_detail_of(obj.teamspace if obj.teamspace_id else None)
 
     def get_members(self, obj):
         project_members = getattr(obj, "members_list", None)
@@ -143,7 +192,7 @@ class ProjectListSerializer(DynamicBaseSerializer):
 
     class Meta:
         model = Project
-        exclude = ["parent"]
+        exclude = PLACEMENT_EXCLUDE
 
 
 class ProjectDetailSerializer(BaseSerializer):
@@ -155,10 +204,21 @@ class ProjectDetailSerializer(BaseSerializer):
     member_role = serializers.IntegerField(read_only=True)
     anchor = serializers.CharField(read_only=True)
     parent_id = ProjectParentIdField(read_only=True)
+    teamspace_id = serializers.UUIDField(read_only=True)
+    private_owner_id = serializers.UUIDField(read_only=True)
+    is_sealed = serializers.BooleanField(read_only=True)
+    section = serializers.SerializerMethodField()
+    teamspace_detail = serializers.SerializerMethodField()
+
+    def get_section(self, obj):
+        return board_placement.section_of(obj.teamspace_id, obj.private_owner_id)
+
+    def get_teamspace_detail(self, obj):
+        return board_placement.teamspace_detail_of(obj.teamspace if obj.teamspace_id else None)
 
     class Meta:
         model = Project
-        exclude = ["parent"]
+        exclude = PLACEMENT_EXCLUDE
 
 
 class ProjectMemberSerializer(BaseSerializer):

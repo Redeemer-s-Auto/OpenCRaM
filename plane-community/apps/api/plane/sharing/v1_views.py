@@ -13,7 +13,12 @@ from plane.sharing.views import (
     AccessGroupViews,
     ProjectGroupExclusionViews,
     ProjectGroupShareViews,
+    TeamspaceViews,
 )
+
+
+class TeamspaceAPIEndpoint(TeamspaceViews, BaseAPIView):
+    pass
 
 
 class AccessGroupAPIEndpoint(AccessGroupViews, BaseAPIView):

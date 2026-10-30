@@ -16,8 +16,13 @@ from plane.db.models import Project, ProjectIdentifier, WorkspaceMember, State, 
 from plane.utils.content_validator import (
     validate_html_content,
 )
+from plane.sharing import placement as board_placement
 from plane.utils.project_tree import ProjectParentIdField, clean_parent_id
 from .base import BaseSerializer
+
+# Where a board sits (plane.sharing.placement): the FKs are exposed as ids, never as nested rows.
+PLACEMENT_EXCLUDE = ["parent", "teamspace", "private_owner"]
+PLACEMENT_WRITE_FIELDS = ["teamspace_id", "private_owner_id", "is_sealed", "private", "section", "teamspace_detail"]
 
 
 class ProjectCreateSerializer(BaseSerializer):
@@ -71,6 +76,28 @@ class ProjectCreateSerializer(BaseSerializer):
 
     # Fork: the board this one sits inside (null = top level). Read back only when visible.
     parent_id = ProjectParentIdField()
+    # Fork: where the board sits. teamspace_id / private_owner_id for workspace admins, is_sealed
+    # also for the owner, private=true for "my own private board". See plane.sharing.placement.
+    teamspace_id = serializers.UUIDField(required=False, allow_null=True)
+    private_owner_id = serializers.UUIDField(required=False, allow_null=True)
+    is_sealed = serializers.BooleanField(required=False)
+    private = serializers.BooleanField(required=False, write_only=True)
+    section = serializers.SerializerMethodField()
+    teamspace_detail = serializers.SerializerMethodField()
+
+    def get_section(self, obj):
+        return board_placement.section_of(obj.teamspace_id, obj.private_owner_id)
+
+    def get_teamspace_detail(self, obj):
+        return board_placement.teamspace_detail_of(obj.teamspace if obj.teamspace_id else None)
+
+    def apply_placement(self, actor=None, instance=None):
+        """Write the placement ``validate`` worked out (if any). Views call it on create after adding members."""
+        placement = getattr(self, "_placement", None)
+        instance = instance if instance is not None else self.instance
+        if placement and instance is not None:
+            board_placement.apply_placement(instance, placement, actor=actor)
+            self._placement = None
 
     class Meta:
         model = Project
@@ -101,7 +128,7 @@ class ProjectCreateSerializer(BaseSerializer):
             "network",
             "is_private",
             "parent_id",
-        ]
+        ] + PLACEMENT_WRITE_FIELDS
 
         read_only_fields = [
             "id",
@@ -146,6 +173,9 @@ class ProjectCreateSerializer(BaseSerializer):
             ).exists():
                 raise serializers.ValidationError("Default assignee should be a user in the workspace")
 
+        self._placement = board_placement.clean_placement(
+            data, self.instance, self.context["workspace_id"], self.context.get("user")
+        )
         return data
 
     def validate_parent_id(self, parent_id):
@@ -215,7 +245,9 @@ class ProjectUpdateSerializer(ProjectCreateSerializer):
         ):
             # Check if the estimate is a estimate in the project
             raise serializers.ValidationError("Estimate should be a estimate in the project")
-        return super().update(instance, validated_data)
+        instance = super().update(instance, validated_data)
+        self.apply_placement(actor=self.context.get("user"), instance=instance)
+        return instance
 
 
 class ProjectSerializer(BaseSerializer):
@@ -235,11 +267,22 @@ class ProjectSerializer(BaseSerializer):
     is_deployed = serializers.BooleanField(read_only=True)
     cover_image_url = serializers.CharField(read_only=True)
     parent_id = ProjectParentIdField(read_only=True)
+    teamspace_id = serializers.UUIDField(read_only=True)
+    private_owner_id = serializers.UUIDField(read_only=True)
+    is_sealed = serializers.BooleanField(read_only=True)
+    section = serializers.SerializerMethodField()
+    teamspace_detail = serializers.SerializerMethodField()
+
+    def get_section(self, obj):
+        return board_placement.section_of(obj.teamspace_id, obj.private_owner_id)
+
+    def get_teamspace_detail(self, obj):
+        return board_placement.teamspace_detail_of(obj.teamspace if obj.teamspace_id else None)
 
     class Meta:
         model = Project
         # "parent" is replaced by parent_id, which hides a parent the user cannot see.
-        exclude = ["parent"]
+        exclude = PLACEMENT_EXCLUDE
         read_only_fields = [
             "id",
             "emoji",

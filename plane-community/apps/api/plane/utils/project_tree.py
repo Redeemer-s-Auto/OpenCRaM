@@ -41,8 +41,10 @@ def visible_project_ids(user, workspace_id=None, slug=None):
     (``ProjectViewSet.list`` / ``list_detail``) and the parent masking below:
     private projects only for active members; guests see projects they belong to;
     members see those plus public (network=2) ones; workspace admins see every
-    non-private project; and everyone also sees the boards a group share reaches
-    (``plane.sharing.board_access``, inherited down the parent chain).
+    open project; and everyone also sees the boards the resolver reaches
+    (``plane.sharing.board_access``: group shares inherited down the parent chain,
+    teamspaces they belong to, their own Private area, Private Readers). Boards in
+    a teamspace or a Private area are closed to everyone else, admins included.
     """
     from plane.sharing.board_access import shared_project_ids
 
@@ -57,7 +59,9 @@ def visible_project_ids(user, workspace_id=None, slug=None):
     if role is None:
         return none
 
-    projects = Project.objects.filter(**_workspace_filter(workspace_id, slug)).filter(visible_projects_q(user))
+    projects = Project.objects.filter(**_workspace_filter(workspace_id, slug)).filter(
+        visible_projects_q(user, workspace_id=workspace_id, slug=slug)
+    )
     member_of = ProjectMember.objects.filter(member=user, is_active=True).values("project_id")
     shared = Q(id__in=shared_project_ids(user, workspace_id=workspace_id, slug=slug))
     if role == ROLE.GUEST.value:

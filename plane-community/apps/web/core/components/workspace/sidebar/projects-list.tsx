@@ -32,12 +32,14 @@ import { useProjectNavigationPreferences } from "@/hooks/use-navigation-preferen
 // plane web imports
 import type { TProject } from "@plane/types";
 // local imports
+import { SidebarProjectSection, SidebarTeamspaceGroup, groupSidebarRoots } from "./projects-sections";
 import { SidebarProjectTreeNode, useSidebarProjectTree } from "./projects-tree";
 
 export const SidebarProjectsList = observer(function SidebarProjectsList() {
   // states
   const [isAllProjectsListOpen, setIsAllProjectsListOpen] = useState(true);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [isPrivateModalOpen, setIsPrivateModalOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false); // scroll animation state
   // refs
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -61,15 +63,19 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
 
   // Projects inside other projects show under their parent; the limit counts top-level projects.
   const projectTree = useSidebarProjectTree(workspaceSlug?.toString() ?? "", joinedProjects);
+  // Private, Teamspaces, then the workspace projects. A section with nothing in it is not drawn.
+  const sections = groupSidebarRoots(projectTree.rootIds, getPartialProjectById);
+  const hasPlacedProjects = sections.privateIds.length > 0 || sections.teamspaces.length > 0;
+  const showWorkspaceSection = sections.workspaceIds.length > 0 || !hasPlacedProjects;
 
   // Compute limited projects for main sidebar
   const displayedProjects = projectPreferences.showLimitedProjects
-    ? projectTree.rootIds.slice(0, projectPreferences.limitedProjectsCount)
-    : projectTree.rootIds;
+    ? sections.workspaceIds.slice(0, projectPreferences.limitedProjectsCount)
+    : sections.workspaceIds;
 
   // Check if there are more projects to show
   const hasMoreProjects =
-    projectPreferences.showLimitedProjects && projectTree.rootIds.length > projectPreferences.limitedProjectsCount;
+    projectPreferences.showLimitedProjects && sections.workspaceIds.length > projectPreferences.limitedProjectsCount;
 
   const handleCopyText = (projectId: string) => {
     copyUrlToClipboard(`${workspaceSlug}/projects/${projectId}/issues`).then(() => {
@@ -166,13 +172,88 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
           workspaceSlug={workspaceSlug.toString()}
         />
       )}
+      {workspaceSlug && (
+        <CreateProjectModal
+          isOpen={isPrivateModalOpen}
+          onClose={() => setIsPrivateModalOpen(false)}
+          setToFavorite={false}
+          workspaceSlug={workspaceSlug.toString()}
+          data={{ private: true }}
+        />
+      )}
       <div
         ref={containerRef}
         className={cn({
           "border-t border-strong": isScrolled,
         })}
       >
-        <>
+        {sections.privateIds.length > 0 && (
+          <SidebarProjectSection
+            storageKey={`sidebar_private_section_open_${workspaceSlug}`}
+            title="Private"
+            actions={
+              isAuthorizedUser ? (
+                <Tooltip tooltipHeading="New private board" tooltipContent="">
+                  <IconButton
+                    variant="ghost"
+                    size="sm"
+                    icon={PlusIcon}
+                    onClick={() => setIsPrivateModalOpen(true)}
+                    className="hidden text-placeholder group-hover:inline-flex"
+                    aria-label="New private board"
+                  />
+                </Tooltip>
+              ) : undefined
+            }
+          >
+            {sections.privateIds.map((projectId, index) => (
+              <SidebarProjectTreeNode
+                key={projectId}
+                projectId={projectId}
+                tree={projectTree}
+                handleCopyText={handleCopyText}
+                isChild
+                isLastChild={index === sections.privateIds.length - 1}
+              />
+            ))}
+            {isAuthorizedUser && (
+              <SidebarNavItem>
+                <button
+                  type="button"
+                  onClick={() => setIsPrivateModalOpen(true)}
+                  className="flex flex-grow items-center gap-1.5 text-13 font-medium text-tertiary"
+                  aria-label="New private board"
+                >
+                  <PlusIcon className="size-3.5 flex-shrink-0" />
+                  <span>New private board</span>
+                </button>
+              </SidebarNavItem>
+            )}
+          </SidebarProjectSection>
+        )}
+        {sections.teamspaces.length > 0 && (
+          <SidebarProjectSection storageKey={`sidebar_teamspaces_section_open_${workspaceSlug}`} title="Teamspaces">
+            {sections.teamspaces.map((teamspace) => (
+              <SidebarTeamspaceGroup
+                key={teamspace.id}
+                workspaceSlug={workspaceSlug?.toString() ?? ""}
+                teamspace={teamspace}
+              >
+                {teamspace.rootIds.map((projectId, index) => (
+                  <SidebarProjectTreeNode
+                    key={projectId}
+                    projectId={projectId}
+                    tree={projectTree}
+                    handleCopyText={handleCopyText}
+                    isChild
+                    isLastChild={index === teamspace.rootIds.length - 1}
+                  />
+                ))}
+              </SidebarTeamspaceGroup>
+            ))}
+          </SidebarProjectSection>
+        )}
+        {showWorkspaceSection && (
           <Disclosure as="div" className="flex flex-col" defaultOpen={isAllProjectsListOpen}>
             <div className="group flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-placeholder hover:bg-layer-transparent-hover">
               <Disclosure.Button
@@ -273,7 +354,7 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
               )}
             </Transition>
           </Disclosure>
-        </>
+        )}
 
         {isAuthorizedUser && joinedProjects?.length === 0 && (
           <button

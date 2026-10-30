@@ -42,6 +42,7 @@ from plane.db.models import (
 )
 from plane.db.models.intake import IntakeIssueStatus
 from plane.sharing.board_access import project_share_level, shared_role_expr
+from plane.sharing.placement import section_of
 from plane.sharing.visibility import hidden_issue_ids
 from plane.utils.private_projects import visible_projects_q
 from plane.utils.project_tree import visible_parent_id_expr, visible_project_ids
@@ -65,8 +66,8 @@ class ProjectViewSet(BaseViewSet):
             super()
             .get_queryset()
             .filter(workspace__slug=self.kwargs.get("slug"))
-            .filter(visible_projects_q(self.request.user))
-            .select_related("workspace", "workspace__owner", "default_assignee", "project_lead")
+            .filter(visible_projects_q(self.request.user, slug=self.kwargs.get("slug")))
+            .select_related("workspace", "workspace__owner", "default_assignee", "project_lead", "teamspace")
             .annotate(
                 is_favorite=Exists(
                     UserFavorite.objects.filter(
@@ -98,6 +99,14 @@ class ProjectViewSet(BaseViewSet):
             )
             .distinct()
         )
+
+    def _project_for_response(self, pk):
+        """The board as the caller sees it after a write; the bare row when the write just hid it from them.
+
+        A workspace admin who moves a board into someone else's Private area, or a
+        teamspace they are not in, gets its data back once more and never again.
+        """
+        return self.get_queryset().filter(pk=pk).first() or Project.objects.get(pk=pk)
 
     def _member_role_expr(self):
         """The user's project role; on a board a group share reaches, the share's stand-in role."""
@@ -146,7 +155,7 @@ class ProjectViewSet(BaseViewSet):
 
         projects = (
             Project.objects.filter(workspace__slug=self.kwargs.get("slug"))
-            .filter(visible_projects_q(self.request.user))
+            .filter(visible_projects_q(self.request.user, slug=slug))
             .select_related("workspace", "workspace__owner", "default_assignee", "project_lead")
             .annotate(member_role=self._member_role_expr())
             .annotate(
@@ -183,6 +192,13 @@ class ProjectViewSet(BaseViewSet):
             "network",
             "is_private",
             "visible_parent_id",
+            "teamspace_id",
+            "private_owner_id",
+            "is_sealed",
+            "teamspace__name",
+            "teamspace__slug",
+            "teamspace__position",
+            "teamspace__is_default",
             "created_at",
             "updated_at",
             "created_by",
@@ -195,6 +211,21 @@ class ProjectViewSet(BaseViewSet):
         projects = list(projects)
         for project in projects:
             project["parent_id"] = project.pop("visible_parent_id")
+            # Sidebar section and teamspace header, so the sidebar groups without a second call.
+            project["section"] = section_of(project["teamspace_id"], project["private_owner_id"])
+            project["teamspace_detail"] = (
+                {
+                    "id": str(project["teamspace_id"]),
+                    "name": project["teamspace__name"],
+                    "slug": project["teamspace__slug"],
+                    "position": project["teamspace__position"],
+                    "is_default": project["teamspace__is_default"],
+                }
+                if project["teamspace_id"]
+                else None
+            )
+            for key in ("teamspace__name", "teamspace__slug", "teamspace__position", "teamspace__is_default"):
+                project.pop(key)
         return Response(projects, status=status.HTTP_200_OK)
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
@@ -273,7 +304,11 @@ class ProjectViewSet(BaseViewSet):
                 ]
             )
 
-            project = self.get_queryset().filter(pk=serializer.data["id"]).first()
+            # Where the board sits (private=true, teamspace_id, private_owner_id): applied after the
+            # memberships above, so a board put in someone's Private area keeps only that person.
+            serializer.apply_placement(actor=request.user)
+
+            project = self._project_for_response(serializer.data["id"])
 
             # Create the model activity
             model_activity.delay(
@@ -343,7 +378,7 @@ class ProjectViewSet(BaseViewSet):
                         is_default=True,
                     )
 
-            project = self.get_queryset().filter(pk=serializer.data["id"]).first()
+            project = self._project_for_response(serializer.data["id"])
 
             model_activity.delay(
                 model_name="project",

@@ -110,6 +110,24 @@ class Project(BaseModel):
         blank=True,
         related_name="children",
     )
+    # Fork: where the board sits in the sidebar. At most one of these is set; a board inside
+    # another board follows its parent. Rules: plane.sharing.board_access / placement.
+    teamspace = models.ForeignKey(
+        "sharing.Teamspace",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="projects",
+    )
+    # Private area: only this person sees the board (plus "Private Readers", read-only, unless sealed).
+    private_owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="private_projects",
+    )
+    is_sealed = models.BooleanField(default=False)
     cover_image = models.TextField(blank=True, null=True)
     cover_image_asset = models.ForeignKey(
         "db.FileAsset",

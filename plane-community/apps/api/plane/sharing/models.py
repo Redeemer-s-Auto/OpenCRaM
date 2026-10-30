@@ -20,6 +20,11 @@ class AccessLevel(models.IntegerChoices):
     EDIT = 15, "Can edit"
 
 
+# The group whose members may read (not change) everyone's unsealed private boards.
+# Looked up by name per workspace; nothing creates it. See plane.sharing.board_access.
+PRIVATE_READERS_GROUP_NAME = "Private Readers"
+
+
 class ShareTarget(models.TextChoices):
     MEMBER = "member", "Person"
     PROJECT = "project", "Department"
@@ -88,6 +93,35 @@ class AccessGroupInclude(TimestampedModel):
                 condition=~models.Q(group=models.F("included_group")), name="sharing_access_group_include_not_self"
             ),
         ]
+
+
+class Teamspace(TimestampedModel):
+    """A sidebar section that holds boards (``Project.teamspace``).
+
+    Who belongs: every active workspace member when ``is_default``; otherwise the
+    people who act as ``group`` (its members and the members of groups it includes).
+    Belonging gives "Can edit" on every board in it. Workspace admins belong only
+    the way anyone else does. Rules live in ``plane.sharing.board_access``.
+    """
+
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="teamspaces")
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=64)
+    group = models.ForeignKey(
+        AccessGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name="teamspaces"
+    )
+    is_default = models.BooleanField(default=False)
+    position = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = "sharing_teamspaces"
+        ordering = ("position", "name")
+        constraints = [
+            models.UniqueConstraint(fields=["workspace", "slug"], name="sharing_teamspace_workspace_slug_unique"),
+        ]
+
+    def __str__(self):
+        return self.name
 
 
 class ProjectShare(TimestampedModel):

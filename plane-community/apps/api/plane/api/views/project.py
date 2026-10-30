@@ -93,8 +93,8 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
             .filter(
                 member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug")) | Q(network=2)
             )
-            .filter(visible_projects_q(self.request.user))
-            .select_related("project_lead")
+            .filter(visible_projects_q(self.request.user, slug=self.kwargs.get("slug")))
+            .select_related("project_lead", "teamspace")
             .annotate(
                 is_member=Exists(
                     ProjectMember.objects.filter(
@@ -276,7 +276,15 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
                         ]
                     )
 
-                    project = self.get_queryset().filter(pk=serializer.instance.id).first()
+                    # Where the board sits (private=true, teamspace_id, private_owner_id): applied after
+                    # the memberships above, so a board put in someone's Private area keeps only that person.
+                    serializer.apply_placement(actor=request.user)
+
+                    # The bare row when the write just hid the board from the caller (see placement rules).
+                    project = (
+                        self.get_queryset().filter(pk=serializer.instance.id).first()
+                        or Project.objects.get(pk=serializer.instance.id)
+                    )
 
                     # Defer the activity-log task until the surrounding
                     # transaction commits, so it never fires on a rolled-back
@@ -361,7 +369,7 @@ class ProjectListLiteAPIEndpoint(BaseAPIView):
             .filter(
                 member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug")) | Q(network=2)
             )
-            .filter(visible_projects_q(self.request.user))
+            .filter(visible_projects_q(self.request.user, slug=self.kwargs.get("slug")))
             .distinct()
         )
 
@@ -446,8 +454,8 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
             .filter(
                 member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug")) | Q(network=2)
             )
-            .filter(visible_projects_q(self.request.user))
-            .select_related("workspace", "workspace__owner", "default_assignee", "project_lead")
+            .filter(visible_projects_q(self.request.user, slug=self.kwargs.get("slug")))
+            .select_related("workspace", "workspace__owner", "default_assignee", "project_lead", "teamspace")
             .annotate(
                 is_member=Exists(
                     ProjectMember.objects.filter(
@@ -581,7 +589,11 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
                             is_default=True,
                         )
 
-                project = self.get_queryset().filter(pk=serializer.instance.id).first()
+                # The bare row when the write just hid the board from the caller (see placement rules).
+                project = (
+                    self.get_queryset().filter(pk=serializer.instance.id).first()
+                    or Project.objects.get(pk=serializer.instance.id)
+                )
 
                 model_activity.delay(
                     model_name="project",

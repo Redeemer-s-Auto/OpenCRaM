@@ -17,6 +17,11 @@ import { Tooltip } from "@plane/propel/tooltip";
 import { copyUrlToClipboard, orderJoinedProjects } from "@plane/utils";
 // components
 import { CreateProjectModal } from "@/components/project/create-project-modal";
+import {
+  SidebarProjectSection,
+  SidebarTeamspaceGroup,
+  groupSidebarRoots,
+} from "@/components/workspace/sidebar/projects-sections";
 import { SidebarProjectTreeNode, useSidebarProjectTree } from "@/components/workspace/sidebar/projects-tree";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
@@ -77,6 +82,10 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
   });
   // A match whose parent did not match shows at the top level.
   const projectTree = useSidebarProjectTree(workspaceSlug?.toString() ?? "", filteredProjects);
+  // Same three sections as the sidebar: Private, Teamspaces, then the workspace projects.
+  const sections = groupSidebarRoots(projectTree.rootIds, getPartialProjectById);
+  const hasPlacedProjects = sections.privateIds.length > 0 || sections.teamspaces.length > 0;
+  const slug = workspaceSlug?.toString() ?? "";
 
   // auth
   const isAuthorizedUser = allowPermissions(
@@ -153,13 +162,50 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
           </div>
         ) : (
           <div className="vertical-scrollbar mt-4 flex scrollbar-sm flex-grow flex-col gap-0.5 overflow-x-hidden overflow-y-auto pr-2 pl-9">
-            {projectTree.rootIds.map((projectId, index) => (
+            {sections.privateIds.length > 0 && (
+              <SidebarProjectSection storageKey={`extended_private_section_open_${slug}`} title="Private">
+                {sections.privateIds.map((projectId, index) => (
+                  <SidebarProjectTreeNode
+                    key={projectId}
+                    projectId={projectId}
+                    tree={projectTree}
+                    handleCopyText={handleCopyText}
+                    isChild
+                    isLastChild={index === sections.privateIds.length - 1}
+                    renderInExtendedSidebar
+                  />
+                ))}
+              </SidebarProjectSection>
+            )}
+            {sections.teamspaces.length > 0 && (
+              <SidebarProjectSection storageKey={`extended_teamspaces_section_open_${slug}`} title="Teamspaces">
+                {sections.teamspaces.map((teamspace) => (
+                  <SidebarTeamspaceGroup key={teamspace.id} workspaceSlug={slug} teamspace={teamspace}>
+                    {teamspace.rootIds.map((projectId, index) => (
+                      <SidebarProjectTreeNode
+                        key={projectId}
+                        projectId={projectId}
+                        tree={projectTree}
+                        handleCopyText={handleCopyText}
+                        isChild
+                        isLastChild={index === teamspace.rootIds.length - 1}
+                        renderInExtendedSidebar
+                      />
+                    ))}
+                  </SidebarTeamspaceGroup>
+                ))}
+              </SidebarProjectSection>
+            )}
+            {sections.workspaceIds.length > 0 && hasPlacedProjects && (
+              <span className="px-2 py-1.5 text-13 font-semibold text-placeholder">Projects</span>
+            )}
+            {sections.workspaceIds.map((projectId, index) => (
               <SidebarProjectTreeNode
                 key={projectId}
                 projectId={projectId}
                 tree={projectTree}
                 handleCopyText={handleCopyText}
-                isLastChild={index === projectTree.rootIds.length - 1}
+                isLastChild={index === sections.workspaceIds.length - 1}
                 handleOnProjectDrop={handleOnProjectDrop}
                 renderInExtendedSidebar
               />

@@ -17,9 +17,20 @@ from plane.sharing.views import (
     ProjectGroupExclusionEndpoint,
     ProjectGroupShareEndpoint,
     ShareTargetSearchEndpoint,
+    TeamspaceEndpoint,
 )
 
 urlpatterns = [
+    path(
+        "workspaces/<str:slug>/teamspaces/",
+        TeamspaceEndpoint.as_view(http_method_names=["get", "post"]),
+        name="teamspaces",
+    ),
+    path(
+        "workspaces/<str:slug>/teamspaces/<uuid:teamspace_id>/",
+        TeamspaceEndpoint.as_view(http_method_names=["get", "patch", "delete"]),
+        name="teamspace",
+    ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/group-shares/",
         ProjectGroupShareEndpoint.as_view(http_method_names=["get", "post"]),

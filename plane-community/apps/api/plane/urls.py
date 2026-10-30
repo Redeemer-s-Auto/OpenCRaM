@@ -25,6 +25,7 @@ urlpatterns = [
     path("api/", include("plane.synced_blocks.urls")),
     path("api/", include("plane.reminders.urls")),
     path("api/", include("plane.shortcuts.urls")),
+    path("api/", include("plane.page_tree.urls")),
     path("api/", include("plane.blueprints.urls")),
     path("api/public/", include("plane.space.urls")),
     path("api/instances/", include("plane.license.urls")),

@@ -34,4 +34,6 @@ export * from "@/types";
 // additional exports
 export { CardLinkExtension, isCardId } from "./core/extensions/card-link";
 export type { TCardLinkHandler, TCardLinkRenderProps } from "./core/extensions/card-link";
+export { PageLinkExtension, isEntityId } from "./core/extensions/page-link";
+export type { TPageLinkHandler, TPageLinkRenderProps, TPageLinkTarget } from "./core/extensions/page-link";
 export { TrailingNode } from "./core/extensions/trailing-node";

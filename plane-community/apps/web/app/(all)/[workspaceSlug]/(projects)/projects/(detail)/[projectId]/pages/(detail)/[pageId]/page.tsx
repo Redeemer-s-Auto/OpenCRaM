@@ -33,9 +33,8 @@ import { WorkspaceService } from "@/services/workspace.service";
 // services
 import { ProjectPageService, ProjectPageVersionService } from "@/services/page";
 import type { Route } from "./+types/page";
-// one-unit screens: Plane Pages are retired (a card is the page); old links open the page list.
-import { PLANE_PAGES_HIDDEN } from "@/components/one-unit/flags";
-import { PagesRedirect } from "@/components/one-unit/pages-redirect";
+// one-unit screens: the Pages list and menu stay hidden (PLANE_PAGES_HIDDEN), but a page itself
+// opens here: the sidebar page tree and "Link to page" blocks (pages inside pages) lead to it.
 const workspaceService = new WorkspaceService();
 const projectPageService = new ProjectPageService();
 const projectPageVersionService = new ProjectPageVersionService();
@@ -200,4 +199,4 @@ function PageDetailsPage({ params }: Route.ComponentProps) {
   );
 }
 
-export default PLANE_PAGES_HIDDEN ? PagesRedirect : observer(PageDetailsPage);
+export default observer(PageDetailsPage);

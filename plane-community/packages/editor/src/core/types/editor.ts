@@ -65,6 +65,7 @@ export type TEditorCommands =
   | "callout"
   | "toggle"
   | "card-link"
+  | "page-link"
   | "columns-2"
   | "columns-3"
   | "inline-view"

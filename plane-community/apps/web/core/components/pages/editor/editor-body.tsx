@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { observer } from "mobx-react";
 // plane imports
 import { LIVE_BASE_PATH, LIVE_BASE_URL } from "@plane/constants";
-import { CollaborativeDocumentEditorWithRef } from "@plane/editor";
+import { CollaborativeDocumentEditorWithRef, PageLinkExtension } from "@plane/editor";
 import type {
   CollaborationState,
   EditorRefApi,
@@ -25,6 +25,7 @@ import { ERowVariant, Row } from "@plane/ui";
 import { cn, generateRandomColor, hslToHex } from "@plane/utils";
 // components
 import { EditorMentionsRoot } from "@/components/editor/embeds/mentions";
+import { getPageLinkHandler } from "@/components/page-links/page-link-block";
 // hooks
 import { useEditorMention } from "@/hooks/editor";
 import { useMember } from "@/hooks/store/use-member";
@@ -126,6 +127,8 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
   // translation
   const { t } = useTranslation();
   // derived values
+  // "Link to page" blocks (pages inside pages): looked up live for the person viewing.
+  const pageLinkExtensions = useMemo(() => [PageLinkExtension(getPageLinkHandler(workspaceSlug))], [workspaceSlug]);
   const displayConfig: TDisplayConfig = useMemo(
     () => ({
       fontSize,
@@ -298,6 +301,7 @@ export const PageEditorBody = observer(function PageEditorBody(props: Props) {
             user={userConfig}
             disabledExtensions={documentEditorExtensions.disabled}
             flaggedExtensions={documentEditorExtensions.flagged}
+            extensions={pageLinkExtensions}
             aiHandler={{
               menu: getAIMenu,
             }}

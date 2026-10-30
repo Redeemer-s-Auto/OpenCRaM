@@ -197,6 +197,11 @@ export const insertCardLink = (editor: Editor, range?: Range) => {
   else editor.chain().focus().insertCardLink(null).run();
 };
 
+export const insertPageLink = (editor: Editor, range?: Range) => {
+  if (range) editor.chain().focus().deleteRange(range).insertPageLink(null).run();
+  else editor.chain().focus().insertPageLink(null).run();
+};
+
 export const insertToggle = (editor: Editor, range?: Range) => {
   if (range) editor.chain().focus().deleteRange(range).insertToggle().run();
   else editor.chain().focus().insertToggle().run();

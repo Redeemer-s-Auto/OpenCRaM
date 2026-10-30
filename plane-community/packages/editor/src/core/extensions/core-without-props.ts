@@ -15,6 +15,7 @@ import { CustomCalloutExtensionConfig } from "./callout/extension-config";
 import { CardLinkExtensionConfig } from "./card-link/extension-config";
 import { ColumnExtensionConfig, ColumnListExtensionConfig } from "./columns/extension-config";
 import { InlineViewExtensionConfig } from "./inline-view/extension-config";
+import { PageLinkExtensionConfig } from "./page-link/extension-config";
 import { SyncedBlockExtensionConfig } from "./synced-block/extension-config";
 import { DateMentionExtensionConfig } from "./date-mention/extension-config";
 import {
@@ -78,6 +79,7 @@ export const CoreEditorExtensionsWithoutProps = [
   SyncedBlockExtensionConfig,
   DateMentionExtensionConfig,
   CardLinkExtensionConfig,
+  PageLinkExtensionConfig,
   CustomColorExtension,
   ...CoreEditorAdditionalExtensionsWithoutProps,
 ];

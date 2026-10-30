@@ -57,8 +57,10 @@ type Props = {
   disableDrop?: boolean;
   isLastChild: boolean;
   renderInExtendedSidebar?: boolean;
-  /** Set when other projects sit inside this one: shows a chevron that opens/closes them. */
+  /** Set when other projects (or pages) sit inside this one: shows a chevron that opens/closes them. */
   childProjects?: { isOpen: boolean; onToggle: () => void };
+  /** A folder board opens on its landing page instead of its default tab. */
+  landingHref?: string;
 };
 
 export const SidebarProjectsListItem = observer(function SidebarProjectsListItem(props: Props) {
@@ -72,6 +74,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
     projectListType,
     renderInExtendedSidebar = false,
     childProjects,
+    landingHref,
   } = props;
   // store hooks
   const { t } = useTranslation();
@@ -114,7 +117,8 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
   const defaultTabKey = tabPreferences.defaultTab;
   // Validate that the default tab is available
   const validatedDefaultTabKey = availableTabKeys.includes(defaultTabKey) ? defaultTabKey : DEFAULT_TAB_KEY;
-  const defaultTabUrl = project ? getTabUrl(workspaceSlug.toString(), project.id, validatedDefaultTabKey) : "";
+  const defaultTabUrl =
+    landingHref ?? (project ? getTabUrl(workspaceSlug.toString(), project.id, validatedDefaultTabKey) : "");
 
   // toggle project list open
   const setIsProjectListOpen = useCallback(

@@ -8,6 +8,7 @@ export * from "./callout";
 export * from "./card-link";
 export * from "./columns";
 export * from "./inline-view";
+export * from "./page-link";
 export * from "./synced-block";
 export * from "./date-mention";
 export * from "./toggle";

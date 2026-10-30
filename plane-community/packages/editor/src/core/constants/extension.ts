@@ -35,6 +35,7 @@ export enum CORE_EXTENSIONS {
   MARKDOWN_CLIPBOARD = "markdownClipboard",
   MENTION = "mention",
   ORDERED_LIST = "orderedList",
+  PAGE_LINK = "pageLink",
   PARAGRAPH = "paragraph",
   PLACEHOLDER = "placeholder",
   SIDE_MENU = "editorSideMenu",
@@ -89,4 +90,5 @@ export const BLOCK_NODE_TYPES = [
   CORE_EXTENSIONS.COLUMN_LIST,
   CORE_EXTENSIONS.INLINE_VIEW,
   CORE_EXTENSIONS.SYNCED_BLOCK,
+  CORE_EXTENSIONS.PAGE_LINK,
 ];

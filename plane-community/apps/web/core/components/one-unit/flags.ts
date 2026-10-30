@@ -5,7 +5,9 @@
 
 /**
  * Plane's separate Pages feature is retired in this fork: a card is the page.
- * The Pages data and API stay; only the screens are hidden. Set to false to bring them back.
+ * The Pages data and API stay; the list, menu entry and settings switch are hidden. Set to
+ * false to bring them back. A single page still opens at its own address: the sidebar page
+ * tree and "Link to page" blocks (pages inside pages, from the Notion import) lead there.
  */
 export const PLANE_PAGES_HIDDEN = true;
 

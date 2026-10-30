@@ -53,6 +53,9 @@ export interface IPartialProject {
   is_sealed?: boolean;
   /** The teamspace header the sidebar draws; null outside a teamspace. */
   teamspace_detail?: TProjectTeamspaceDetail | null;
+  /** Set by an import. A Notion folder page is "notion" / "folder:<notion page id>": it opens on its landing page. */
+  external_source?: string | null;
+  external_id?: string | null;
   project_lead?: IUserLite | string | null;
   network?: number;
   // Timestamps

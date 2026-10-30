@@ -9,6 +9,7 @@ import {
   CaseSensitive,
   ChevronRight,
   Columns2,
+  FileSymlink,
   CalendarClock,
   Columns3,
   LayoutGrid,
@@ -48,6 +49,7 @@ import {
   insertImage,
   insertCallout,
   insertCardLink,
+  insertPageLink,
   insertColumns,
   insertInlineView,
   insertSyncedBlock,
@@ -367,6 +369,20 @@ export const getSlashCommandFilteredSections =
         description: "Show another card here; its title stays up to date.",
         searchTerms: ["link", "card", "page", "mention", "reference", "shortcut"],
         command: ({ editor, range }: CommandProps) => insertCardLink(editor, range),
+        section: "general",
+        pushAfter: "callout",
+      });
+    }
+    // "Link to page" only where the app supplied the block (page bodies).
+    if (editor?.schema.nodes[CORE_EXTENSIONS.PAGE_LINK]) {
+      internalAdditionalOptions.push({
+        commandKey: "page-link",
+        key: "page-link",
+        title: "Link to page",
+        icon: <FileSymlink className="size-3.5" />,
+        description: "Open another page or board from here; its title stays up to date.",
+        searchTerms: ["link", "page", "board", "sub-page", "subpage", "folder", "reference", "shortcut"],
+        command: ({ editor, range }: CommandProps) => insertPageLink(editor, range),
         section: "general",
         pushAfter: "callout",
       });

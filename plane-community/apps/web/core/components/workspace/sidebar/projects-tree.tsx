@@ -3,15 +3,19 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// Boards inside boards: the sidebar shows projects as a tree built from `parent_id`.
+// Boards inside boards: the sidebar shows projects as a tree built from `parent_id`. A folder board
+// (made from a Notion page) also lists its pages, and opens on its landing page.
 
 import type { ReactElement } from "react";
 import { observer } from "mobx-react";
+import { useParams } from "next/navigation";
 // plane imports
 import { useLocalStorage } from "@plane/hooks";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
+import { pageHref } from "@/services/page-tree.service";
 // local imports
+import { SidebarProjectPages, isFolderProject, projectHasPages, usePageTree } from "./pages-tree";
 import { SidebarProjectsListItem } from "./projects-list-item";
 
 const NONE_CLOSED: string[] = [];
@@ -111,6 +115,15 @@ export const SidebarProjectTreeNode = observer(function ProjectTreeNode(
   } = props;
   const childIds = tree.getChildIds(projectId);
   const isOpen = tree.isOpen(projectId);
+  // A folder board opens on its landing page and lists its pages before the boards inside it.
+  const { workspaceSlug } = useParams();
+  const slug = workspaceSlug?.toString() ?? "";
+  const { getPartialProjectById } = useProject();
+  const isFolder = isFolderProject(getPartialProjectById(projectId));
+  const pageTree = usePageTree(isFolder ? slug : "");
+  const landing = isFolder ? pageTree.getLandingPage(projectId) : undefined;
+  const hasPages = isFolder && projectHasPages(pageTree, projectId);
+  const hasChildren = childIds.length > 0 || hasPages;
 
   return (
     <>
@@ -123,10 +136,12 @@ export const SidebarProjectTreeNode = observer(function ProjectTreeNode(
         isLastChild={isLastChild}
         handleOnProjectDrop={isChild ? undefined : handleOnProjectDrop}
         renderInExtendedSidebar={renderInExtendedSidebar}
-        childProjects={childIds.length > 0 ? { isOpen, onToggle: () => tree.toggleOpen(projectId) } : undefined}
+        childProjects={hasChildren ? { isOpen, onToggle: () => tree.toggleOpen(projectId) } : undefined}
+        landingHref={landing ? pageHref(slug, projectId, landing.id) : undefined}
       />
-      {childIds.length > 0 && isOpen && (
+      {hasChildren && isOpen && (
         <div className="flex flex-col gap-0.5 pl-3">
+          {hasPages && <SidebarProjectPages workspaceSlug={slug} projectId={projectId} tree={pageTree} />}
           {childIds.map((childId) => (
             <SidebarProjectTreeNode
               key={childId}

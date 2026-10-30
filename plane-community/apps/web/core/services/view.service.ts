@@ -5,7 +5,7 @@
  */
 
 import { API_BASE_URL } from "@plane/constants";
-import type { IProjectView } from "@plane/types";
+import type { IProjectView, TTaskListViewsResponse } from "@plane/types";
 import { APIService } from "@/services/api.service";
 // types
 // helpers
@@ -13,6 +13,15 @@ import { APIService } from "@/services/api.service";
 export class ViewService extends APIService {
   constructor() {
     super(API_BASE_URL);
+  }
+
+  /** Adds (or refreshes) the Seen checkbox and the Active / Completed / Checked views. Admins only. */
+  async addTaskListViews(workspaceSlug: string, projectId: string): Promise<TTaskListViewsResponse> {
+    return this.post(`/api/workspaces/${workspaceSlug}/projects/${projectId}/views/task-list/`, {})
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
   }
 
   async createView(workspaceSlug: string, projectId: string, data: Partial<IProjectView>): Promise<any> {

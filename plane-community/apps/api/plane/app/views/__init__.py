@@ -90,6 +90,7 @@ from .view.base import (
     IssueViewViewSet,
     IssueViewFavoriteViewSet,
 )
+from .view.task_list import TaskListViewsEndpoint
 from .cycle.base import (
     CycleViewSet,
     CycleDateCheckEndpoint,

@@ -36,9 +36,21 @@ export interface IProjectView {
   workspace: string;
   logo_props: TLogoProps | undefined;
   is_locked: boolean;
+  /** Hidden views stay out of the view tabs above the board; "Show hidden views" still reaches them. */
+  is_hidden: boolean;
   anchor?: string;
   owned_by: string;
+  sort_order?: number;
 }
+
+/** What "Add task list views" returns: the Seen checkbox plus Active / Completed / Checked. */
+export type TTaskListViewsResponse = {
+  field: { id: string; name: string };
+  views: IProjectView[];
+  created: string[];
+  updated: string[];
+  field_created: boolean;
+};
 
 export interface IPublishedProjectView extends Omit<IProjectView, "rich_filters"> {
   filters: IIssueFilterOptions;

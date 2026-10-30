@@ -10,6 +10,7 @@ from plane.app.views import (
     WorkspaceViewViewSet,
     WorkspaceViewIssuesViewSet,
     IssueViewFavoriteViewSet,
+    TaskListViewsEndpoint,
 )
 
 
@@ -18,6 +19,11 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/views/",
         IssueViewViewSet.as_view({"get": "list", "post": "create"}),
         name="project-view",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/views/task-list/",
+        TaskListViewsEndpoint.as_view(),
+        name="project-task-list-views",
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/views/<uuid:pk>/",

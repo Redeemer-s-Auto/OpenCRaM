@@ -8,7 +8,7 @@ import { set } from "lodash-es";
 import { observable, action, makeObservable, runInAction, computed } from "mobx";
 import { computedFn } from "mobx-utils";
 // types
-import type { IProjectView, TViewFilters } from "@plane/types";
+import type { IProjectView, TTaskListViewsResponse, TViewFilters } from "@plane/types";
 // constants
 // helpers
 import { getValidatedViewFilters, getViewName, orderViews, shouldFilterView } from "@plane/utils";
@@ -42,6 +42,7 @@ export interface IProjectViewStore {
     data: Partial<IProjectView>
   ) => Promise<IProjectView>;
   deleteView: (workspaceSlug: string, projectId: string, viewId: string) => Promise<any>;
+  addTaskListViews: (workspaceSlug: string, projectId: string) => Promise<TTaskListViewsResponse>;
   updateFilters: <T extends keyof TViewFilters>(filterKey: T, filterValue: TViewFilters[T]) => void;
   clearAllFilters: () => void;
   // favorites actions
@@ -77,6 +78,7 @@ export class ProjectViewStore implements IProjectViewStore {
       createView: action,
       updateView: action,
       deleteView: action,
+      addTaskListViews: action,
       // actions
       updateFilters: action,
       clearAllFilters: action,
@@ -212,6 +214,20 @@ export class ProjectViewStore implements IProjectViewStore {
 
     return response;
   }
+
+  /**
+   * Adds the task-list views (Active / Completed / Checked) and the Seen checkbox to a board,
+   * then puts the views in the store and reloads the board's fields so the checkbox shows.
+   */
+  addTaskListViews = async (workspaceSlug: string, projectId: string): Promise<TTaskListViewsResponse> => {
+    const response = await this.viewService.addTaskListViews(workspaceSlug, projectId);
+    runInAction(() => {
+      response.views.forEach((view) => set(this.viewMap, [view.id], view));
+      set(this.fetchedMap, projectId, true);
+    });
+    await this.rootStore.customField.fetchProjectFields(workspaceSlug, projectId);
+    return response;
+  };
 
   /**
    * Updates a view details of specific view and updates it in the store

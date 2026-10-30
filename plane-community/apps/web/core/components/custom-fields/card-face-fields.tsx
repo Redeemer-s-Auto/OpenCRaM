@@ -7,11 +7,10 @@
 import type { ReactElement, SyntheticEvent } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-import { CheckSquare } from "lucide-react";
 import { Tooltip } from "@plane/propel/tooltip";
 import type { IIssueDisplayProperties, TCustomField, TCustomFieldValue, TIssue } from "@plane/types";
 import { EIssueLayoutTypes } from "@plane/types";
-import { CustomSearchSelect } from "@plane/ui";
+import { Checkbox, CustomSearchSelect } from "@plane/ui";
 import { cn } from "@plane/utils";
 // components
 import { ButtonAvatars } from "@/components/dropdowns/member/avatar";
@@ -29,6 +28,7 @@ import {
   linkedCards,
 } from "./helpers";
 import { buildCustomFieldsPayload } from "./issue-properties";
+import { useRefetchWorkItems } from "./use-refetch-work-items";
 import { OptionChip } from "./value-input";
 
 /**
@@ -83,8 +83,13 @@ export const CustomFieldCardFaces = observer(function CustomFieldCardFaces(props
   );
 });
 
-/** Empty values (and an unticked checkbox) show nothing on a card. */
+/**
+ * Empty values show nothing on a card. A checkbox field is the exception: it is a real box the
+ * person ticks on the row (a task list's "Seen"), so it shows ticked or not. A formula that
+ * yields a checkbox still hides until it is true.
+ */
 const hasCardValue = (field: TCustomField, value: TCustomFieldValue | undefined) => {
+  if (field.field_type === "checkbox") return true;
   if (isEmptyValue(value)) return false;
   if (effectiveFieldType(field) === "checkbox") return value === true;
   return true;
@@ -98,6 +103,7 @@ const CardFaceValue = observer(function CardFaceValue(props: {
   const { field, issue, updateIssue } = props;
   const { isMobile } = usePlatformOS();
   const { getUserDetails } = useMember();
+  const refetch = useRefetchWorkItems();
   const value = issue.custom_fields?.[field.id];
   const Icon = getFieldDetails(field).icon;
   const text = formatCustomFieldValue(field, value, (userId) => getUserDetails(userId)?.display_name);
@@ -111,29 +117,35 @@ const CardFaceValue = observer(function CardFaceValue(props: {
     </Tooltip>
   );
 
-  // Checkbox: a ticked box shows the field name; clicking it unticks.
+  // Checkbox: a real box with the field name, ticked or not, right on the row. Tall enough to tap
+  // on a phone. Ticking saves at once and reloads the list, so a card that no longer fits the
+  // view's filter (Completed -> Checked) leaves without a page reload.
   if (field.field_type === "checkbox") {
-    const chip = (
-      <span className={chipClass}>
-        <CheckSquare className="size-3 flex-shrink-0" />
-        <span className="truncate">{field.name}</span>
-      </span>
-    );
-    if (!updateIssue) return withTooltip(chip, "Yes");
+    const checked = value === true;
+    const canEdit = !!updateIssue;
     return withTooltip(
-      <button
-        type="button"
-        className={cn(chipClass, "hover:bg-layer-transparent-hover")}
-        onClick={(e) => {
-          stop(e);
-          void save(false);
-        }}
-        aria-label={`Untick ${field.name}`}
+      // oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions
+      <label
+        className={cn(
+          "flex h-7 max-w-48 flex-shrink-0 items-center gap-1.5 overflow-hidden rounded-sm border-[0.5px] border-strong px-2 text-caption-sm-regular",
+          checked ? "text-primary" : "text-tertiary",
+          canEdit ? "cursor-pointer hover:bg-layer-transparent-hover" : "cursor-default"
+        )}
+        onClick={(e) => e.stopPropagation()}
+        onFocus={(e) => e.stopPropagation()}
       >
-        <CheckSquare className="size-3 flex-shrink-0" />
+        <Checkbox
+          checked={checked}
+          disabled={!canEdit}
+          onChange={(e) => {
+            const saved = save(e.target.checked);
+            if (saved) void saved.then(() => refetch());
+          }}
+          aria-label={field.name}
+        />
         <span className="truncate">{field.name}</span>
-      </button>,
-      "Yes (click to untick)"
+      </label>,
+      checked ? "Yes" : "No"
     );
   }
 

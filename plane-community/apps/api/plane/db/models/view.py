@@ -69,6 +69,8 @@ class IssueView(WorkspaceBaseModel):
     owned_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="views")
     is_locked = models.BooleanField(default=False)
     archived_at = models.DateTimeField(null=True)
+    # Hidden views stay out of the view tabs above a board; "Show hidden views" still reaches them.
+    is_hidden = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Issue View"

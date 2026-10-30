@@ -12,6 +12,7 @@ import { ISSUE_DISPLAY_FILTERS_BY_PAGE, PROJECT_VIEW_TRACKER_ELEMENTS } from "@p
 import { EIssueLayoutTypes, EIssuesStoreType } from "@plane/types";
 import { Spinner } from "@plane/ui";
 // components
+import { ProjectViewTabs } from "@/components/views/view-tabs";
 import { ProjectLevelWorkItemFiltersHOC } from "@/components/work-item-filters/filters-hoc/project-level";
 import { WorkItemFiltersRow } from "@/components/work-item-filters/filters-row";
 // hooks
@@ -84,6 +85,7 @@ export const ProjectLayoutRoot = observer(function ProjectLayoutRoot() {
       >
         {({ filter: projectWorkItemsFilter }) => (
           <div className="relative flex h-full w-full flex-col overflow-hidden">
+            <ProjectViewTabs workspaceSlug={workspaceSlug} projectId={projectId} />
             {projectWorkItemsFilter && (
               <WorkItemFiltersRow
                 filter={projectWorkItemsFilter}

@@ -237,15 +237,22 @@ export const CustomFieldValueInput = observer(function CustomFieldValueInput(pro
       );
 
     case "checkbox":
+      // The whole label is the tap target (a table cell fills its cell), not just the 16px box.
       return (
-        <div className="flex h-7.5 items-center px-2">
+        <label
+          className={cn(
+            "flex items-center px-2",
+            variant === "cell" ? "h-full min-h-10 w-full" : "h-7.5 min-w-10",
+            disabled ? "cursor-default" : "cursor-pointer"
+          )}
+        >
           <Checkbox
             checked={value === true}
             disabled={disabled}
             onChange={(e) => onChange(e.target.checked)}
             aria-label={field.name}
           />
-        </div>
+        </label>
       );
 
     case "date":

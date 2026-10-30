@@ -12,6 +12,7 @@ import useSWR from "swr";
 import { ISSUE_DISPLAY_FILTERS_BY_PAGE, PROJECT_VIEW_TRACKER_ELEMENTS } from "@plane/constants";
 import { EIssuesStoreType, EIssueLayoutTypes } from "@plane/types";
 // hooks
+import { ProjectViewTabs } from "@/components/views/view-tabs";
 import { ProjectLevelWorkItemFiltersHOC } from "@/components/work-item-filters/filters-hoc/project-level";
 import { WorkItemFiltersRow } from "@/components/work-item-filters/filters-row";
 import { useIssues } from "@/hooks/store/use-issues";
@@ -104,6 +105,7 @@ export const ProjectViewLayoutRoot = observer(function ProjectViewLayoutRoot() {
       >
         {({ filter: projectViewWorkItemsFilter }) => (
           <div className="relative flex h-full w-full flex-col overflow-hidden">
+            <ProjectViewTabs workspaceSlug={workspaceSlug} projectId={projectId} activeViewId={viewId} />
             {projectViewWorkItemsFilter && (
               <WorkItemFiltersRow
                 filter={projectViewWorkItemsFilter}

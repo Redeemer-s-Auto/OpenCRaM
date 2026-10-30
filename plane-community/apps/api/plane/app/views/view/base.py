@@ -354,7 +354,7 @@ class IssueViewViewSet(BaseViewSet):
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @allow_permission(allowed_roles=[], creator=True, model=IssueView)
+    @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=IssueView)
     def partial_update(self, request, slug, project_id, pk):
         with transaction.atomic():
             issue_view = IssueView.objects.select_for_update().get(pk=pk, workspace__slug=slug, project_id=project_id)
@@ -362,8 +362,13 @@ class IssueViewViewSet(BaseViewSet):
             if issue_view.is_locked:
                 return Response({"error": "view is locked"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Only update the view if owner is updating
-            if issue_view.owned_by_id != request.user.id:
+            # Only update the view if owner is updating. A board admin may still hide a view
+            # from the tabs or show it again (is_hidden alone).
+            is_admin = ProjectMember.objects.filter(
+                workspace__slug=slug, project_id=project_id, member=request.user, role=20, is_active=True
+            ).exists()
+            only_hidden = set(request.data.keys()) == {"is_hidden"}
+            if issue_view.owned_by_id != request.user.id and not (is_admin and only_hidden):
                 return Response(
                     {"error": "Only the owner of the view can update the view"},
                     status=status.HTTP_400_BAD_REQUEST,

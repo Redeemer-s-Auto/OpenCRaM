@@ -16,7 +16,8 @@ import type { SideMenuHandleOptions, SideMenuPluginProps } from "@/extensions";
 const verticalEllipsisIcon =
   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-ellipsis-vertical"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>';
 
-const generalSelectors = [
+/** The blocks the side menu (drag handle, +) sits beside. */
+export const blockSelectors = [
   "li",
   "p.editor-paragraph-block:not(:first-child)",
   ".code-block",
@@ -118,7 +119,7 @@ export const nodeDOMAtCoords = (coords: { x: number; y: number }) => {
     }
 
     // apply general selector
-    if (elem.matches(generalSelectors)) {
+    if (elem.matches(blockSelectors)) {
       return elem;
     }
   }

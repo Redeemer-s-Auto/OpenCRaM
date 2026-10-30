@@ -25,6 +25,7 @@ import {
   getFieldDetails,
   isAuditPersonField,
   isEmptyValue,
+  isSeenField,
   linkedCards,
 } from "./helpers";
 import { buildCustomFieldsPayload } from "./issue-properties";
@@ -68,9 +69,12 @@ export const CustomFieldCardFaces = observer(function CustomFieldCardFaces(props
   const { getProjectFields } = useCustomField();
   // Fields of the card's own board (workspace views mix boards); fall back to the board in the URL.
   const fields = getProjectFields(issue.project_id ?? projectId?.toString()) ?? [];
+  // The Seen box has its own place at the right end of the row (SeenCheck), so it is not a face here.
   const shown = fields.filter(
     (field) =>
-      isCustomFieldOnCardFace(displayProperties, field.id) && hasCardValue(field, issue.custom_fields?.[field.id])
+      !isSeenField(field) &&
+      isCustomFieldOnCardFace(displayProperties, field.id) &&
+      hasCardValue(field, issue.custom_fields?.[field.id])
   );
   if (shown.length === 0) return null;
 

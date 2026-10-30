@@ -105,6 +105,7 @@ export const SpreadsheetView = observer(function SpreadsheetView(props: Props) {
                 spreadsheetColumnsList={spreadsheetColumnsList}
                 selectionHelpers={helpers}
                 isEpic={isEpic}
+                quickAddCallback={enableQuickCreateIssue && !disableIssueCreation ? quickAddCallback : undefined}
               />
             </div>
             <div className="border-t border-subtle">

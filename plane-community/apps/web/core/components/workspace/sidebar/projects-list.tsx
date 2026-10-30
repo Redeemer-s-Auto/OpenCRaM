@@ -19,7 +19,7 @@ import { IconButton } from "@plane/propel/icon-button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { Tooltip } from "@plane/propel/tooltip";
 import { Loader } from "@plane/ui";
-import { copyUrlToClipboard, cn, orderJoinedProjects } from "@plane/utils";
+import { copyUrlToClipboard, cn } from "@plane/utils";
 // components
 import { CreateProjectModal } from "@/components/project/create-project-modal";
 import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
@@ -29,11 +29,9 @@ import { useCommandPalette } from "@/hooks/store/use-command-palette";
 import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
 import { useProjectNavigationPreferences } from "@/hooks/use-navigation-preferences";
-// plane web imports
-import type { TProject } from "@plane/types";
 // local imports
 import { SidebarProjectSection, SidebarTeamspaceGroup, groupSidebarRoots } from "./projects-sections";
-import { SidebarProjectTreeNode, useSidebarProjectTree } from "./projects-tree";
+import { SidebarProjectTreeNode, planSiblingPositions, useSidebarProjectTree } from "./projects-tree";
 
 export const SidebarProjectsList = observer(function SidebarProjectsList() {
   // states
@@ -50,7 +48,7 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
   const { preferences: projectPreferences } = useProjectNavigationPreferences();
   const { isExtendedProjectSidebarOpened, toggleExtendedProjectSidebar } = useAppTheme();
 
-  const { loader, getPartialProjectById, joinedProjectIds: joinedProjects, updateProjectView } = useProject();
+  const { loader, getPartialProjectById, joinedProjectIds: joinedProjects, updateProject } = useProject();
   // router params
   const { workspaceSlug } = useParams();
   const pathname = usePathname();
@@ -87,6 +85,8 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
     });
   };
 
+  // Only the top-level workspace boards drag. A drop lands the board before the one it was dropped on
+  // (or last, when dropped below the last one) and saves the shared `position` of the boards involved.
   const handleOnProjectDrop = (
     sourceId: string | undefined,
     destinationId: string | undefined,
@@ -94,27 +94,24 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
   ) => {
     if (!sourceId || !destinationId || !workspaceSlug) return;
     if (sourceId === destinationId) return;
+    const siblings = sections.workspaceIds;
+    if (!siblings.includes(sourceId) || !siblings.includes(destinationId)) return;
 
-    const joinedProjectsList: TProject[] = [];
-    joinedProjects.map((projectId) => {
-      const projectDetails = getPartialProjectById(projectId);
-      if (projectDetails) joinedProjectsList.push(projectDetails);
-    });
+    const others = siblings.filter((projectId) => projectId !== sourceId);
+    const at = others.indexOf(destinationId) + (shouldDropAtEnd ? 1 : 0);
+    const ordered = [...others.slice(0, at), sourceId, ...others.slice(at)];
+    const positionOf = (projectId: string) => getPartialProjectById(projectId)?.position;
+    const updates = planSiblingPositions(ordered, sourceId, positionOf);
 
-    const sourceIndex = joinedProjects.indexOf(sourceId);
-    const destinationIndex = shouldDropAtEnd ? joinedProjects.length : joinedProjects.indexOf(destinationId);
-
-    if (joinedProjectsList.length <= 0) return;
-
-    const updatedSortOrder = orderJoinedProjects(sourceIndex, destinationIndex, sourceId, joinedProjectsList);
-    if (updatedSortOrder != undefined)
-      updateProjectView(workspaceSlug.toString(), sourceId, { sort_order: updatedSortOrder }).catch(() => {
-        setToast({
-          type: TOAST_TYPE.ERROR,
-          title: t("error"),
-          message: t("something_went_wrong"),
-        });
+    Promise.all(
+      updates.map((update) => updateProject(workspaceSlug.toString(), update.id, { position: update.position }))
+    ).catch(() => {
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: t("error"),
+        message: t("something_went_wrong"),
       });
+    });
   };
 
   /**

@@ -128,6 +128,10 @@ class Project(BaseModel):
         related_name="private_projects",
     )
     is_sealed = models.BooleanField(default=False)
+    # Fork: where the board sits among its siblings in the sidebar tree (same parent, same
+    # section): lower first, null after every placed sibling. Shared by everyone, unlike the
+    # per-person ProjectUserProperty.sort_order, which only breaks ties. Written by admins.
+    position = models.FloatField(null=True, blank=True)
     cover_image = models.TextField(blank=True, null=True)
     cover_image_asset = models.ForeignKey(
         "db.FileAsset",

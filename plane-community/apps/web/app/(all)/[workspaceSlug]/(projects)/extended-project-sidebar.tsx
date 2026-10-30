@@ -14,7 +14,7 @@ import { EmptyStateCompact } from "@plane/propel/empty-state";
 import { PlusIcon, SearchIcon } from "@plane/propel/icons";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import { Tooltip } from "@plane/propel/tooltip";
-import { copyUrlToClipboard, orderJoinedProjects } from "@plane/utils";
+import { copyUrlToClipboard } from "@plane/utils";
 // components
 import { CreateProjectModal } from "@/components/project/create-project-modal";
 import {
@@ -22,12 +22,15 @@ import {
   SidebarTeamspaceGroup,
   groupSidebarRoots,
 } from "@/components/workspace/sidebar/projects-sections";
-import { SidebarProjectTreeNode, useSidebarProjectTree } from "@/components/workspace/sidebar/projects-tree";
+import {
+  SidebarProjectTreeNode,
+  planSiblingPositions,
+  useSidebarProjectTree,
+} from "@/components/workspace/sidebar/projects-tree";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
-import type { TProject } from "@plane/types";
 import { ExtendedSidebarWrapper } from "./extended-sidebar-wrapper";
 
 export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar() {
@@ -41,38 +44,8 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
   // store hooks
   const { t } = useTranslation();
   const { isExtendedProjectSidebarOpened, toggleExtendedProjectSidebar } = useAppTheme();
-  const { getPartialProjectById, joinedProjectIds: joinedProjects, updateProjectView } = useProject();
+  const { getPartialProjectById, joinedProjectIds: joinedProjects, updateProject } = useProject();
   const { allowPermissions } = useUserPermissions();
-
-  const handleOnProjectDrop = (
-    sourceId: string | undefined,
-    destinationId: string | undefined,
-    shouldDropAtEnd: boolean
-  ) => {
-    if (!sourceId || !destinationId || !workspaceSlug) return;
-    if (sourceId === destinationId) return;
-
-    const joinedProjectsList: TProject[] = [];
-    joinedProjects.map((projectId) => {
-      const projectDetails = getPartialProjectById(projectId);
-      if (projectDetails) joinedProjectsList.push(projectDetails);
-    });
-
-    const sourceIndex = joinedProjects.indexOf(sourceId);
-    const destinationIndex = shouldDropAtEnd ? joinedProjects.length : joinedProjects.indexOf(destinationId);
-
-    if (joinedProjectsList.length <= 0) return;
-
-    const updatedSortOrder = orderJoinedProjects(sourceIndex, destinationIndex, sourceId, joinedProjectsList);
-    if (updatedSortOrder != undefined)
-      updateProjectView(workspaceSlug.toString(), sourceId, { sort_order: updatedSortOrder }).catch(() => {
-        setToast({
-          type: TOAST_TYPE.ERROR,
-          title: t("error"),
-          message: t("something_went_wrong"),
-        });
-      });
-  };
 
   // filter projects based on search query
   const filteredProjects = joinedProjects.filter((projectId) => {
@@ -86,6 +59,33 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
   const sections = groupSidebarRoots(projectTree.rootIds, getPartialProjectById);
   const hasPlacedProjects = sections.privateIds.length > 0 || sections.teamspaces.length > 0;
   const slug = workspaceSlug?.toString() ?? "";
+
+  // Same rule as the sidebar: a top-level workspace board lands before the one it was dropped on
+  // (or last) and the shared `position` of the boards involved is saved.
+  const handleOnProjectDrop = (
+    sourceId: string | undefined,
+    destinationId: string | undefined,
+    shouldDropAtEnd: boolean
+  ) => {
+    if (!sourceId || !destinationId || !slug) return;
+    if (sourceId === destinationId) return;
+    const siblings = sections.workspaceIds;
+    if (!siblings.includes(sourceId) || !siblings.includes(destinationId)) return;
+
+    const others = siblings.filter((projectId) => projectId !== sourceId);
+    const at = others.indexOf(destinationId) + (shouldDropAtEnd ? 1 : 0);
+    const ordered = [...others.slice(0, at), sourceId, ...others.slice(at)];
+    const positionOf = (projectId: string) => getPartialProjectById(projectId)?.position;
+    const updates = planSiblingPositions(ordered, sourceId, positionOf);
+
+    Promise.all(updates.map((update) => updateProject(slug, update.id, { position: update.position }))).catch(() => {
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: t("error"),
+        message: t("something_went_wrong"),
+      });
+    });
+  };
 
   // auth
   const isAuthorizedUser = allowPermissions(

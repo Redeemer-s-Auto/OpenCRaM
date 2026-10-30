@@ -254,6 +254,13 @@ export const ListGroup = observer(function ListGroup(props: Props) {
 
   const isGroupByCreatedBy = group_by === "created_by";
   const shouldExpand = (!!groupIssueCount && isExpanded) || !group_by;
+  // The quick-add row at the foot of the group and the + on each row share one gate.
+  const canQuickAdd =
+    enableIssueQuickAdd &&
+    !disableIssueCreation &&
+    !isGroupByCreatedBy &&
+    !isCompletedCycle &&
+    !isWorkflowIssueCreationDisabled;
 
   return validateEmptyIssueGroups(groupIssueCount) ? (
     <div
@@ -311,6 +318,8 @@ export const ListGroup = observer(function ListGroup(props: Props) {
               canDropOverIssue={!canOverlayBeVisible}
               selectionHelpers={selectionHelpers}
               isEpic={isEpic}
+              quickAddCallback={canQuickAdd ? quickAddCallback : undefined}
+              groupQuickAddData={prePopulateQuickAddData(group_by, group.id)}
             />
           )}
 
@@ -327,22 +336,18 @@ export const ListGroup = observer(function ListGroup(props: Props) {
               </>
             ))}
 
-          {enableIssueQuickAdd &&
-            !disableIssueCreation &&
-            !isGroupByCreatedBy &&
-            !isCompletedCycle &&
-            !isWorkflowIssueCreationDisabled && (
-              <div className="sticky bottom-0 z-[1] w-full flex-shrink-0">
-                <QuickAddIssueRoot
-                  layout={EIssueLayoutTypes.LIST}
-                  QuickAddButton={ListQuickAddIssueButton}
-                  prePopulatedData={prePopulateQuickAddData(group_by, group.id)}
-                  containerClassName="border-b border-t border-subtle bg-surface-1 "
-                  quickAddCallback={quickAddCallback}
-                  isEpic={isEpic}
-                />
-              </div>
-            )}
+          {canQuickAdd && (
+            <div className="sticky bottom-0 z-[1] w-full flex-shrink-0">
+              <QuickAddIssueRoot
+                layout={EIssueLayoutTypes.LIST}
+                QuickAddButton={ListQuickAddIssueButton}
+                prePopulatedData={prePopulateQuickAddData(group_by, group.id)}
+                containerClassName="border-b border-t border-subtle bg-surface-1 "
+                quickAddCallback={quickAddCallback}
+                isEpic={isEpic}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

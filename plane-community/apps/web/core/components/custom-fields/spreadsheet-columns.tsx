@@ -20,8 +20,9 @@ import { useCustomField } from "@/hooks/store/use-custom-field";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // local
 import { AddCustomFieldButton } from "./add-field-button";
-import { getFieldDetails, isLinkedField } from "./helpers";
+import { getFieldDetails, isLinkedField, isSeenField } from "./helpers";
 import { buildCustomFieldsPayload } from "./issue-properties";
+import { SeenCheck, useSeenField } from "./seen-check";
 import { useRefetchWorkItems } from "./use-refetch-work-items";
 import { CustomFieldValueInput } from "./value-input";
 
@@ -31,12 +32,48 @@ export const customFieldDisplayKey = (fieldId: string) => `customfield_${fieldId
 export const isCustomFieldColumnShown = (displayProperties: IIssueDisplayProperties, fieldId: string) =>
   displayProperties[customFieldDisplayKey(fieldId)] !== false;
 
-/** Live custom fields of the board in the URL. Empty outside a single board. */
+/**
+ * Live custom fields of the board in the URL, as table columns. Empty outside a single board.
+ * The Seen box is left out: it is the last column of the table (SeenHeaderColumn / SeenCell).
+ */
 export const useSpreadsheetCustomFields = (): TCustomField[] => {
   const { projectId } = useParams();
   const { getProjectFields } = useCustomField();
-  return getProjectFields(projectId?.toString()) ?? [];
+  return (getProjectFields(projectId?.toString()) ?? []).filter((field) => !isSeenField(field));
 };
+
+/** Header of the check-mark column at the right end of a task-style board's table. */
+export const SeenHeaderColumn = observer(function SeenHeaderColumn() {
+  const { projectId } = useParams();
+  const field = useSeenField(projectId?.toString());
+  if (!field) return null;
+  return (
+    <th
+      className="h-11 w-14 min-w-14 border border-t-0 border-b-0 border-subtle bg-layer-1 px-2 text-center text-13 font-medium text-secondary"
+      tabIndex={-1}
+    >
+      {field.name}
+    </th>
+  );
+});
+
+/** The check-mark cell at the right end of a task-style board's table row. */
+export const SeenCell = observer(function SeenCell(props: Omit<TCellProps, "displayProperties">) {
+  const { issueDetail, disableUserActions, updateIssue } = props;
+  const { projectId } = useParams();
+  const field = useSeenField(projectId?.toString());
+  if (!field) return null;
+  return (
+    <td
+      tabIndex={0}
+      className="h-11 w-14 min-w-14 border-r-[1px] border-subtle text-13 after:absolute after:bottom-[-1px] after:w-full after:border after:border-subtle"
+    >
+      <div className="flex h-full w-full items-center justify-center">
+        <SeenCheck issue={issueDetail} updateIssue={updateIssue} isReadOnly={disableUserActions} />
+      </div>
+    </td>
+  );
+});
 
 type THeaderProps = {
   displayProperties: IIssueDisplayProperties;

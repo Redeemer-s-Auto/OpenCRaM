@@ -61,7 +61,9 @@ def get_default_filters():
 def get_default_display_filters():
     return {
         "group_by": None,
-        "order_by": "-created_at",
+        # Fork: a board with no sort chosen shows its cards in their manual order (Issue.sort_order,
+        # ascending), the order an import such as Notion's wrote; new cards land at the bottom.
+        "order_by": "sort_order",
         "type": None,
         "sub_issue": True,
         "show_empty_groups": True,

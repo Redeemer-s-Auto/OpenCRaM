@@ -38,6 +38,8 @@ type Props = {
   spreadsheetColumnsList: (keyof IIssueDisplayProperties)[];
   selectionHelpers: TSelectionHelper;
   isEpic?: boolean;
+  /** When set, every row gets a + that adds a card right above or below it. */
+  quickAddCallback?: (projectId: string | null | undefined, data: TIssue) => Promise<TIssue | undefined>;
 };
 
 export const SpreadsheetTable = observer(function SpreadsheetTable(props: Props) {
@@ -57,6 +59,7 @@ export const SpreadsheetTable = observer(function SpreadsheetTable(props: Props)
     spreadsheetColumnsList,
     selectionHelpers,
     isEpic = false,
+    quickAddCallback,
   } = props;
 
   // states
@@ -139,6 +142,8 @@ export const SpreadsheetTable = observer(function SpreadsheetTable(props: Props)
             spreadsheetColumnsList={spreadsheetColumnsList}
             selectionHelpers={selectionHelpers}
             isEpic={isEpic}
+            quickAddCallback={quickAddCallback}
+            siblingIds={issueIds}
           />
         ))}
       </tbody>

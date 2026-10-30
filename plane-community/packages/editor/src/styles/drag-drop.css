@@ -10,6 +10,14 @@
     opacity: 0;
     pointer-events: none;
   }
+
+  /* No hover on a touch screen: once placed beside a block, the menu (the +) stays in view. */
+  @media (hover: none) {
+    &.side-menu-placed.side-menu-hidden {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
 }
 /* end side menu */
 

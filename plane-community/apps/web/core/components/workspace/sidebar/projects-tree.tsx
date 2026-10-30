@@ -4,13 +4,16 @@
  */
 
 // Boards inside boards: the sidebar shows projects as a tree built from `parent_id`. A folder board
-// (made from a Notion page) also lists its pages, and opens on its landing page.
+// (made from a Notion page) also lists its pages, and opens on its landing page. Siblings are
+// ordered by the shared `position` (set by an import or by dragging), then by the person's own
+// `sort_order`, then by name.
 
 import type { ReactElement } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // plane imports
 import { useLocalStorage } from "@plane/hooks";
+import type { TPartialProject } from "@plane/types";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
 import { pageHref } from "@/services/page-tree.service";
@@ -20,9 +23,62 @@ import { SidebarProjectsListItem } from "./projects-list-item";
 
 const NONE_CLOSED: string[] = [];
 const NO_CHILDREN: string[] = [];
+/** Gap between positions handed out in one go; a drop lands halfway between its neighbours. */
+const POSITION_STEP = 1000;
+/** Below this gap the halfway point stops being exact, so every sibling is numbered afresh. */
+const MIN_POSITION_GAP = 1e-6;
+
+const asPosition = (value: number | null | undefined): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+/** Sibling order: position (null last), then the person's own sort_order (null last), then name. */
+export const compareSiblingProjects = (a: TPartialProject | undefined, b: TPartialProject | undefined): number => {
+  const pa = asPosition(a?.position);
+  const pb = asPosition(b?.position);
+  if (pa !== null || pb !== null) {
+    if (pa === null) return 1;
+    if (pb === null) return -1;
+    if (pa !== pb) return pa - pb;
+  }
+  const sa = asPosition(a?.sort_order);
+  const sb = asPosition(b?.sort_order);
+  if (sa !== null || sb !== null) {
+    if (sa === null) return 1;
+    if (sb === null) return -1;
+    if (sa !== sb) return sa - sb;
+  }
+  return (a?.name ?? "").localeCompare(b?.name ?? "");
+};
+
+/**
+ * The positions to save after `movedId` was dropped so that siblings read in `orderedIds` order.
+ * One write (halfway between the neighbours) when every other sibling already has an increasing
+ * position; otherwise every sibling is numbered afresh, POSITION_STEP apart, in the new order.
+ */
+export const planSiblingPositions = (
+  orderedIds: string[],
+  movedId: string,
+  getPosition: (projectId: string) => number | null | undefined
+): { id: string; position: number }[] => {
+  const index = orderedIds.indexOf(movedId);
+  if (index < 0) return [];
+  const renumber = () => orderedIds.map((id, i) => ({ id, position: (i + 1) * POSITION_STEP }));
+  const others = orderedIds.filter((id) => id !== movedId).map((id) => asPosition(getPosition(id)));
+  const increasing = others.every((p, i) => p !== null && (i === 0 || p > (others[i - 1] as number)));
+  if (!increasing) return renumber();
+  const prev = index > 0 ? asPosition(getPosition(orderedIds[index - 1])) : null;
+  const next = index < orderedIds.length - 1 ? asPosition(getPosition(orderedIds[index + 1])) : null;
+  if (prev !== null && next !== null) {
+    if (next - prev < MIN_POSITION_GAP) return renumber();
+    return [{ id: movedId, position: (prev + next) / 2 }];
+  }
+  if (prev !== null) return [{ id: movedId, position: prev + POSITION_STEP }];
+  if (next !== null) return [{ id: movedId, position: next - POSITION_STEP }];
+  return [{ id: movedId, position: POSITION_STEP }];
+};
 
 export type TSidebarProjectTree = {
-  /** Top level: projects with no parent, or whose parent is not in the list. In list order. */
+  /** Top level: projects with no parent, or whose parent is not in the list. In sibling order. */
   rootIds: string[];
   getChildIds: (projectId: string) => string[];
   isOpen: (projectId: string) => boolean;
@@ -30,7 +86,7 @@ export type TSidebarProjectTree = {
 };
 
 /**
- * Arrange sidebar project ids (already in sidebar order) as a tree. Call it from an observer component.
+ * Arrange sidebar project ids as a tree, each level in sibling order. Call it from an observer component.
  * Which parents are closed is kept per workspace in localStorage; parents start open.
  */
 export const useSidebarProjectTree = (workspaceSlug: string, projectIds: string[]): TSidebarProjectTree => {
@@ -45,6 +101,7 @@ export const useSidebarProjectTree = (workspaceSlug: string, projectIds: string[
   const parentOf = new Map<string, string>();
   const childIds = new Map<string, string[]>();
   const rootIds: string[] = [];
+  const byId = (projectId: string) => getPartialProjectById(projectId);
   projectIds.forEach((projectId) => {
     const parentId = getPartialProjectById(projectId)?.parent_id;
     if (parentId && parentId !== projectId && inList.has(parentId)) {
@@ -70,6 +127,10 @@ export const useSidebarProjectTree = (workspaceSlug: string, projectIds: string[
     rootIds.push(projectId);
     visit(projectId);
   });
+
+  const sortSiblings = (ids: string[]) => ids.sort((a, b) => compareSiblingProjects(byId(a), byId(b)));
+  sortSiblings(rootIds);
+  childIds.forEach(sortSiblings);
 
   return {
     rootIds,

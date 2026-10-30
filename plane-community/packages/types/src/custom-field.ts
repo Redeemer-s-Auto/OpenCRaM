@@ -111,6 +111,9 @@ export type TCustomField = {
   archived_at: string | null;
   project: string;
   workspace: string;
+  /** Set by the server for fields it made itself, like the task list "Seen" box (task_list / seen). */
+  external_source?: string | null;
+  external_id?: string | null;
   created_at: string;
   updated_at: string;
 };

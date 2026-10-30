@@ -68,6 +68,23 @@ export const isAuditField = (field: TCustomField) => AUDIT_FIELD_TYPES.includes(
 export const isAuditPersonField = (field: TCustomField) =>
   field.field_type === "created_by" || field.field_type === "last_edited_by";
 
+/**
+ * The task list "Seen" box (see plane/utils/task_list_views.py): the checkbox the server made for the
+ * task list views, or failing that any checkbox named "Seen". A board that has one is a task-style
+ * board and shows the box at the right end of every row; a board named like a task list but without
+ * the field shows nothing extra until "Add task list views" is run.
+ */
+export const isSeenField = (field: TCustomField) =>
+  field.field_type === "checkbox" &&
+  !field.archived_at &&
+  ((field.external_source === "task_list" && field.external_id === "seen") ||
+    field.name.trim().toLowerCase() === "seen");
+
+export const getSeenField = (fields: TCustomField[] | undefined): TCustomField | undefined =>
+  fields?.find(
+    (field) => field.external_source === "task_list" && field.external_id === "seen" && isSeenField(field)
+  ) ?? fields?.find(isSeenField);
+
 /** Relation and rollup values depend on who is looking; they cannot be sorted or filtered. */
 export const LINKED_FIELD_TYPES: TCustomFieldType[] = ["relation", "rollup"];
 export const isLinkedField = (field: TCustomField) => LINKED_FIELD_TYPES.includes(field.field_type);

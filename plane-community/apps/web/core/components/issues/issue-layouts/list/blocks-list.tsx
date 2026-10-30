@@ -26,6 +26,9 @@ interface Props {
   canDropOverIssue: boolean;
   selectionHelpers: TSelectionHelper;
   isEpic?: boolean;
+  /** When set, every row gets a + that adds a card right above or below it. */
+  quickAddCallback?: (projectId: string | null | undefined, data: TIssue) => Promise<TIssue | undefined>;
+  groupQuickAddData?: Partial<TIssue>;
 }
 
 export function IssueBlocksList(props: Props) {
@@ -42,6 +45,8 @@ export function IssueBlocksList(props: Props) {
     isDragAllowed,
     canDropOverIssue,
     isEpic = false,
+    quickAddCallback,
+    groupQuickAddData,
   } = props;
 
   return (
@@ -66,6 +71,9 @@ export function IssueBlocksList(props: Props) {
             isDragAllowed={isDragAllowed}
             canDropOverIssue={canDropOverIssue}
             isEpic={isEpic}
+            quickAddCallback={quickAddCallback}
+            groupQuickAddData={groupQuickAddData}
+            siblingIds={issueIds}
           />
         ))}
     </div>

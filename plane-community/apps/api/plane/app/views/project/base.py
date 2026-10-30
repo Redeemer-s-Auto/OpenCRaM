@@ -177,6 +177,7 @@ class ProjectViewSet(BaseViewSet):
             "name",
             "identifier",
             "sort_order",
+            "position",
             "logo_props",
             "member_role",
             "intake_count",

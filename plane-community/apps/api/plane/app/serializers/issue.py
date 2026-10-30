@@ -3,6 +3,8 @@
 # See the LICENSE file for details.
 
 # Django imports
+import math
+
 from django.utils import timezone
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
@@ -173,6 +175,12 @@ class IssueCreateSerializer(BaseSerializer):
         data["custom_fields"] = values_for_issues([instance.id]).get(str(instance.id), {})
         return data
 
+    def validate_sort_order(self, value):
+        """A place in the list, from the row's + button: a finite number."""
+        if value is not None and not math.isfinite(value):
+            raise serializers.ValidationError("sort_order must be a finite number")
+        return value
+
     def validate(self, attrs):
         allow_triage = self.context.get("allow_triage_state", False)
         state_manager = State.triage_objects if allow_triage else State.objects
@@ -264,6 +272,9 @@ class IssueCreateSerializer(BaseSerializer):
         assignees = validated_data.pop("assignee_ids", None)
         labels = validated_data.pop("label_ids", None)
         custom_fields = validated_data.pop("custom_fields", None)
+        # Issue.save puts a new card at the end of its state; a card added from a row's + button
+        # asks for a place (midway between two rows), so that place is written back after the save.
+        sort_order = validated_data.pop("sort_order", None)
 
         project_id = self.context["project_id"]
         workspace_id = self.context["workspace_id"]
@@ -271,6 +282,9 @@ class IssueCreateSerializer(BaseSerializer):
 
         # Create Issue
         issue = Issue.objects.create(**validated_data, project_id=project_id)
+        if sort_order is not None:
+            Issue.objects.filter(pk=issue.pk).update(sort_order=sort_order)
+            issue.sort_order = sort_order
 
         # Issue Audit Users
         created_by_id = issue.created_by_id

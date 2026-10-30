@@ -23,6 +23,7 @@ import { ControlLink, DropIndicator } from "@plane/ui";
 import { cn, generateWorkItemLink } from "@plane/utils";
 // components
 import RenderIfVisible from "@/components/core/render-if-visible-HOC";
+import { SeenCheck } from "@/components/custom-fields/seen-check";
 import { HIGHLIGHT_CLASS, getIssueBlockId } from "@/components/issues/issue-layouts/utils";
 import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // hooks
@@ -134,16 +135,20 @@ const KanbanIssueDetailsBlock = observer(function KanbanIssueDetailsBlock(props:
         </div>
       </Tooltip>
 
-      <IssueProperties
-        className="flex flex-wrap items-center gap-2 pt-1.5 whitespace-nowrap text-tertiary"
-        issue={issue}
-        displayProperties={displayProperties}
-        activeLayout="Kanban"
-        updateIssue={updateIssue}
-        isReadOnly={isReadOnly}
-        isEpic={isEpic}
-        showCustomFields
-      />
+      <div className="flex items-end gap-2">
+        <IssueProperties
+          className="flex min-w-0 flex-1 flex-wrap items-center gap-2 pt-1.5 whitespace-nowrap text-tertiary"
+          issue={issue}
+          displayProperties={displayProperties}
+          activeLayout="Kanban"
+          updateIssue={updateIssue}
+          isReadOnly={isReadOnly}
+          isEpic={isEpic}
+          showCustomFields
+        />
+        {/* task lists: the check mark at the right end of the card */}
+        {!isEpic && <SeenCheck issue={issue} updateIssue={updateIssue} isReadOnly={isReadOnly} className="-mr-1" />}
+      </div>
     </>
   );
 });

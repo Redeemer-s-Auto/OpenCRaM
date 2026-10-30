@@ -5,13 +5,14 @@
  */
 
 import { Extension } from "@tiptap/core";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { NodeSelection, Plugin, PluginKey } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 // constants
 import { CORE_EXTENSIONS } from "@/constants/extension";
 // plugins
+import { ADD_HANDLE_WIDTH, AddHandlePlugin } from "@/plugins/add-handle";
 import { AIHandlePlugin } from "@/plugins/ai-handle";
-import { DragHandlePlugin, nodeDOMAtCoords } from "@/plugins/drag-handle";
+import { DragHandlePlugin, blockSelectors, nodeDOMAtCoords } from "@/plugins/drag-handle";
 
 type Props = {
   aiEnabled: boolean;
@@ -22,6 +23,8 @@ export type SideMenuPluginProps = {
   dragHandleWidth: number;
   handlesConfig: {
     ai: boolean;
+    /** The + that adds a line below (Alt+click: above) a block. */
+    add: boolean;
     dragDrop: boolean;
   };
   scrollThreshold: {
@@ -48,6 +51,7 @@ export const SideMenuExtension = (props: Props) => {
           dragHandleWidth: 24,
           handlesConfig: {
             ai: aiEnabled,
+            add: dragDropEnabled,
             dragDrop: dragDropEnabled,
           },
           scrollThreshold: { up: 200, down: 150 },
@@ -67,10 +71,27 @@ const absoluteRect = (node: Element) => {
   };
 };
 
+/** A touch screen with no hover: the side menu stays beside the block that holds the caret. */
+const isTouchScreen = () => typeof window !== "undefined" && !!window.matchMedia?.("(hover: none)").matches;
+
+/** The block element that holds the selection, as the side menu would find it under the mouse. */
+const blockDOMAtSelection = (view: EditorView): Element | null => {
+  const { selection } = view.state;
+  const { $from } = selection;
+  const pos = selection instanceof NodeSelection ? $from.pos : $from.depth >= 1 ? $from.before($from.depth) : null;
+  if (pos === null) return null;
+  const dom = view.nodeDOM(pos);
+  const element = dom instanceof Element ? dom : dom?.parentElement;
+  if (!element) return null;
+  return element.closest(blockSelectors) ?? (element.parentElement?.matches(".ProseMirror") ? element : null);
+};
+
 const SideMenu = (options: SideMenuPluginProps) => {
   const { handlesConfig } = options;
   const editorSideMenu: HTMLDivElement | null = document.createElement("div");
   editorSideMenu.id = "editor-side-menu";
+  // the block the menu sits beside, for touch screens (re-placed on scroll and selection change)
+  let currentNode: Element | null = null;
   // side menu view actions
   const hideSideMenu = () => {
     if (!editorSideMenu?.classList.contains("side-menu-hidden")) editorSideMenu?.classList.add("side-menu-hidden");
@@ -79,6 +100,54 @@ const SideMenu = (options: SideMenuPluginProps) => {
   // side menu elements
   const { view: dragHandleView, domEvents: dragHandleDOMEvents } = DragHandlePlugin(options);
   const { view: aiHandleView, domEvents: aiHandleDOMEvents } = AIHandlePlugin(options);
+  const { view: addHandleView, domEvents: addHandleDOMEvents } = AddHandlePlugin(options);
+
+  /** Put the side menu at the left of ``node``. */
+  const placeBeside = (node: Element) => {
+    const compStyle = window.getComputedStyle(node);
+    const lineHeight = parseInt(compStyle.lineHeight, 10);
+    const paddingTop = parseInt(compStyle.paddingTop, 10);
+
+    const rect = absoluteRect(node);
+
+    rect.top += (lineHeight - 20) / 2;
+    rect.top += paddingTop;
+
+    if (handlesConfig.ai) {
+      rect.left -= 20;
+    }
+    if (handlesConfig.add) {
+      rect.left -= ADD_HANDLE_WIDTH;
+    }
+
+    if (node.parentElement?.parentElement?.matches("td") || node.parentElement?.parentElement?.matches("th")) {
+      if (node.matches("ul:not([data-type=taskList]) li, ol li")) {
+        rect.left -= 5;
+      }
+    } else {
+      // Li markers
+      if (node.matches("ul:not([data-type=taskList]) li, ol li")) {
+        rect.left -= 18;
+      }
+    }
+
+    if (node.matches("table")) {
+      rect.top += 8;
+      rect.left -= 8;
+    }
+
+    rect.width = options.dragHandleWidth;
+
+    if (!editorSideMenu) return;
+
+    editorSideMenu.style.left = `${rect.left - rect.width}px`;
+    editorSideMenu.style.top = `${rect.top}px`;
+    editorSideMenu.classList.add("side-menu-placed");
+    currentNode = node;
+    if (handlesConfig.add) {
+      addHandleDOMEvents?.mousemove?.(node);
+    }
+  };
 
   return new Plugin({
     key: new PluginKey("sideMenu"),
@@ -90,12 +159,35 @@ const SideMenu = (options: SideMenuPluginProps) => {
         aiHandleView(view, editorSideMenu);
       }
 
+      if (handlesConfig.add && !editorSideMenu.querySelector("#add-handle")) {
+        addHandleView(view, editorSideMenu);
+      }
+
       if (handlesConfig.dragDrop && !editorSideMenu.querySelector("#drag-handle")) {
         dragHandleView(view, editorSideMenu);
       }
 
+      // A fixed menu drifts when the page scrolls under a finger; follow the block.
+      const scrollHandler = () => {
+        if (!currentNode || !isTouchScreen()) return;
+        requestAnimationFrame(() => currentNode && placeBeside(currentNode));
+      };
+      document.addEventListener("scroll", scrollHandler, true);
+
       return {
-        destroy: () => hideSideMenu(),
+        update: (view) => {
+          // No hover on a touch screen: keep the + beside the block that holds the caret.
+          if (!isTouchScreen() || !view.editable) return;
+          const node = blockDOMAtSelection(view);
+          if (!node) return;
+          placeBeside(node);
+          showSideMenu();
+        },
+        destroy: () => {
+          document.removeEventListener("scroll", scrollHandler, true);
+          currentNode = null;
+          hideSideMenu();
+        },
       };
     },
     props: {
@@ -113,41 +205,7 @@ const SideMenu = (options: SideMenuPluginProps) => {
             return;
           }
 
-          const compStyle = window.getComputedStyle(node);
-          const lineHeight = parseInt(compStyle.lineHeight, 10);
-          const paddingTop = parseInt(compStyle.paddingTop, 10);
-
-          const rect = absoluteRect(node);
-
-          rect.top += (lineHeight - 20) / 2;
-          rect.top += paddingTop;
-
-          if (handlesConfig.ai) {
-            rect.left -= 20;
-          }
-
-          if (node.parentElement?.parentElement?.matches("td") || node.parentElement?.parentElement?.matches("th")) {
-            if (node.matches("ul:not([data-type=taskList]) li, ol li")) {
-              rect.left -= 5;
-            }
-          } else {
-            // Li markers
-            if (node.matches("ul:not([data-type=taskList]) li, ol li")) {
-              rect.left -= 18;
-            }
-          }
-
-          if (node.matches("table")) {
-            rect.top += 8;
-            rect.left -= 8;
-          }
-
-          rect.width = options.dragHandleWidth;
-
-          if (!editorSideMenu) return;
-
-          editorSideMenu.style.left = `${rect.left - rect.width}px`;
-          editorSideMenu.style.top = `${rect.top}px`;
+          placeBeside(node);
           showSideMenu();
           if (handlesConfig.dragDrop) {
             dragHandleDOMEvents?.mousemove();
@@ -157,7 +215,9 @@ const SideMenu = (options: SideMenuPluginProps) => {
           }
         },
         // keydown: () => hideSideMenu(),
-        mousewheel: () => hideSideMenu(),
+        mousewheel: () => {
+          if (!isTouchScreen()) hideSideMenu();
+        },
         dragenter: (view) => {
           if (handlesConfig.dragDrop) {
             dragHandleDOMEvents?.dragenter?.(view);

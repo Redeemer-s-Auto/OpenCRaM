@@ -16,7 +16,7 @@ import { ChevronRightIcon } from "@plane/propel/icons";
 // types
 import { Tooltip } from "@plane/propel/tooltip";
 import type { IIssueDisplayProperties, TIssue } from "@plane/types";
-import { EIssueServiceType } from "@plane/types";
+import { EIssueLayoutTypes, EIssueServiceType } from "@plane/types";
 // ui
 import { ControlLink, Row } from "@plane/ui";
 import { cn, generateWorkItemLink } from "@plane/utils";
@@ -33,8 +33,12 @@ import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // local components
 import type { TRenderQuickActions } from "../list/list-view-types";
+import { QuickAddIssueRoot } from "../quick-add";
+import { buildInlineAddData } from "../quick-add/inline-row";
+import type { TRowAddPlacement } from "../row-add-button";
+import { RowAddButton } from "../row-add-button";
 import { isIssueNew } from "../utils";
-import { CustomFieldCells } from "@/components/custom-fields/spreadsheet-columns";
+import { CustomFieldCells, SeenCell } from "@/components/custom-fields/spreadsheet-columns";
 import { IssueColumn } from "./issue-column";
 // card shortcuts: a shortcut card shows its target's live title
 import { ShortcutAwareTitle, shortcutAwareName } from "@/components/card-links/shortcut-title";
@@ -55,7 +59,13 @@ interface Props {
   selectionHelpers: TSelectionHelper;
   shouldRenderByDefault?: boolean;
   isEpic?: boolean;
+  /** When set, the row gets a + that adds a card right above or below it (top-level rows only). */
+  quickAddCallback?: (projectId: string | null | undefined, data: TIssue) => Promise<TIssue | undefined>;
+  /** The ids of the table's rows, in order: the new card's sort_order lands between neighbours. */
+  siblingIds?: string[];
 }
+
+type TInlineAdd = { placement: TRowAddPlacement; data: Partial<TIssue> };
 
 export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: Props) {
   const {
@@ -74,9 +84,14 @@ export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: 
     selectionHelpers,
     shouldRenderByDefault,
     isEpic = false,
+    quickAddCallback,
+    siblingIds,
   } = props;
   // states
   const [isExpanded, setExpanded] = useState<boolean>(false);
+  const [inlineAdd, setInlineAdd] = useState<TInlineAdd | null>(null);
+  // router
+  const { projectId: routerProjectId } = useParams();
   // store hooks
   const { subIssues: subIssuesStore } = useIssueDetail(isEpic ? EIssueServiceType.EPICS : EIssueServiceType.ISSUES);
   const { issueMap } = useIssues();
@@ -89,8 +104,47 @@ export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: 
 
   if (!issue) return null;
 
+  // The + adds to the board in the URL, so it needs one, and the row must belong to it.
+  const canInlineAdd =
+    !!quickAddCallback &&
+    !!siblingIds &&
+    nestingLevel === 0 &&
+    !!routerProjectId &&
+    issue.project_id === routerProjectId.toString() &&
+    canEditProperties(routerProjectId.toString());
+
+  const handleInlineAdd = (placement: TRowAddPlacement) => {
+    if (!siblingIds) return;
+    setInlineAdd({ placement, data: buildInlineAddData(issue, placement, siblingIds, (id) => issueMap[id]) });
+  };
+
+  const inlineAddRow = inlineAdd && quickAddCallback && (
+    <tr className="bg-surface-1">
+      <td colSpan={100} className="border-b-[0.5px] border-subtle">
+        <QuickAddIssueRoot
+          layout={EIssueLayoutTypes.SPREADSHEET}
+          isQuickAddOpen
+          setIsQuickAddOpen={(open) => {
+            if (!open) setInlineAdd(null);
+          }}
+          prePopulatedData={inlineAdd.data}
+          quickAddCallback={async (projectId, data) => {
+            try {
+              return await quickAddCallback(projectId, data);
+            } finally {
+              // One line per click: the next line needs its own place between neighbours.
+              setInlineAdd(null);
+            }
+          }}
+          isEpic={isEpic}
+        />
+      </td>
+    </tr>
+  );
+
   return (
     <>
+      {inlineAdd?.placement === "above" && inlineAddRow}
       {/* first column/ issue name and key column */}
       <RenderIfVisible
         as="tr"
@@ -126,8 +180,11 @@ export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: 
           spreadsheetColumnsList={spreadsheetColumnsList}
           selectionHelpers={selectionHelpers}
           isEpic={isEpic}
+          hasAddColumn={!!quickAddCallback}
+          onInlineAdd={canInlineAdd ? handleInlineAdd : undefined}
         />
       </RenderIfVisible>
+      {inlineAdd?.placement === "below" && inlineAddRow}
 
       {isExpanded &&
         !isEpic &&
@@ -148,6 +205,7 @@ export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: 
             spreadsheetColumnsList={spreadsheetColumnsList}
             selectionHelpers={selectionHelpers}
             shouldRenderByDefault={isExpanded}
+            quickAddCallback={quickAddCallback}
           />
         ))}
     </>
@@ -170,6 +228,10 @@ interface IssueRowDetailsProps {
   spacingLeft?: number;
   selectionHelpers: TSelectionHelper;
   isEpic?: boolean;
+  /** The table keeps a column for the + on every row, so sub-rows line up with their parent. */
+  hasAddColumn?: boolean;
+  /** Click adds a card below this row, Alt+click above. */
+  onInlineAdd?: (placement: TRowAddPlacement) => void;
 }
 
 const IssueRowDetails = observer(function IssueRowDetails(props: IssueRowDetailsProps) {
@@ -189,6 +251,8 @@ const IssueRowDetails = observer(function IssueRowDetails(props: IssueRowDetails
     spacingLeft = 6,
     selectionHelpers,
     isEpic = false,
+    hasAddColumn = false,
+    onInlineAdd,
   } = props;
   // states
   const [isMenuActive, setIsMenuActive] = useState(false);
@@ -284,6 +348,12 @@ const IssueRowDetails = observer(function IssueRowDetails(props: IssueRowDetails
               }
             )}
           >
+            {/* + : add a line below (Alt+click: above) */}
+            {hasAddColumn && (
+              <div className="mr-1 grid w-6 flex-shrink-0 place-items-center">
+                {onInlineAdd && !issueDetail.tempId && <RowAddButton onAdd={onInlineAdd} />}
+              </div>
+            )}
             {/* Identifier section - conditionally rendered */}
             {displayProperties?.key && (
               <div className="flex h-full min-w-24 flex-shrink-0 items-center">
@@ -405,12 +475,16 @@ const IssueRowDetails = observer(function IssueRowDetails(props: IssueRowDetails
         />
       ))}
       {!isEpic && (
-        <CustomFieldCells
-          displayProperties={displayProperties}
-          issueDetail={issueDetail}
-          disableUserActions={disableUserActions}
-          updateIssue={updateIssue}
-        />
+        <>
+          <CustomFieldCells
+            displayProperties={displayProperties}
+            issueDetail={issueDetail}
+            disableUserActions={disableUserActions}
+            updateIssue={updateIssue}
+          />
+          {/* task lists: the check mark at the right end of the row */}
+          <SeenCell issueDetail={issueDetail} disableUserActions={disableUserActions} updateIssue={updateIssue} />
+        </>
       )}
     </>
   );

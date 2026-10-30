@@ -93,15 +93,21 @@ ul[data-type="taskList"] li {
   line-height: 1.5;
 }
 
+/* the check mark sits at the right-hand end of the line (the text keeps the left edge) */
 ul[data-type="taskList"] li > label {
   position: absolute;
-  left: -5px;
-  margin: 0.1rem 0.15rem 0 0;
+  right: 0;
+  margin: 0.1rem 0 0 0.15rem;
   user-select: none;
 }
 
 ul[data-type="taskList"] li > div {
-  margin-left: 1.15rem;
+  margin-right: 1.5rem;
+}
+
+/* nested to-dos: pull the inner list back out so every check mark lines up on the right */
+ul[data-type="taskList"] li > div > ul[data-type="taskList"] {
+  margin-right: -1.5rem;
 }
 
 ul[data-type="taskList"] li > label input[type="checkbox"] {
@@ -132,7 +138,7 @@ ul[data-type="taskList"] li > label input[type="checkbox"]:checked:hover {
 
 @media screen and (max-width: 768px) {
   ul[data-type="taskList"] li > label {
-    margin-right: 0.5rem;
+    margin-left: 0.5rem;
   }
 }
 

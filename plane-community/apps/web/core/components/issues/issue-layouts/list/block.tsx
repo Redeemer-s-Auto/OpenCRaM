@@ -21,6 +21,7 @@ import { Spinner, ControlLink, Row } from "@plane/ui";
 import { cn, generateWorkItemLink } from "@plane/utils";
 // components
 import { MultipleSelectEntityAction } from "@/components/core/multiple-select";
+import { SeenCheck } from "@/components/custom-fields/seen-check";
 import { IssueProperties } from "@/components/issues/issue-layouts/properties";
 import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // hooks
@@ -30,6 +31,8 @@ import { useProject } from "@/hooks/store/use-project";
 import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 import useIssuePeekOverviewRedirection from "@/hooks/use-issue-peek-overview-redirection";
 import { usePlatformOS } from "@/hooks/use-platform-os";
+import type { TRowAddPlacement } from "../row-add-button";
+import { RowAddButton } from "../row-add-button";
 import { calculateIdentifierWidth } from "../utils";
 // card shortcuts: a shortcut card shows its target's live title
 import { ShortcutAwareTitle, shortcutAwareName } from "@/components/card-links/shortcut-title";
@@ -52,6 +55,10 @@ interface IssueBlockProps {
   setIsCurrentBlockDragging: React.Dispatch<React.SetStateAction<boolean>>;
   canDrag: boolean;
   isEpic?: boolean;
+  /** The list keeps a column for the + on every row, so sub-rows line up with their parent. */
+  hasAddColumn?: boolean;
+  /** Click adds a card below this row, Alt+click above. */
+  onInlineAdd?: (placement: TRowAddPlacement) => void;
 }
 
 export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
@@ -72,6 +79,8 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
     setIsCurrentBlockDragging,
     canDrag,
     isEpic = false,
+    hasAddColumn = false,
+    onInlineAdd,
   } = props;
   // ref
   const issueRef = useRef<HTMLDivElement | null>(null);
@@ -198,6 +207,12 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
         <div className="flex w-full gap-2 truncate">
           <div className="flex flex-grow items-center gap-0.5 truncate">
             <div className="flex items-center gap-1" style={isSubIssue ? { marginLeft } : {}}>
+              {/* + : add a line below (Alt+click: above) */}
+              {hasAddColumn && (
+                <div className="grid w-6 flex-shrink-0 place-items-center">
+                  {onInlineAdd && !issue?.tempId && <RowAddButton onAdd={onInlineAdd} />}
+                </div>
+              )}
               {/* select checkbox */}
               {projectId && canSelectIssues && !isEpic && (
                 <Tooltip
@@ -293,6 +308,17 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
               })}
             </div>
           )}
+          {/* task lists, phone layout: the check mark at the right end of the title line */}
+          {!issue?.tempId && !isEpic && (
+            <div
+              className={cn("flex items-center", {
+                "md:hidden": isSidebarCollapsed,
+                "lg:hidden": !isSidebarCollapsed,
+              })}
+            >
+              <SeenCheck issue={issue} updateIssue={updateIssue} isReadOnly={!canEditIssueProperties} />
+            </div>
+          )}
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
           {!issue?.tempId ? (
@@ -323,6 +349,17 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
                   parentRef: issueRef,
                 })}
               </div>
+              {/* task lists: the check mark at the right end of the row */}
+              {!isEpic && (
+                <div
+                  className={cn("hidden", {
+                    "md:flex": isSidebarCollapsed,
+                    "lg:flex": !isSidebarCollapsed,
+                  })}
+                >
+                  <SeenCheck issue={issue} updateIssue={updateIssue} isReadOnly={!canEditIssueProperties} />
+                </div>
+              )}
             </>
           ) : (
             <div className="h-4 w-4">

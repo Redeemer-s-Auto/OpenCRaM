@@ -30,7 +30,10 @@ export interface IPartialProject {
   id: string;
   name: string;
   identifier: string;
+  /** Your own order of the sidebar (ProjectUserProperty); breaks ties between boards with no position. */
   sort_order: number | null;
+  /** Shared order among sibling boards in the sidebar tree: lower first, null after every placed sibling. */
+  position?: number | null;
   logo_props: TLogoProps;
   member_role?: TUserPermissions | EUserProjectRoles | null;
   archived_at: string | null;

@@ -25,6 +25,17 @@ type TArgs = {
 export const usePageFallback = (args: TArgs) => {
   const { editorRef, fetchPageDescription, collaborationState, updatePageDescription, page } = args;
   const hasShownFallbackToast = useRef(false);
+  // One fallback save at a time. The collaboration stage flips between "reconnecting" and
+  // "disconnected" on every failed attempt, and each flip used to start another save while the
+  // previous one was still converting the page HTML: two independent conversions applied to the
+  // same Y.Doc show the body twice.
+  const isSavingRef = useRef(false);
+  // Read through refs so the save callback does not change identity (and re-run) when the store
+  // echoes our own PATCH back into page.description_html.
+  const pageRef = useRef(page);
+  useEffect(() => {
+    pageRef.current = page;
+  }, [page]);
 
   const [isFetchingFallbackBinary, setIsFetchingFallbackBinary] = useState(false);
 
@@ -33,6 +44,7 @@ export const usePageFallback = (args: TArgs) => {
 
   const handleUpdateDescription = useCallback(async () => {
     if (!hasConnectionFailed) return;
+    if (isSavingRef.current) return;
     const editor = editorRef.current;
     if (!editor) return;
 
@@ -42,22 +54,23 @@ export const usePageFallback = (args: TArgs) => {
       hasShownFallbackToast.current = true;
     }
 
+    isSavingRef.current = true;
     try {
       setIsFetchingFallbackBinary(true);
 
       const latestEncodedDescription = await fetchPageDescription();
-      let latestDecodedDescription: Uint8Array;
       if (latestEncodedDescription && latestEncodedDescription.byteLength > 0) {
-        latestDecodedDescription = new Uint8Array(latestEncodedDescription);
-      } else {
-        const pageDescriptionHtml = page.description_html;
-        latestDecodedDescription = getBinaryDataFromDocumentEditorHTMLString(
-          pageDescriptionHtml ?? "<p></p>",
-          page.name
+        // Yjs merges a stored update that is already in the document as a no-op.
+        editor.setProviderDocument(new Uint8Array(latestEncodedDescription));
+      } else if (!editor.hasProviderDocumentContent()) {
+        // Never opened in the editor yet: the body exists only as HTML. Build the document from
+        // it once. Converting again onto a document that already has content (an earlier
+        // conversion, the local cache) would append a second copy of every block.
+        const currentPage = pageRef.current;
+        editor.setProviderDocument(
+          getBinaryDataFromDocumentEditorHTMLString(currentPage.description_html ?? "<p></p>", currentPage.name)
         );
       }
-
-      editor.setProviderDocument(latestDecodedDescription);
       const { binary, html, json } = editor.getDocument();
       if (!binary || !json) return;
       const encodedBinary = convertBinaryDataToBase64String(binary);
@@ -70,9 +83,10 @@ export const usePageFallback = (args: TArgs) => {
     } catch (error: any) {
       console.error(error);
     } finally {
+      isSavingRef.current = false;
       setIsFetchingFallbackBinary(false);
     }
-  }, [editorRef, fetchPageDescription, hasConnectionFailed, updatePageDescription, page.description_html, page.name]);
+  }, [editorRef, fetchPageDescription, hasConnectionFailed, updatePageDescription]);
 
   useEffect(() => {
     if (hasConnectionFailed) {

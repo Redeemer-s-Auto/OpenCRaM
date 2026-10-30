@@ -152,6 +152,8 @@ export type CoreEditorRefApi = {
   setEditorValueAtCursorPosition: (content: string) => void;
   setFocusAtPosition: (position: number) => void;
   setProviderDocument: (value: Uint8Array) => void;
+  /** True once the collaborative document's body fragment holds any node (from the server, the local cache, or an applied update). */
+  hasProviderDocumentContent: () => boolean;
   undo: () => void;
 };
 

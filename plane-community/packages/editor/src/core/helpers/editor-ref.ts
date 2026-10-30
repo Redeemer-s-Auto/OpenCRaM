@@ -283,6 +283,11 @@ export const getEditorRefHelpers = (args: TArgs): EditorRefApi => {
       if (!document) return;
       Y.applyUpdate(document, value);
     },
+    hasProviderDocumentContent: () => {
+      const document = provider?.document;
+      if (!document) return false;
+      return document.getXmlFragment("default").length > 0;
+    },
     undo: () => editor?.commands.undo(),
   };
 };

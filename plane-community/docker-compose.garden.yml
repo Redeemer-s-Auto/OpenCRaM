@@ -11,7 +11,10 @@ x-api-environment: &api-environment
   SPACE_BASE_PATH: /spaces
   LIVE_BASE_URL: ${GARDEN_WORK_URL:?Set GARDEN_WORK_URL}
   LIVE_BASE_PATH: /live
-  ALLOWED_HOSTS: ${ALLOWED_HOSTS:?Set ALLOWED_HOSTS}
+  # "api" is the compose-network name the live (collaboration) server calls the API by
+  # (API_BASE_URL=http://api:8000). Without it Django answers every live-server request,
+  # including the sign-in check behind each page open, with 400 Bad Request (DisallowedHost).
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:?Set ALLOWED_HOSTS},api
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?Set CORS_ALLOWED_ORIGINS}
   SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
   SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-garden-work-session}

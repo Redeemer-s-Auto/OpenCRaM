@@ -429,7 +429,7 @@ class Applier:
         return out
 
     def _card_payload(self, c, full: bool, clear: bool = False):
-        p = {"name": c.name, "external_source": SOURCE, "external_id": dashed(c.notion_id)}
+        p = {"name": c.name.strip() or "Untitled", "external_source": SOURCE, "external_id": dashed(c.notion_id)}
         if c.state:
             sid = self.states.get(c.board, {}).get(c.state.lower())
             if sid:
@@ -695,7 +695,7 @@ class Applier:
                 sid = self.states.get(b.key, {}).get(t["state"].lower())
                 if sid:
                     data["state_id"] = sid
-            payload = {"name": t["name"], "description": "Imported from a Notion database template", "data": data}
+            payload = {"name": t["name"].strip() or "Untitled", "description": "Imported from a Notion database template", "data": data}
             try:
                 if t["name"].lower() in have:
                     self.n.update_template(pid, have[t["name"].lower()]["id"], payload)

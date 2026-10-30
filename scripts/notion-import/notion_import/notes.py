@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 import uuid
 from urllib.parse import urlparse
@@ -9,7 +10,8 @@ from typing import Optional
 
 from .http import HTTPError, JSONClient, Transport, urllib_transport
 
-NOTES_RATE = 0.9  # requests per second; the v1 default limit is 60 per minute per key
+# requests per second; the v1 default limit is 60 per minute per key. NOTES_RATE_PER_SECOND raises it for a key with a higher limit.
+NOTES_RATE = float(os.environ.get("NOTES_RATE_PER_SECOND", "0.9"))
 
 
 def notes_retry_delay(headers: dict, attempt: int, now: float) -> Optional[float]:

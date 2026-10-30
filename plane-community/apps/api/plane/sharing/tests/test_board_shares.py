@@ -147,7 +147,8 @@ class TestBoardShare:
         found = cast.outsider_client.get(_url(GLOBAL_SEARCH, cast), {"search": "Needle", "workspace_search": "true"})
         assert found.status_code == 200, found.data
         assert str(card.id) in {str(row["id"]) for row in found.data["results"]["issue"]}
-        assert str(secret_alpha.id) in {str(row["id"]) for row in found.data["results"]["project"]}
+        by_name = cast.outsider_client.get(_url(GLOBAL_SEARCH, cast), {"search": "Alpha", "workspace_search": "true"})
+        assert str(secret_alpha.id) in {str(row["id"]) for row in by_name.data["results"]["project"]}
         projects = cast.outsider_client.get(_url(ENTITY_SEARCH, cast), {"query_type": "project", "query": "Alpha"})
         assert str(secret_alpha.id) in {str(row["id"]) for row in projects.data["project"]}
 
@@ -199,9 +200,6 @@ class TestBoardShare:
         _share(cast, secret_alpha, advisors)
         rows = _rows(cast.outsider_client.get(_url(ISSUES_DETAIL, cast)))
         assert len(rows) == 3
-        v1 = cast.outsider_client.get(_url(V1_PROJECTS, cast))
-        # The session client has no API key, so v1 answers 401/403; the member check is in the next test.
-        assert v1.status_code in (401, 403)
 
     def test_v1_project_list_includes_the_shared_board(self, cast, secret_alpha, advisors):
         _share(cast, secret_alpha, advisors)

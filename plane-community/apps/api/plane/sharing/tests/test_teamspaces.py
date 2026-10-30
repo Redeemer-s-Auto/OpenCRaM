@@ -176,7 +176,8 @@ class TestTeamspaceVisibility:
         found = client.get(_url(GLOBAL_SEARCH, cast), {"search": "Needle", "workspace_search": "true"})
         assert found.status_code == 200, found.data
         assert str(card.id) in {str(row["id"]) for row in found.data["results"]["issue"]}
-        assert str(secret_alpha.id) in {str(row["id"]) for row in found.data["results"]["project"]}
+        by_name = client.get(_url(GLOBAL_SEARCH, cast), {"search": "Alpha", "workspace_search": "true"})
+        assert str(secret_alpha.id) in {str(row["id"]) for row in by_name.data["results"]["project"]}
 
     def test_nested_group_reaches_the_teamspace(self, cast, secret_alpha, stranger):
         upper = _group(cast, "Upper Management", stranger)

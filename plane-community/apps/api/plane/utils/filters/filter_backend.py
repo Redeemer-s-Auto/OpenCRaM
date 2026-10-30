@@ -10,6 +10,7 @@ from django.db.models import Q
 from django.http import QueryDict
 
 # Third party imports
+from django_filters.filters import BaseCSVFilter
 from django_filters.utils import translate_validation
 from rest_framework import filters
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -298,8 +299,13 @@ class ComplexFilterBackend(filters.BaseFilterBackend):
         for key, value in processed_conditions.items():
             # Default serialization to string; QueryDict expects strings
             if isinstance(value, list):
-                # Repeat key for list values (e.g., __in)
-                qd.setlist(key, [str(v) for v in value])
+                base_filter = filterset_class.base_filters.get(key)
+                if isinstance(base_filter, BaseCSVFilter):
+                    # CSV "in" filters read one comma-separated value, not a repeated key.
+                    qd[key] = ",".join(str(v) for v in value)
+                else:
+                    # Repeat key for list values (e.g., __in)
+                    qd.setlist(key, [str(v) for v in value])
             else:
                 qd[key] = "" if value is None else str(value)
 

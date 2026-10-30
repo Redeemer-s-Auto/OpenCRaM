@@ -33,6 +33,8 @@ export interface IPartialProject {
   guest_view_all_features?: boolean;
   /** Only active members can see this project - workspace admins included. */
   is_private?: boolean;
+  /** The project this one sits inside (sidebar tree). Null at top level, or when the parent is hidden from you. */
+  parent_id?: string | null;
   project_lead?: IUserLite | string | null;
   network?: number;
   // Timestamps

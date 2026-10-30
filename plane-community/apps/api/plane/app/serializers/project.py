@@ -25,16 +25,22 @@ from plane.db.models import (
 from plane.utils.content_validator import (
     validate_html_content,
 )
+from plane.utils.project_tree import ProjectParentIdField, clean_parent_id
 
 
 class ProjectSerializer(BaseSerializer):
     workspace_detail = WorkspaceLiteSerializer(source="workspace", read_only=True)
     inbox_view = serializers.BooleanField(read_only=True, source="intake_view")
+    parent_id = ProjectParentIdField()
 
     class Meta:
         model = Project
-        fields = "__all__"
+        # "parent" is replaced by parent_id, which hides a parent the user cannot see.
+        exclude = ["parent"]
         read_only_fields = ["workspace", "deleted_at"]
+
+    def validate_parent_id(self, parent_id):
+        return clean_parent_id(parent_id, self.instance, self.context["workspace_id"], self.context.get("user"))
 
     def validate_name(self, name):
         project_id = self.instance.id if self.instance else None
@@ -121,6 +127,7 @@ class ProjectListSerializer(DynamicBaseSerializer):
     cover_image_url = serializers.CharField(read_only=True)
     inbox_view = serializers.BooleanField(read_only=True, source="intake_view")
     next_work_item_sequence = serializers.SerializerMethodField()
+    parent_id = ProjectParentIdField(read_only=True)
 
     def get_members(self, obj):
         project_members = getattr(obj, "members_list", None)
@@ -136,7 +143,7 @@ class ProjectListSerializer(DynamicBaseSerializer):
 
     class Meta:
         model = Project
-        fields = "__all__"
+        exclude = ["parent"]
 
 
 class ProjectDetailSerializer(BaseSerializer):
@@ -147,10 +154,11 @@ class ProjectDetailSerializer(BaseSerializer):
     sort_order = serializers.FloatField(read_only=True)
     member_role = serializers.IntegerField(read_only=True)
     anchor = serializers.CharField(read_only=True)
+    parent_id = ProjectParentIdField(read_only=True)
 
     class Meta:
         model = Project
-        fields = "__all__"
+        exclude = ["parent"]
 
 
 class ProjectMemberSerializer(BaseSerializer):

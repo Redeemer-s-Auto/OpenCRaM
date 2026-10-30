@@ -57,6 +57,8 @@ type Props = {
   disableDrop?: boolean;
   isLastChild: boolean;
   renderInExtendedSidebar?: boolean;
+  /** Set when other projects sit inside this one: shows a chevron that opens/closes them. */
+  childProjects?: { isOpen: boolean; onToggle: () => void };
 };
 
 export const SidebarProjectsListItem = observer(function SidebarProjectsListItem(props: Props) {
@@ -69,6 +71,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
     handleOnProjectDrop,
     projectListType,
     renderInExtendedSidebar = false,
+    childProjects,
   } = props;
   // store hooks
   const { t } = useTranslation();
@@ -327,6 +330,24 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
               </Tooltip>
             )}
             <>
+              {/* Same chevron as the sidebar card tree. */}
+              {childProjects && (
+                <button
+                  type="button"
+                  aria-label={childProjects.isOpen ? `Close ${project.name}` : `Open ${project.name}`}
+                  aria-expanded={childProjects.isOpen}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    childProjects.onToggle();
+                  }}
+                  className="mr-1 -ml-1 grid size-4 flex-shrink-0 place-items-center rounded-sm text-placeholder hover:bg-layer-1"
+                >
+                  <ChevronRightIcon
+                    className={cn("size-3 transition-transform", { "rotate-90": childProjects.isOpen })}
+                  />
+                </button>
+              )}
               <ControlLink href={defaultTabUrl} className="flex flex-grow truncate" onClick={handleItemClick}>
                 {isAccordionMode ? (
                   <Disclosure.Button

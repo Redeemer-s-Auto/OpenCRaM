@@ -101,6 +101,15 @@ class Project(BaseModel):
     # Only active members see a private project - workspace admins included.
     # Stricter than network=SECRET. See plane.utils.private_projects.
     is_private = models.BooleanField(default=False)
+    # Fork: a board can sit inside another board (sidebar tree). SET_NULL: deleting a parent
+    # moves its children to the top level. Rules live in plane.utils.project_tree.
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="children",
+    )
     cover_image = models.TextField(blank=True, null=True)
     cover_image_asset = models.ForeignKey(
         "db.FileAsset",

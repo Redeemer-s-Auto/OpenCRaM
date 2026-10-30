@@ -42,6 +42,7 @@ from plane.db.models import (
 from plane.db.models.intake import IntakeIssueStatus
 from plane.sharing.visibility import hidden_issue_ids
 from plane.utils.private_projects import visible_projects_q
+from plane.utils.project_tree import visible_parent_id_expr
 from plane.utils.host import base_host
 from plane.utils.order_queryset import PROJECT_ORDER_BY_ALLOWLIST, sanitize_order_by
 
@@ -89,6 +90,7 @@ class ProjectViewSet(BaseViewSet):
                 ).values("anchor")
             )
             .annotate(sort_order=Subquery(sort_order))
+            .annotate(visible_parent_id=visible_parent_id_expr(self.request.user, slug=self.kwargs.get("slug")))
             .prefetch_related(
                 Prefetch(
                     "project_projectmember",
@@ -176,6 +178,7 @@ class ProjectViewSet(BaseViewSet):
             )
             .annotate(inbox_view=F("intake_view"))
             .annotate(sort_order=Subquery(sort_order))
+            .annotate(visible_parent_id=visible_parent_id_expr(self.request.user, slug=slug))
             .distinct()
         ).values(
             "id",
@@ -196,6 +199,7 @@ class ProjectViewSet(BaseViewSet):
             "project_lead",
             "network",
             "is_private",
+            "visible_parent_id",
             "created_at",
             "updated_at",
             "created_by",
@@ -226,6 +230,10 @@ class ProjectViewSet(BaseViewSet):
                 )
                 | Q(network=2)
             )
+        # parent_id is a model field, so the masked value is annotated under another name.
+        projects = list(projects)
+        for project in projects:
+            project["parent_id"] = project.pop("visible_parent_id")
         return Response(projects, status=status.HTTP_200_OK)
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
@@ -266,7 +274,7 @@ class ProjectViewSet(BaseViewSet):
 
         # Plane Pages are retired in this fork (cards are the pages): new projects start with Pages off.
         serializer = ProjectSerializer(
-            data={"page_view": False, **request.data}, context={"workspace_id": workspace.id}
+            data={"page_view": False, **request.data}, context={"workspace_id": workspace.id, "user": request.user}
         )
         if serializer.is_valid():
             serializer.save()
@@ -358,7 +366,7 @@ class ProjectViewSet(BaseViewSet):
         serializer = ProjectSerializer(
             project,
             data={**request.data, "intake_view": intake_view},
-            context={"workspace_id": workspace.id},
+            context={"workspace_id": workspace.id, "user": request.user},
             partial=True,
         )
 

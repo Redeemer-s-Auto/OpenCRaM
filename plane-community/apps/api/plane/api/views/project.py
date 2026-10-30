@@ -40,6 +40,7 @@ from plane.db.models import (
 )
 from plane.bgtasks.webhook_task import model_activity, webhook_activity
 from plane.utils.private_projects import visible_projects_q
+from plane.utils.project_tree import visible_parent_id_expr
 from plane.utils.exception_logger import log_exception
 from .base import BaseAPIView
 from plane.sharing.visibility import visible_issues, visible_pages
@@ -142,6 +143,7 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
                     )
                 )
             )
+            .annotate(visible_parent_id=visible_parent_id_expr(self.request.user, slug=self.kwargs.get("slug")))
             .order_by(self.kwargs.get("order_by", "-created_at"))
             .distinct()
         )
@@ -235,7 +237,8 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
 
             # Plane Pages are retired in this fork (cards are the pages): new projects start with Pages off.
             serializer = ProjectCreateSerializer(
-                data={"page_view": False, **request.data}, context={"workspace_id": workspace.id}
+                data={"page_view": False, **request.data},
+                context={"workspace_id": workspace.id, "user": request.user},
             )
 
             if serializer.is_valid():
@@ -501,6 +504,7 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
                     )
                 )
             )
+            .annotate(visible_parent_id=visible_parent_id_expr(self.request.user, slug=self.kwargs.get("slug")))
             .order_by(self.kwargs.get("order_by", "-created_at"))
             .distinct()
         )
@@ -573,7 +577,7 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
             serializer = ProjectUpdateSerializer(
                 project,
                 data={**request.data, "intake_view": intake_view},
-                context={"workspace_id": workspace.id},
+                context={"workspace_id": workspace.id, "user": request.user},
                 partial=True,
             )
 

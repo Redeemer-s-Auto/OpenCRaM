@@ -32,7 +32,7 @@ import { useProjectNavigationPreferences } from "@/hooks/use-navigation-preferen
 // plane web imports
 import type { TProject } from "@plane/types";
 // local imports
-import { SidebarProjectsListItem } from "./projects-list-item";
+import { SidebarProjectTreeNode, useSidebarProjectTree } from "./projects-tree";
 
 export const SidebarProjectsList = observer(function SidebarProjectsList() {
   // states
@@ -59,14 +59,17 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
     EUserPermissionsLevel.WORKSPACE
   );
 
+  // Projects inside other projects show under their parent; the limit counts top-level projects.
+  const projectTree = useSidebarProjectTree(workspaceSlug?.toString() ?? "", joinedProjects);
+
   // Compute limited projects for main sidebar
   const displayedProjects = projectPreferences.showLimitedProjects
-    ? joinedProjects.slice(0, projectPreferences.limitedProjectsCount)
-    : joinedProjects;
+    ? projectTree.rootIds.slice(0, projectPreferences.limitedProjectsCount)
+    : projectTree.rootIds;
 
   // Check if there are more projects to show
   const hasMoreProjects =
-    projectPreferences.showLimitedProjects && joinedProjects.length > projectPreferences.limitedProjectsCount;
+    projectPreferences.showLimitedProjects && projectTree.rootIds.length > projectPreferences.limitedProjectsCount;
 
   const handleCopyText = (projectId: string) => {
     copyUrlToClipboard(`${workspaceSlug}/projects/${projectId}/issues`).then(() => {
@@ -238,13 +241,11 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
                 <Disclosure.Panel as="div" className="flex flex-col gap-0.5" static>
                   <>
                     {displayedProjects.map((projectId, index) => (
-                      <SidebarProjectsListItem
+                      <SidebarProjectTreeNode
                         key={projectId}
                         projectId={projectId}
-                        handleCopyText={() => handleCopyText(projectId)}
-                        projectListType={"JOINED"}
-                        disableDrag={false}
-                        disableDrop={false}
+                        tree={projectTree}
+                        handleCopyText={handleCopyText}
                         isLastChild={index === displayedProjects.length - 1}
                         handleOnProjectDrop={handleOnProjectDrop}
                       />

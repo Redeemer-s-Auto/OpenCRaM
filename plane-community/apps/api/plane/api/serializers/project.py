@@ -16,6 +16,7 @@ from plane.db.models import Project, ProjectIdentifier, WorkspaceMember, State, 
 from plane.utils.content_validator import (
     validate_html_content,
 )
+from plane.utils.project_tree import ProjectParentIdField, clean_parent_id
 from .base import BaseSerializer
 
 
@@ -68,6 +69,9 @@ class ProjectCreateSerializer(BaseSerializer):
         "cycle",
     ]
 
+    # Fork: the board this one sits inside (null = top level). Read back only when visible.
+    parent_id = ProjectParentIdField()
+
     class Meta:
         model = Project
         fields = [
@@ -96,6 +100,7 @@ class ProjectCreateSerializer(BaseSerializer):
             # from the start, so nothing it creates is ever visible wider than intended.
             "network",
             "is_private",
+            "parent_id",
         ]
 
         read_only_fields = [
@@ -142,6 +147,9 @@ class ProjectCreateSerializer(BaseSerializer):
                 raise serializers.ValidationError("Default assignee should be a user in the workspace")
 
         return data
+
+    def validate_parent_id(self, parent_id):
+        return clean_parent_id(parent_id, self.instance, self.context["workspace_id"], self.context.get("user"))
 
     def create(self, validated_data):
         identifier = validated_data.get("identifier", "").strip().upper()
@@ -226,10 +234,12 @@ class ProjectSerializer(BaseSerializer):
     member_role = serializers.IntegerField(read_only=True)
     is_deployed = serializers.BooleanField(read_only=True)
     cover_image_url = serializers.CharField(read_only=True)
+    parent_id = ProjectParentIdField(read_only=True)
 
     class Meta:
         model = Project
-        fields = "__all__"
+        # "parent" is replaced by parent_id, which hides a parent the user cannot see.
+        exclude = ["parent"]
         read_only_fields = [
             "id",
             "emoji",

@@ -17,7 +17,7 @@ import { Tooltip } from "@plane/propel/tooltip";
 import { copyUrlToClipboard, orderJoinedProjects } from "@plane/utils";
 // components
 import { CreateProjectModal } from "@/components/project/create-project-modal";
-import { SidebarProjectsListItem } from "@/components/workspace/sidebar/projects-list-item";
+import { SidebarProjectTreeNode, useSidebarProjectTree } from "@/components/workspace/sidebar/projects-tree";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useProject } from "@/hooks/store/use-project";
@@ -75,6 +75,8 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
     if (!project) return false;
     return project.name.toLowerCase().includes(searchQuery.toLowerCase()) || project.identifier.includes(searchQuery);
   });
+  // A match whose parent did not match shows at the top level.
+  const projectTree = useSidebarProjectTree(workspaceSlug?.toString() ?? "", filteredProjects);
 
   // auth
   const isAuthorizedUser = allowPermissions(
@@ -151,15 +153,13 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
           </div>
         ) : (
           <div className="vertical-scrollbar mt-4 flex scrollbar-sm flex-grow flex-col gap-0.5 overflow-x-hidden overflow-y-auto pr-2 pl-9">
-            {filteredProjects.map((projectId, index) => (
-              <SidebarProjectsListItem
+            {projectTree.rootIds.map((projectId, index) => (
+              <SidebarProjectTreeNode
                 key={projectId}
                 projectId={projectId}
-                handleCopyText={() => handleCopyText(projectId)}
-                projectListType={"JOINED"}
-                disableDrag={false}
-                disableDrop={false}
-                isLastChild={index === filteredProjects.length - 1}
+                tree={projectTree}
+                handleCopyText={handleCopyText}
+                isLastChild={index === projectTree.rootIds.length - 1}
                 handleOnProjectDrop={handleOnProjectDrop}
                 renderInExtendedSidebar
               />

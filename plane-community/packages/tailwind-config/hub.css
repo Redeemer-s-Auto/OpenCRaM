@@ -338,13 +338,67 @@ html[data-brand-theme="hub"] :is([role="menu"], [role="listbox"]) {
 }
 
 /* ---------- phones ---------- */
+/*
+ * The sidebar is a drawer over the page on a phone (ResizableSidebar sets data-mobile="true" for a
+ * phone user agent or a phone-sized window). These rules do not depend on data-garden-work, so they
+ * hold in a hub build whether or not the Garden sign-in mode is on.
+ */
 html[data-brand-theme="hub"] .garden-mobile-sidebar-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 19;
+  width: 100%;
+  min-height: 100%;
+  border: 0;
   background: var(--hub-scrim);
 }
 html[data-brand-theme="hub"] [data-garden-sidebar="primary"][data-mobile="true"][data-collapsed="false"] {
+  width: min(88vw, 22rem) !important;
+  min-width: min(88vw, 22rem) !important;
+  max-width: min(88vw, 22rem) !important;
   box-shadow: 18px 0 52px rgba(16, 16, 20, 0.2);
 }
+html[data-brand-theme="hub"] [data-garden-sidebar][data-mobile="true"] [role="separator"] {
+  display: none;
+}
 @media (max-width: 767px) {
+  /* The app fills the phone screen (dvh follows the browser bars), and nothing scrolls sideways. */
+  html[data-brand-theme="hub"],
+  html[data-brand-theme="hub"] body {
+    overscroll-behavior: none;
+  }
+  html[data-brand-theme="hub"] .desktop-app-container {
+    height: 100dvh;
+  }
+  html[data-brand-theme="hub"] main {
+    min-width: 0;
+  }
+  html[data-brand-theme="hub"] :is(button, [role="button"], a) {
+    touch-action: manipulation;
+  }
+  /* The page frame (rounded border with the 8px gap) is for wide screens; a phone uses the whole width. */
+  html[data-brand-theme="hub"] .rounded-lg.border.border-subtle:is(:has(> #full-screen-portal), :has(> main)) {
+    border-inline: 0;
+    border-bottom: 0;
+    border-radius: 0;
+  }
+  /* Drawer rows are 44px tap targets, and buttons that only show on hover always show (no hover on a phone). */
+  html[data-brand-theme="hub"] [data-garden-sidebar="primary"] [data-sidebar-row] {
+    min-height: 44px;
+  }
+  html[data-brand-theme="hub"] [data-garden-sidebar="primary"] [class*="group-hover/project-item:opacity-100"] {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  html[data-brand-theme="hub"]
+    [data-garden-sidebar="primary"]
+    :is([class*="group-hover:inline-flex"], [class*="group-hover/project-item:inline-flex"]) {
+    display: inline-flex;
+  }
+  html[data-brand-theme="hub"] [data-garden-sidebar="primary"] [data-sidebar-row] button[aria-expanded] {
+    min-width: 32px;
+    min-height: 32px;
+  }
   /* Hub rule: 44px fields and 16px text in fields on a phone. Buttons keep Plane's sizes:
      44px on every button (Garden's phone rule) swells the property chips on cards and clips them. */
   html[data-brand-theme="hub"] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select) {

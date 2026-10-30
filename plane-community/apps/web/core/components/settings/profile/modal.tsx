@@ -39,13 +39,13 @@ export const ProfileSettingsModal = observer(function ProfileSettingsModal() {
       handleClose={handleClose}
       position={EModalPosition.CENTER}
       width={EModalWidth.VIXL}
-      className="h-175"
+      className="h-175 max-sm:h-dvh"
     >
       <div className="@container relative size-full">
         <div className="flex size-full">
           <ProfileSettingsSidebarRoot
             activeTab={activeTab}
-            className="w-[250px] rounded-l-xl"
+            className="w-[250px] rounded-l-xl max-sm:w-36 max-sm:rounded-none"
             updateActiveTab={(tab) => toggleProfileSettingsModal({ activeTab: tab })}
           />
           <ProfileSettingsContent activeTab={activeTab} className="flex-1 rounded-r-xl" />

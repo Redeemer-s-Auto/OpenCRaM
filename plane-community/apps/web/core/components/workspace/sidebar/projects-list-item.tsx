@@ -80,7 +80,8 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
   const { allowPermissions } = useUserPermissions();
   const { getIsProjectListOpen, toggleProjectListOpen } = useCommandPalette();
   const { preferences: projectPreferences } = useProjectNavigationPreferences();
-  const { isExtendedProjectSidebarOpened, toggleExtendedProjectSidebar, toggleAnySidebarDropdown } = useAppTheme();
+  const { isExtendedProjectSidebarOpened, toggleExtendedProjectSidebar, toggleAnySidebarDropdown, toggleSidebar } =
+    useAppTheme();
 
   // states
   const [leaveProjectModalOpen, setLeaveProjectModal] = useState(false);
@@ -272,6 +273,8 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
       setIsProjectListOpen(!isProjectListOpen);
     } else {
       router.push(defaultTabUrl);
+      // on a phone the menu is a drawer over the page: it gets out of the way after a tap
+      if (window.innerWidth < 768) toggleSidebar(true);
     }
     // close the extended sidebar if it is open
     if (isExtendedProjectSidebarOpened && !isAccordionMode) {
@@ -303,6 +306,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
               }
             )}
             id={`${project?.id}`}
+            data-sidebar-row=""
           >
             {!disableDrag && (
               <Tooltip

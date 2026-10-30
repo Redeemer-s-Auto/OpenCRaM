@@ -78,7 +78,10 @@ export const SidebarProjectSection = observer(function SidebarProjectSection(pro
   const isOpen = storedValue !== false;
   return (
     <div className="flex flex-col">
-      <div className="group flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-placeholder hover:bg-layer-transparent-hover">
+      <div
+        data-sidebar-row=""
+        className="group flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-placeholder hover:bg-layer-transparent-hover"
+      >
         <button
           type="button"
           className="flex w-full items-center gap-1 text-left text-13 font-semibold whitespace-nowrap text-placeholder"
@@ -127,6 +130,7 @@ export const SidebarTeamspaceGroup = observer(function SidebarTeamspaceGroup(pro
         onClick={() => setValue(!isOpen)}
         aria-expanded={isOpen}
         aria-label={isOpen ? `Close ${teamspace.name}` : `Open ${teamspace.name}`}
+        data-sidebar-row=""
         className="group/teamspace flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-13 font-medium text-secondary hover:bg-layer-transparent-hover"
       >
         <span className="grid size-4 flex-shrink-0 place-items-center rounded-sm text-placeholder">

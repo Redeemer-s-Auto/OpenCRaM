@@ -9,6 +9,8 @@ import React, { useCallback, useEffect, useState, useRef } from "react";
 // helpers
 import { usePlatformOS } from "@plane/hooks";
 import { cn } from "@plane/utils";
+// hooks
+import { usePhoneViewport } from "@/hooks/use-phone-viewport";
 
 interface ResizableSidebarProps {
   showPeek?: boolean;
@@ -57,7 +59,10 @@ export function ResizableSidebar({
   const initialWidthRef = useRef<number>(0);
   const initialMouseXRef = useRef<number>(0);
   // hooks
-  const { isMobile } = usePlatformOS();
+  const { isMobile: isMobileDevice } = usePlatformOS();
+  const isPhoneViewport = usePhoneViewport();
+  // A drawer over the page on a phone (by user agent) and in any phone-sized window.
+  const isMobile = isMobileDevice || isPhoneViewport;
   // handlers
   const setShowPeek = useCallback(
     (value: boolean) => {

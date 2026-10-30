@@ -21,6 +21,9 @@ import { GardenWorkIcon, showGardenIcons } from "@/components/common/garden-work
 import { gardenOrgName } from "@/lib/garden-config";
 import useSWR from "swr";
 import { useWorkspaceNotifications } from "@/hooks/store/notifications";
+import { useAppTheme } from "@/hooks/store/use-app-theme";
+import { IconButton } from "@plane/propel/icon-button";
+import { Menu as MenuIcon } from "lucide-react";
 // local imports
 import { StarUsOnGitHubLink } from "@/app/(all)/[workspaceSlug]/(projects)/star-us-link";
 
@@ -32,8 +35,13 @@ export const TopNavigationRoot = observer(function TopNavigationRoot() {
   // store hooks
   const { unreadNotificationsCount, getUnreadNotificationsCount } = useWorkspaceNotifications();
   const { preferences } = useAppRailPreferences();
+  const { sidebarCollapsed, toggleSidebar } = useAppTheme();
 
   const showLabel = preferences.displayMode === "icon_with_label";
+  // Phones: the sidebar is a slide-in menu, opened from here. Settings and the inbox draw no sidebar.
+  const hasDrawer = !pathname.includes(`/${workspaceSlug}/settings`) && !pathname.includes("/notifications/");
+  // Only an "open" button: while the menu is open, a tap outside it (this bar included) closes it.
+  const showMenuButton = hasDrawer && sidebarCollapsed !== false;
 
   // Fetch notification count
   useSWR(
@@ -56,6 +64,16 @@ export const TopNavigationRoot = observer(function TopNavigationRoot() {
     >
       {/* Workspace Menu */}
       <div className="flex flex-1 items-center gap-3 shrink-0">
+        {showMenuButton && (
+          <IconButton
+            size="base"
+            variant="ghost"
+            icon={MenuIcon}
+            className="md:hidden"
+            aria-label="Open menu"
+            onClick={() => toggleSidebar(false)}
+          />
+        )}
         <BrandMark />
         {showGardenIcons ? <span className="garden-work-brand"><GardenWorkIcon className="size-5" /><span>{gardenOrgName}<span className="garden-work-brand-subtitle">WORKSPACE</span></span></span> : null}
         <WorkspaceMenuRoot variant="top-navigation" />

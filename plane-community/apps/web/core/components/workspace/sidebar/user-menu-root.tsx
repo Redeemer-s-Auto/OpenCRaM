@@ -7,7 +7,7 @@
 import { useState, useEffect } from "react";
 import { observer } from "mobx-react";
 import { useRouter } from "next/navigation";
-import { LogOut, Settings, Settings2 } from "lucide-react";
+import { Home, LogOut, Settings, Settings2 } from "lucide-react";
 // plane imports
 import { GOD_MODE_URL } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
@@ -21,6 +21,9 @@ import { AppSidebarItem } from "@/components/sidebar/sidebar-item";
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
 import { useUser } from "@/hooks/store/user";
+// lib
+import { isHubTheme } from "@/lib/brand-config";
+import { hubHomeUrl } from "@/lib/hub-apps";
 
 export const UserMenuRoot = observer(function UserMenuRoot() {
   // states
@@ -108,6 +111,13 @@ export const UserMenuRoot = observer(function UserMenuRoot() {
         </div>
       </div>
       <div>
+        {/* Back to the hub's home page without signing out (hub theme). */}
+        {isHubTheme && (
+          <CustomMenu.MenuItem onClick={() => window.location.assign(hubHomeUrl)} className="flex items-center gap-2">
+            <Home className="size-3.5 shrink-0" />
+            Home
+          </CustomMenu.MenuItem>
+        )}
         <CustomMenu.MenuItem
           onClick={() =>
             toggleProfileSettingsModal({

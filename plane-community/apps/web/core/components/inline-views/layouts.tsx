@@ -328,12 +328,12 @@ export function BoardLayout(props: TLayoutProps) {
   const cards = (key: string) => data.results.filter((card) => (known.has(pick(card)) ? pick(card) : "") === key);
   const shown = columns.filter((c) => c.key !== "" || cards("").length > 0);
   return (
-    <div className="flex gap-3 overflow-x-auto pb-1">
+    <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 md:snap-none">
       {shown.map((column) => (
         <div
           key={column.key}
           className={cn(
-            "w-64 shrink-0 rounded-md bg-layer-1 p-2",
+            "w-64 shrink-0 snap-start rounded-md bg-layer-1 p-2",
             over === column.key && "outline-accent-primary outline outline-1"
           )}
           onDragOver={(e) => {

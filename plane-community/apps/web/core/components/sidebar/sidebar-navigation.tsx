@@ -17,6 +17,7 @@ export function SidebarNavItem(props: TSidebarNavItem) {
   return (
     <div
       data-sidebar-active={isActive ? "true" : undefined}
+      data-sidebar-row=""
       className={cn(
         "group relative flex w-full cursor-pointer items-center justify-between gap-1.5 rounded-md px-2 py-1 outline-none",
         {

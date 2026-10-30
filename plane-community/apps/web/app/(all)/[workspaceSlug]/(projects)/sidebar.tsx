@@ -9,6 +9,7 @@ import { observer } from "mobx-react";
 // plane helpers
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 // components
+import { HubAppsDrawerList } from "@/components/navigation/hub-apps";
 import { SidebarWrapper } from "@/components/sidebar/sidebar-wrapper";
 import { SidebarFavoritesMenu } from "@/components/workspace/sidebar/favorites/favorites-menu";
 import { SidebarProjectsList } from "@/components/workspace/sidebar/projects-list";
@@ -33,6 +34,8 @@ export const AppSidebar = observer(function AppSidebar() {
 
   return (
     <SidebarWrapper title="Projects" quickActions={<SidebarQuickActions />}>
+      {/* Phones only: the hub's apps, Home and Sign out, since the app rail is hidden there. */}
+      <HubAppsDrawerList />
       <SidebarMenuItems />
       {/* Favorites Menu */}
       {canPerformWorkspaceMemberActions && !isFavoriteEmpty && <SidebarFavoritesMenu />}

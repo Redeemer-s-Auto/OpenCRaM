@@ -17,7 +17,9 @@ import { AppSidebarItem } from "@/components/sidebar/sidebar-item";
 // hooks
 import { useAppRailPreferences } from "@/hooks/use-navigation-preferences";
 import { useAppRailVisibility } from "@/lib/app-rail/context";
+import { isHubTheme } from "@/lib/brand-config";
 // local imports
+import { HubAppRailItems } from "./hub-apps";
 import { AppSidebarItemsRoot } from "./items-root";
 
 export const AppRailRoot = observer(() => {
@@ -35,10 +37,10 @@ export const AppRailRoot = observer(() => {
   return (
     <div
       data-garden-surface="rail"
-      className="z-[26] h-full flex-shrink-0 bg-canvas transition-all duration-300 ease-in-out"
+      // On phones the apps live in the slide-in menu instead (HubAppsDrawerList).
+      className="z-[26] h-full flex-shrink-0 bg-canvas transition-all duration-300 ease-in-out max-md:hidden"
       style={{
         width: railWidth,
-        display: "block",
       }}
     >
       <ContextMenu>
@@ -50,7 +52,7 @@ export const AppRailRoot = observer(() => {
                 "gap-3": !showLabel,
               })}
             >
-              <AppSidebarItemsRoot showLabel={showLabel} />
+              {isHubTheme ? <HubAppRailItems showLabel={showLabel} /> : <AppSidebarItemsRoot showLabel={showLabel} />}
               <div className="mx-2 border-t border-strong" />
               <AppSidebarItem
                 item={{

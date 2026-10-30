@@ -121,6 +121,24 @@ export const SlashCommandsMenu = forwardRef(function SlashCommandsMenu(props: Sl
 
   useOutsideClickDetector(commandListContainer, onClose);
 
+  // The menu never grows past what is visible above the on-screen keyboard (the visual viewport
+  // shrinks when the keyboard opens; window.innerHeight does not on iOS).
+  const [maxHeight, setMaxHeight] = useState(320);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const update = () => {
+      const visible = viewport?.height ?? window.innerHeight;
+      setMaxHeight(Math.max(160, Math.min(320, Math.floor(visible * 0.45))));
+    };
+    update();
+    viewport?.addEventListener("resize", update);
+    window.addEventListener("resize", update);
+    return () => {
+      viewport?.removeEventListener("resize", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
   const areSearchResultsEmpty = sections.map((s) => s.items?.length).reduce((acc, curr) => acc + curr, 0) === 0;
 
   if (areSearchResultsEmpty) return null;
@@ -137,9 +155,10 @@ export const SlashCommandsMenu = forwardRef(function SlashCommandsMenu(props: Sl
       <div
         id="slash-command"
         ref={commandListContainer}
-        className="relative max-h-80 min-w-[12rem] space-y-2 overflow-y-auto rounded-md border-[0.5px] border-strong bg-surface-1 px-2 py-2.5 shadow-raised-200"
+        className="relative min-w-[12rem] space-y-2 overflow-y-auto rounded-md border-[0.5px] border-strong bg-surface-1 px-2 py-2.5 shadow-raised-200"
         style={{
           zIndex: 100,
+          maxHeight,
         }}
         onClick={(e) => {
           e.stopPropagation();

@@ -174,7 +174,7 @@ export const IssueView = observer(function IssueView(props: IIssueView) {
               {/* content */}
               <div className="vertical-scrollbar relative scrollbar-md h-full w-full overflow-hidden overflow-y-auto">
                 {["side-peek", "modal"].includes(peekMode) ? (
-                  <div className="relative flex flex-col gap-3 space-y-3 px-8 py-5">
+                  <div className="relative flex flex-col gap-3 space-y-3 px-4 py-5 md:px-8">
                     <PeekOverviewIssueDetails
                       editorRef={editorRef}
                       workspaceSlug={workspaceSlug}
@@ -213,8 +213,8 @@ export const IssueView = observer(function IssueView(props: IIssueView) {
                     />
                   </div>
                 ) : (
-                  <div className="vertical-scrollbar flex h-full w-full overflow-auto">
-                    <div className="relative h-full w-full space-y-6 overflow-auto p-4 py-5">
+                  <div className="vertical-scrollbar flex h-full w-full flex-col overflow-auto md:flex-row">
+                    <div className="relative w-full space-y-6 p-4 py-5 md:h-full md:overflow-auto">
                       <div className="space-y-3">
                         <PeekOverviewIssueDetails
                           editorRef={editorRef}
@@ -247,7 +247,7 @@ export const IssueView = observer(function IssueView(props: IIssueView) {
                       </div>
                     </div>
                     <div
-                      className={`vertical-scrollbar scrollbar-sm h-full !w-[400px] flex-shrink-0 overflow-hidden border-l border-subtle p-4 py-5 ${
+                      className={`vertical-scrollbar scrollbar-sm w-full flex-shrink-0 overflow-hidden border-t border-subtle p-4 py-5 md:h-full md:!w-[400px] md:border-t-0 md:border-l ${
                         is_archived ? "pointer-events-none" : ""
                       }`}
                     >

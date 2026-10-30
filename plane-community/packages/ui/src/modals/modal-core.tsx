@@ -45,7 +45,8 @@ export function ModalCore(props: Props) {
         </Transition.Child>
 
         <div className="fixed inset-0 z-30 overflow-y-auto">
-          <div className={position}>
+          {/* Phones: every dialog is a full-screen sheet (no margin, full height, square corners). */}
+          <div className={cn(position, "max-sm:m-0 max-sm:min-h-full max-sm:p-0")}>
             <Transition.Child
               as={Fragment}
               enter="ease-out duration-300"
@@ -59,6 +60,7 @@ export function ModalCore(props: Props) {
                 className={cn(
                   "relative w-full transform rounded-lg bg-surface-1 text-left shadow-raised-200 transition-all",
                   width,
+                  "max-sm:min-h-dvh max-sm:rounded-none",
                   className
                 )}
               >

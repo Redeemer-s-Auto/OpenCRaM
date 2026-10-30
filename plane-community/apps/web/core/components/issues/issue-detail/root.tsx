@@ -17,7 +17,6 @@ import emptyIssue from "@/app/assets/empty-state/issue.svg?url";
 // components
 import { EmptyState } from "@/components/common/empty-state";
 // hooks
-import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useIssues } from "@/hooks/store/use-issues";
 import { useUserPermissions } from "@/hooks/store/user";
@@ -80,7 +79,6 @@ export const IssueDetailRoot = observer(function IssueDetailRoot(props: TIssueDe
     issues: { removeIssue: removeArchivedIssue },
   } = useIssues(EIssuesStoreType.ARCHIVED);
   const { allowPermissions } = useUserPermissions();
-  const { issueDetailSidebarCollapsed } = useAppTheme();
 
   const issueOperations: TIssueOperations = useMemo(
     () => ({
@@ -238,8 +236,9 @@ export const IssueDetailRoot = observer(function IssueDetailRoot(props: TIssueDe
           }}
         />
       ) : (
-        <div className="flex h-full w-full overflow-hidden">
-          <div className="h-full w-full space-y-6 overflow-y-auto px-9 py-5">
+        // Phones: the body, then the fields panel below it, one scroll. Wider: side by side.
+        <div className="flex h-full w-full flex-col overflow-y-auto md:flex-row md:overflow-hidden">
+          <div className="w-full space-y-6 px-4 py-5 md:h-full md:overflow-y-auto md:px-9">
             <IssueMainContent
               workspaceSlug={workspaceSlug}
               projectId={projectId}
@@ -249,10 +248,7 @@ export const IssueDetailRoot = observer(function IssueDetailRoot(props: TIssueDe
               isArchived={is_archived}
             />
           </div>
-          <div
-            className="fixed right-0 z-[5] h-full w-full min-w-[300px] border-l border-subtle bg-surface-1 sm:w-1/2 md:relative md:w-1/4 lg:min-w-80 xl:min-w-96"
-            style={issueDetailSidebarCollapsed ? { right: `-${window?.innerWidth || 0}px` } : {}}
-          >
+          <div className="w-full border-t border-subtle bg-surface-1 md:relative md:z-[5] md:h-full md:w-1/4 md:min-w-[300px] md:border-t-0 md:border-l lg:min-w-80 xl:min-w-96">
             <IssueDetailsSidebar
               workspaceSlug={workspaceSlug}
               projectId={projectId}

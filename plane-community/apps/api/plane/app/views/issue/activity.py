@@ -16,6 +16,7 @@ from rest_framework import status
 
 # Module imports
 from .. import BaseAPIView
+from plane.sharing.board_access import member_or_shared_projects_q
 from plane.app.serializers import IssueActivitySerializer, IssueCommentSerializer
 from plane.app.permissions import ProjectEntityPermission, allow_permission, ROLE
 from plane.db.models import IssueActivity, IssueComment, CommentReaction, IntakeIssue
@@ -38,8 +39,7 @@ class IssueActivityEndpoint(BaseAPIView):
             IssueActivity.objects.filter(issue_id=issue_id)
             .filter(
                 ~Q(field__in=["comment", "vote", "reaction", "draft"]),
-                project__project_projectmember__member=self.request.user,
-                project__project_projectmember__is_active=True,
+                member_or_shared_projects_q(self.request.user, slug=slug, prefix="project"),
                 project__archived_at__isnull=True,
                 workspace__slug=slug,
             )
@@ -61,8 +61,7 @@ class IssueActivityEndpoint(BaseAPIView):
         issue_comments = (
             IssueComment.objects.filter(issue_id=issue_id)
             .filter(
-                project__project_projectmember__member=self.request.user,
-                project__project_projectmember__is_active=True,
+                member_or_shared_projects_q(self.request.user, slug=slug, prefix="project"),
                 project__archived_at__isnull=True,
                 workspace__slug=slug,
             )

@@ -35,6 +35,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 # Module imports
+from plane.sharing.board_access import member_or_shared_projects_q
 from plane.app.permissions import (
     ProjectEntityPermission,
     ProjectLitePermission,
@@ -785,8 +786,7 @@ class ModuleLinkViewSet(BaseViewSet):
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(module_id=self.kwargs.get("module_id"))
             .filter(
-                project__project_projectmember__member=self.request.user,
-                project__project_projectmember__is_active=True,
+                member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug"), prefix="project"),
                 project__archived_at__isnull=True,
             )
             .order_by("-created_at")

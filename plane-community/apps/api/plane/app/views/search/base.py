@@ -27,6 +27,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 # Module imports
+from plane.sharing.board_access import member_or_shared_projects_q
 from plane.utils.private_projects import visible_projects_q
 from plane.app.views.base import BaseAPIView
 from plane.app.permissions import WorkspaceUserPermission
@@ -72,8 +73,7 @@ class GlobalSearchEndpoint(BaseAPIView):
         return (
             Project.objects.filter(
                 q,
-                project_projectmember__member=self.request.user,
-                project_projectmember__is_active=True,
+                member_or_shared_projects_q(self.request.user, slug=slug),
                 archived_at__isnull=True,
                 workspace__slug=slug,
             )
@@ -97,8 +97,7 @@ class GlobalSearchEndpoint(BaseAPIView):
 
         issues = Issue.issue_objects.filter(
             q,
-            project__project_projectmember__member=self.request.user,
-            project__project_projectmember__is_active=True,
+            member_or_shared_projects_q(self.request.user, slug=slug, prefix="project"),
             project__archived_at__isnull=True,
             workspace__slug=slug,
         )
@@ -126,8 +125,7 @@ class GlobalSearchEndpoint(BaseAPIView):
 
         cycles = Cycle.objects.filter(
             q,
-            project__project_projectmember__member=self.request.user,
-            project__project_projectmember__is_active=True,
+            member_or_shared_projects_q(self.request.user, slug=slug, prefix="project"),
             project__archived_at__isnull=True,
             workspace__slug=slug,
         )
@@ -150,8 +148,7 @@ class GlobalSearchEndpoint(BaseAPIView):
 
         modules = Module.objects.filter(
             q,
-            project__project_projectmember__member=self.request.user,
-            project__project_projectmember__is_active=True,
+            member_or_shared_projects_q(self.request.user, slug=slug, prefix="project"),
             project__archived_at__isnull=True,
             workspace__slug=slug,
         )
@@ -177,8 +174,7 @@ class GlobalSearchEndpoint(BaseAPIView):
                 Page.objects.filter(
                     q,
                     Q(owned_by=self.request.user) | Q(access=0),
-                    projects__project_projectmember__member=self.request.user,
-                    projects__project_projectmember__is_active=True,
+                    member_or_shared_projects_q(self.request.user, slug=slug, prefix="projects"),
                     projects__archived_at__isnull=True,
                     workspace__slug=slug,
                 ),
@@ -224,8 +220,7 @@ class GlobalSearchEndpoint(BaseAPIView):
 
         issue_views = IssueView.objects.filter(
             q,
-            project__project_projectmember__member=self.request.user,
-            project__project_projectmember__is_active=True,
+            member_or_shared_projects_q(self.request.user, slug=slug, prefix="project"),
             project__archived_at__isnull=True,
             workspace__slug=slug,
         )
@@ -254,8 +249,7 @@ class GlobalSearchEndpoint(BaseAPIView):
 
         issues = Issue.objects.filter(
             q,
-            project__project_projectmember__member=self.request.user,
-            project__project_projectmember__is_active=True,
+            member_or_shared_projects_q(self.request.user, slug=slug, prefix="project"),
             project__archived_at__isnull=True,
             workspace__slug=slug,
         ).filter(models.Q(issue_intake__status=0) | models.Q(issue_intake__status=-2))
@@ -385,7 +379,7 @@ class SearchEndpoint(BaseAPIView):
                     projects = (
                         Project.objects.filter(
                             q,
-                            Q(project_projectmember__member=self.request.user) | Q(network=2),
+                            member_or_shared_projects_q(self.request.user, slug=slug) | Q(network=2),
                             visible_projects_q(self.request.user),
                             workspace__slug=slug,
                         )
@@ -412,8 +406,7 @@ class SearchEndpoint(BaseAPIView):
                         visible_issues(
                             Issue.issue_objects.filter(
                                 q,
-                                project__project_projectmember__member=self.request.user,
-                                project__project_projectmember__is_active=True,
+                                member_or_shared_projects_q(self.request.user, slug=slug, prefix="project"),
                                 workspace__slug=slug,
                                 project_id=project_id,
                             ),
@@ -445,8 +438,7 @@ class SearchEndpoint(BaseAPIView):
                     cycles = (
                         Cycle.objects.filter(
                             q,
-                            project__project_projectmember__member=self.request.user,
-                            project__project_projectmember__is_active=True,
+                            member_or_shared_projects_q(self.request.user, slug=slug, prefix="project"),
                             workspace__slug=slug,
                             project_id=project_id,
                         )
@@ -493,8 +485,7 @@ class SearchEndpoint(BaseAPIView):
                     modules = (
                         Module.objects.filter(
                             q,
-                            project__project_projectmember__member=self.request.user,
-                            project__project_projectmember__is_active=True,
+                            member_or_shared_projects_q(self.request.user, slug=slug, prefix="project"),
                             workspace__slug=slug,
                             project_id=project_id,
                         )
@@ -523,8 +514,7 @@ class SearchEndpoint(BaseAPIView):
                         visible_pages(
                             Page.objects.filter(
                                 q,
-                                projects__project_projectmember__member=self.request.user,
-                                projects__project_projectmember__is_active=True,
+                                member_or_shared_projects_q(self.request.user, slug=slug, prefix="projects"),
                                 projects__id=project_id,
                                 workspace__slug=slug,
                                 access=0,
@@ -597,7 +587,7 @@ class SearchEndpoint(BaseAPIView):
                     projects = (
                         Project.objects.filter(
                             q,
-                            Q(project_projectmember__member=self.request.user) | Q(network=2),
+                            member_or_shared_projects_q(self.request.user, slug=slug) | Q(network=2),
                             visible_projects_q(self.request.user),
                             workspace__slug=slug,
                         )
@@ -624,8 +614,7 @@ class SearchEndpoint(BaseAPIView):
                         visible_issues(
                             Issue.issue_objects.filter(
                                 q,
-                                project__project_projectmember__member=self.request.user,
-                                project__project_projectmember__is_active=True,
+                                member_or_shared_projects_q(self.request.user, slug=slug, prefix="project"),
                                 workspace__slug=slug,
                             ),
                             request.user,
@@ -656,8 +645,7 @@ class SearchEndpoint(BaseAPIView):
                     cycles = (
                         Cycle.objects.filter(
                             q,
-                            project__project_projectmember__member=self.request.user,
-                            project__project_projectmember__is_active=True,
+                            member_or_shared_projects_q(self.request.user, slug=slug, prefix="project"),
                             workspace__slug=slug,
                         )
                         .annotate(
@@ -703,8 +691,7 @@ class SearchEndpoint(BaseAPIView):
                     modules = (
                         Module.objects.filter(
                             q,
-                            project__project_projectmember__member=self.request.user,
-                            project__project_projectmember__is_active=True,
+                            member_or_shared_projects_q(self.request.user, slug=slug, prefix="project"),
                             workspace__slug=slug,
                         )
                         .order_by("-created_at")
@@ -732,8 +719,7 @@ class SearchEndpoint(BaseAPIView):
                         visible_pages(
                             Page.objects.filter(
                                 q,
-                                projects__project_projectmember__member=self.request.user,
-                                projects__project_projectmember__is_active=True,
+                                member_or_shared_projects_q(self.request.user, slug=slug, prefix="projects"),
                                 workspace__slug=slug,
                                 access=0,
                                 is_global=True,

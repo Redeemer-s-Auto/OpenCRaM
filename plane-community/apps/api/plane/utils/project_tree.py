@@ -37,10 +37,15 @@ def _workspace_filter(workspace_id=None, slug=None, prefix=""):
 def visible_project_ids(user, workspace_id=None, slug=None):
     """Values queryset of the ids ``user`` sees in the workspace project list.
 
-    Same rules as the sidebar list (``ProjectViewSet.list``): private projects only for
-    active members; guests see projects they belong to; members see those plus public
-    (network=2) ones; workspace admins see every non-private project.
+    The one rule for "which boards can this person see", used by the sidebar lists
+    (``ProjectViewSet.list`` / ``list_detail``) and the parent masking below:
+    private projects only for active members; guests see projects they belong to;
+    members see those plus public (network=2) ones; workspace admins see every
+    non-private project; and everyone also sees the boards a group share reaches
+    (``plane.sharing.board_access``, inherited down the parent chain).
     """
+    from plane.sharing.board_access import shared_project_ids
+
     none = Project.objects.none().values("id")
     if user is None or not user.is_authenticated:
         return none
@@ -54,10 +59,11 @@ def visible_project_ids(user, workspace_id=None, slug=None):
 
     projects = Project.objects.filter(**_workspace_filter(workspace_id, slug)).filter(visible_projects_q(user))
     member_of = ProjectMember.objects.filter(member=user, is_active=True).values("project_id")
+    shared = Q(id__in=shared_project_ids(user, workspace_id=workspace_id, slug=slug))
     if role == ROLE.GUEST.value:
-        projects = projects.filter(id__in=member_of)
+        projects = projects.filter(Q(id__in=member_of) | shared)
     elif role == ROLE.MEMBER.value:
-        projects = projects.filter(Q(id__in=member_of) | Q(network=2))
+        projects = projects.filter(Q(id__in=member_of) | Q(network=2) | shared)
     return projects.values("id")
 
 

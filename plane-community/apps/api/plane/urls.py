@@ -30,6 +30,7 @@ urlpatterns = [
     path("api/instances/", include("plane.license.urls")),
     path("api/v1/", include("plane.api.urls")),
     path("api/v1/", include("plane.blueprints.v1_urls")),
+    path("api/v1/", include("plane.sharing.v1_urls")),
     path("auth/firebase/", include("plane.garden.urls")),
     path("auth/", include("plane.authentication.urls")),
     path("", include("plane.web.urls")),

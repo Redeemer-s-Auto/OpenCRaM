@@ -99,6 +99,13 @@ def allow_permission(allowed_roles, level="PROJECT", creator=False, model=None):
                 if is_user_has_allowed_role:
                     return view_func(instance, request, *args, **kwargs)
 
+                # Boards shared with a group: a non-member acts with the share's stand-in
+                # role (plane.sharing.board_access). Membership above always wins.
+                from plane.sharing.guard import shared_project_role
+
+                if shared_project_role(request, slug, kwargs["project_id"]) in allowed_role_values:
+                    return view_func(instance, request, *args, **kwargs)
+
                 # A Garden global Work admin is authoritative for the managed
                 # workspace even if the corresponding ProjectMember row has not
                 # been materialized yet. Upstream behavior remains unchanged for

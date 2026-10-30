@@ -10,7 +10,15 @@ from rest_framework.response import Response
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.views.base import BaseAPIView
 from plane.db.models import Issue, Page, Project, User, Workspace
-from plane.sharing.models import AccessGroup, AccessGroupMember
+from plane.sharing.board_access import MAX_BOARD_DEPTH, group_includes_transitively
+from plane.sharing.models import (
+    AccessGroup,
+    AccessGroupInclude,
+    AccessGroupMember,
+    AccessLevel,
+    ProjectShare,
+    ProjectShareExclusion,
+)
 from plane.sharing.services import can_manage_sharing, is_workspace_admin, read_sharing, write_sharing
 
 FORBIDDEN = Response({"error": "You don't have the required permissions."}, status=status.HTTP_403_FORBIDDEN)
@@ -76,6 +84,9 @@ def _group_payload(group):
         "member_ids": [str(row.member_id) for row in members],
         "member_count": len(members),
         "shared_item_count": getattr(group, "shared_item_count", None),
+        # Groups this group includes (their members inherit this group's access) and the reverse.
+        "includes": [str(row.included_group_id) for row in group.includes.all()],
+        "included_in": [str(row.group_id) for row in group.included_in.all()],
     }
 
 
@@ -99,8 +110,11 @@ def _set_group_members(group, workspace, member_ids):
     )
 
 
-class AccessGroupEndpoint(BaseAPIView):
-    """Groups: every workspace member may list them; only admins change them."""
+class AccessGroupViews:
+    """Groups: every workspace member may list them; only admins change them.
+
+    A mixin so the same handlers serve the app (session) and the v1 API (API key).
+    """
 
     def _groups(self, slug):
         return AccessGroup.objects.filter(workspace__slug=slug).annotate(
@@ -153,6 +167,177 @@ class AccessGroupEndpoint(BaseAPIView):
     def delete(self, request, slug, group_id):
         AccessGroup.objects.filter(workspace__slug=slug, pk=group_id).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AccessGroupEndpoint(AccessGroupViews, BaseAPIView):
+    pass
+
+
+def _group_in_workspace(slug, group_id, field="group_id"):
+    group = AccessGroup.objects.filter(workspace__slug=slug, pk=group_id).first() if group_id else None
+    if group is None:
+        raise ValidationError({field: "Group is not in this workspace."})
+    return group
+
+
+class AccessGroupIncludeViews:
+    """Groups inside groups: ``group_id`` includes the group named in the body.
+
+    Members of the included group inherit everything shared with ``group_id``.
+    A loop (the included group already includes ``group_id``, directly or through
+    other groups) is rejected, as is a group including itself.
+    """
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def post(self, request, slug, group_id):
+        group = _group_in_workspace(slug, group_id)
+        included = _group_in_workspace(slug, request.data.get("group_id"))
+        if included.pk == group.pk:
+            return Response({"error": "A group cannot include itself."}, status=status.HTTP_400_BAD_REQUEST)
+        if group_includes_transitively(included.pk, group.pk):
+            return Response(
+                {"error": f"{included.name} already includes {group.name}; that would make a loop."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        _, created = AccessGroupInclude.objects.get_or_create(
+            group=group, included_group=included, defaults={"created_by": request.user}
+        )
+        return Response(
+            _group_payload(AccessGroup.objects.get(pk=group.pk)),
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def delete(self, request, slug, group_id, included_group_id):
+        AccessGroupInclude.objects.filter(
+            group__workspace__slug=slug, group_id=group_id, included_group_id=included_group_id
+        ).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AccessGroupIncludeEndpoint(AccessGroupIncludeViews, BaseAPIView):
+    pass
+
+
+def _board(slug, project_id):
+    return Project.objects.get(workspace__slug=slug, pk=project_id)
+
+
+def _board_sharing(project):
+    """Shares and exclusions set on this board, plus what it inherits from the boards above it."""
+    shares = project.group_shares.select_related("group").order_by("group__name")
+    exclusions = project.group_exclusions.select_related("group").order_by("group__name")
+    decided = {share.group_id for share in shares} | {row.group_id for row in exclusions}
+    inherited = []
+    ancestor_id = project.parent_id
+    visited = {project.id}
+    while ancestor_id and ancestor_id not in visited and len(visited) <= MAX_BOARD_DEPTH:
+        visited.add(ancestor_id)
+        ancestor = Project.objects.filter(pk=ancestor_id).first()
+        if ancestor is None or ancestor.is_private:
+            break
+        for row in ancestor.group_exclusions.all():
+            decided.add(row.group_id)
+        for share in ancestor.group_shares.select_related("group").order_by("group__name"):
+            if share.group_id in decided:
+                continue
+            decided.add(share.group_id)
+            inherited.append(
+                {
+                    "group_id": str(share.group_id),
+                    "name": share.group.name,
+                    "level": share.level,
+                    "from_project_id": str(ancestor.id),
+                    "from_project_name": ancestor.name,
+                }
+            )
+        ancestor_id = ancestor.parent_id
+    return {
+        "shares": [{"group_id": str(s.group_id), "name": s.group.name, "level": s.level} for s in shares],
+        "exclusions": [{"group_id": str(e.group_id), "name": e.group.name} for e in exclusions],
+        "inherited": inherited,
+    }
+
+
+class ProjectGroupShareViews:
+    """Share a whole board with a group.
+
+    GET: anyone who can open the board sees its share list. POST ``{"group_id", "level"}``
+    (5 view, 10 comment, 15 edit) adds or changes the share; DELETE removes it.
+    Writes are for workspace admins. The share flows down to the boards inside this
+    one (see ``plane.sharing.board_access``).
+    """
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def get(self, request, slug, project_id):
+        return Response(_board_sharing(_board(slug, project_id)))
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def post(self, request, slug, project_id):
+        project = _board(slug, project_id)
+        if project.is_private:
+            return Response(
+                {"error": "A private board cannot be shared. Turn off Private first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        group = _group_in_workspace(slug, request.data.get("group_id"))
+        level = request.data.get("level", AccessLevel.VIEW)
+        if level not in AccessLevel.values:
+            raise ValidationError({"level": f"Unknown level {level!r}."})
+        with transaction.atomic():
+            share, created = ProjectShare.objects.update_or_create(
+                project=project,
+                group=group,
+                defaults={"workspace_id": project.workspace_id, "level": level, "created_by": request.user},
+            )
+            # A share on this board replaces an exclusion for the same group here.
+            ProjectShareExclusion.objects.filter(project=project, group=group).delete()
+        return Response(
+            _board_sharing(project), status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        )
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def delete(self, request, slug, project_id, group_id):
+        ProjectShare.objects.filter(project__workspace__slug=slug, project_id=project_id, group_id=group_id).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProjectGroupShareEndpoint(ProjectGroupShareViews, BaseAPIView):
+    pass
+
+
+class ProjectGroupExclusionViews:
+    """"Not this board": stop a group's inherited share at this board and everything inside it.
+
+    POST ``{"group_id"}`` adds the exclusion (and drops a direct share for that group
+    here); DELETE removes it. Workspace admins only.
+    """
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def post(self, request, slug, project_id):
+        project = _board(slug, project_id)
+        group = _group_in_workspace(slug, request.data.get("group_id"))
+        with transaction.atomic():
+            _, created = ProjectShareExclusion.objects.get_or_create(
+                project=project,
+                group=group,
+                defaults={"workspace_id": project.workspace_id, "created_by": request.user},
+            )
+            ProjectShare.objects.filter(project=project, group=group).delete()
+        return Response(
+            _board_sharing(project), status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        )
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def delete(self, request, slug, project_id, group_id):
+        ProjectShareExclusion.objects.filter(
+            project__workspace__slug=slug, project_id=project_id, group_id=group_id
+        ).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProjectGroupExclusionEndpoint(ProjectGroupExclusionViews, BaseAPIView):
+    pass
 
 
 class ShareTargetSearchEndpoint(BaseAPIView):

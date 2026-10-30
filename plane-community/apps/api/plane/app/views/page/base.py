@@ -30,6 +30,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 # Module imports
+from plane.sharing.board_access import member_or_shared_projects_q
 from plane.app.permissions import allow_permission, ROLE
 from plane.app.serializers import (
     PageSerializer,
@@ -92,8 +93,7 @@ class PageViewSet(BaseViewSet):
             visible_pages(super().get_queryset(), self.request.user)
             .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(
-                projects__project_projectmember__member=self.request.user,
-                projects__project_projectmember__is_active=True,
+                member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug"), prefix="projects"),
                 projects__archived_at__isnull=True,
             )
             .filter(parent__isnull=True)
@@ -429,8 +429,7 @@ class PageViewSet(BaseViewSet):
         queryset = (
             visible_pages(Page.objects.filter(workspace__slug=slug), request.user)
             .filter(
-                projects__project_projectmember__member=self.request.user,
-                projects__project_projectmember__is_active=True,
+                member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug"), prefix="projects"),
                 projects__archived_at__isnull=True,
             )
             .filter(parent__isnull=True)

@@ -14,6 +14,7 @@ from rest_framework import status
 
 # Module imports
 from .. import BaseViewSet, BaseAPIView
+from plane.sharing.board_access import member_or_shared_projects_q
 from plane.app.serializers import LabelSerializer
 from plane.app.permissions import allow_permission, ProjectBasePermission, ROLE
 from plane.db.models import Project, Label
@@ -31,7 +32,7 @@ class LabelViewSet(BaseViewSet):
             .get_queryset()
             .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
-            .filter(project__project_projectmember__member=self.request.user)
+            .filter(member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug"), prefix="project"))
             .select_related("project")
             .select_related("workspace")
             .select_related("parent")

@@ -9,9 +9,47 @@ from plane.sharing.shared_views import (
     SharedPageEndpoint,
     SharedWithMeListEndpoint,
 )
-from plane.sharing.views import AccessGroupEndpoint, IssueSharingEndpoint, PageSharingEndpoint, ShareTargetSearchEndpoint
+from plane.sharing.views import (
+    AccessGroupEndpoint,
+    AccessGroupIncludeEndpoint,
+    IssueSharingEndpoint,
+    PageSharingEndpoint,
+    ProjectGroupExclusionEndpoint,
+    ProjectGroupShareEndpoint,
+    ShareTargetSearchEndpoint,
+)
 
 urlpatterns = [
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/group-shares/",
+        ProjectGroupShareEndpoint.as_view(http_method_names=["get", "post"]),
+        name="project-group-shares",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/group-shares/<uuid:group_id>/",
+        ProjectGroupShareEndpoint.as_view(http_method_names=["delete"]),
+        name="project-group-share",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/group-exclusions/",
+        ProjectGroupExclusionEndpoint.as_view(http_method_names=["post"]),
+        name="project-group-exclusions",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/group-exclusions/<uuid:group_id>/",
+        ProjectGroupExclusionEndpoint.as_view(http_method_names=["delete"]),
+        name="project-group-exclusion",
+    ),
+    path(
+        "workspaces/<str:slug>/access-groups/<uuid:group_id>/includes/",
+        AccessGroupIncludeEndpoint.as_view(http_method_names=["post"]),
+        name="access-group-includes",
+    ),
+    path(
+        "workspaces/<str:slug>/access-groups/<uuid:group_id>/includes/<uuid:included_group_id>/",
+        AccessGroupIncludeEndpoint.as_view(http_method_names=["delete"]),
+        name="access-group-include",
+    ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/issues/<uuid:issue_id>/permissions/",
         IssueSharingEndpoint.as_view(),

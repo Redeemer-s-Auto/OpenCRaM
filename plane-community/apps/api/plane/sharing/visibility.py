@@ -27,7 +27,8 @@ restricted item.
 from django.db.models import Q, QuerySet
 
 from plane.db.models import Issue, Page, Project, ProjectMember, ProjectPage, Workspace, WorkspaceMember
-from plane.sharing.models import AccessGroupMember, AccessLevel, ItemRestriction, ItemShare, ShareTarget
+from plane.sharing.board_access import effective_group_ids
+from plane.sharing.models import AccessLevel, ItemRestriction, ItemShare, ShareTarget
 
 ADMIN_ROLE = 20
 
@@ -79,7 +80,8 @@ def _admin_workspace_q(user, field="workspace_id"):
 def share_matches_user(user, min_level=AccessLevel.VIEW):
     """Q on ItemShare: the share reaches ``user`` at ``min_level`` or higher."""
     project_ids = ProjectMember.objects.filter(member=user, is_active=True, deleted_at__isnull=True).values("project_id")
-    group_ids = AccessGroupMember.objects.filter(member=user).values("group_id")
+    # Direct groups plus every group that includes one of them (groups inside groups).
+    group_ids = list(effective_group_ids(user))
     # "Everybody" means workspace members and admins, not outside guests (role 5).
     workspace_ids = WorkspaceMember.objects.filter(
         member=user, role__gte=15, is_active=True, deleted_at__isnull=True

@@ -67,9 +67,10 @@ class ProjectPagePermission(BasePermission):
 
     def _check_project_member_access(self, request, slug, project_id):
         """
-        Check if the user is a project member.
+        Check if the user is a project member. A board shared with one of the
+        user's groups gives the share's stand-in role instead (membership wins).
         """
-        return (
+        role = (
             ProjectMember.objects.filter(
                 member=request.user,
                 workspace__slug=slug,
@@ -79,6 +80,11 @@ class ProjectPagePermission(BasePermission):
             .values_list("role", flat=True)
             .first()
         )
+        if role:
+            return role
+        from plane.sharing.guard import shared_project_role
+
+        return shared_project_role(request, slug, project_id=project_id)
 
     def _check_access_and_get_role(self, request, slug, project_id):
         """

@@ -15,6 +15,7 @@ from rest_framework import status
 
 # Module imports
 from .. import BaseViewSet, BaseAPIView
+from plane.sharing.board_access import member_or_shared_projects_q
 from plane.app.serializers import StateSerializer
 from plane.app.permissions import ROLE, allow_permission
 from plane.db.models import State, Issue
@@ -32,8 +33,7 @@ class StateViewSet(BaseViewSet):
             .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(
-                project__project_projectmember__member=self.request.user,
-                project__project_projectmember__is_active=True,
+                member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug"), prefix="project"),
                 project__archived_at__isnull=True,
             )
             .filter(is_triage=False)

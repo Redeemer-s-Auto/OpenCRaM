@@ -12,7 +12,8 @@ import re
 
 from rest_framework.exceptions import NotFound, PermissionDenied
 
-from plane.db.models import Issue
+from plane.db.models import Issue, Project
+from plane.sharing.board_access import project_share_level, role_for_level
 from plane.sharing.models import AccessLevel
 from plane.sharing.visibility import can_reach, issue_access_level, page_access_level
 
@@ -75,6 +76,30 @@ def _check(level, required):
         raise NotFound("The required object does not exist.")
     if not can_reach(level, required):
         raise PermissionDenied("You don't have the required permissions.")
+
+
+def shared_project_role(request, slug, project_id=None, project_identifier=None):
+    """Stand-in project role a group share gives ``request.user`` on a board, or None.
+
+    Used by the project permission checks after the real membership check fails.
+    Safe methods need "Can view"; writes on comment paths need "Can comment";
+    other writes need "Can edit". Editors act as project members, the rest as guests.
+    """
+    user = getattr(request, "user", None)
+    if user is None or not user.is_authenticated:
+        return None
+    if project_id is None and project_identifier:
+        project_id = (
+            Project.objects.filter(workspace__slug=slug, identifier__iexact=project_identifier)
+            .values_list("id", flat=True)
+            .first()
+        )
+    if not project_id:
+        return None
+    level = project_share_level(user, project_id, slug=slug)
+    if not level or level < _required_level(request):
+        return None
+    return role_for_level(level)
 
 
 def enforce_item_access(request, kwargs):

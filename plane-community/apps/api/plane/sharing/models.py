@@ -68,6 +68,62 @@ class AccessGroupMember(TimestampedModel):
         ]
 
 
+class AccessGroupInclude(TimestampedModel):
+    """``group`` includes ``included_group``.
+
+    Members of ``included_group`` inherit everything shared with ``group`` (and with
+    every group that in turn includes ``group``). "Service Advisors" includes "Upper
+    Management": Upper Management's people get Service Advisors' access. Loops are
+    rejected on write and the resolver (``plane.sharing.board_access``) is loop-safe.
+    """
+
+    group = models.ForeignKey(AccessGroup, on_delete=models.CASCADE, related_name="includes")
+    included_group = models.ForeignKey(AccessGroup, on_delete=models.CASCADE, related_name="included_in")
+
+    class Meta:
+        db_table = "sharing_access_group_includes"
+        constraints = [
+            models.UniqueConstraint(fields=["group", "included_group"], name="sharing_access_group_include_unique"),
+            models.CheckConstraint(
+                condition=~models.Q(group=models.F("included_group")), name="sharing_access_group_include_not_self"
+            ),
+        ]
+
+
+class ProjectShare(TimestampedModel):
+    """A whole board (project) shared with a group at one level.
+
+    Flows down the ``Project.parent`` tree to every board inside it unless a child
+    carries a ``ProjectShareExclusion`` for the group or is private. The rule lives
+    in ``plane.sharing.board_access.shared_project_levels``.
+    """
+
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="project_shares")
+    project = models.ForeignKey("db.Project", on_delete=models.CASCADE, related_name="group_shares")
+    group = models.ForeignKey(AccessGroup, on_delete=models.CASCADE, related_name="project_shares")
+    level = models.PositiveSmallIntegerField(choices=AccessLevel.choices, default=AccessLevel.VIEW)
+
+    class Meta:
+        db_table = "sharing_project_shares"
+        constraints = [
+            models.UniqueConstraint(fields=["project", "group"], name="sharing_project_share_unique"),
+        ]
+
+
+class ProjectShareExclusion(TimestampedModel):
+    """"Not this board": stops a group's inherited share at this board and everything inside it."""
+
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="project_share_exclusions")
+    project = models.ForeignKey("db.Project", on_delete=models.CASCADE, related_name="group_exclusions")
+    group = models.ForeignKey(AccessGroup, on_delete=models.CASCADE, related_name="project_exclusions")
+
+    class Meta:
+        db_table = "sharing_project_share_exclusions"
+        constraints = [
+            models.UniqueConstraint(fields=["project", "group"], name="sharing_project_share_exclusion_unique"),
+        ]
+
+
 class ItemRestriction(TimestampedModel):
     """Marks one work item or page as "only the people I pick"."""
 

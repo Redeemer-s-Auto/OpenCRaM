@@ -17,6 +17,7 @@ from rest_framework import status
 
 # Module imports
 from .. import BaseViewSet
+from plane.sharing.board_access import member_or_shared_projects_q
 from plane.app.serializers import IssueCommentSerializer, CommentReactionSerializer
 from plane.app.permissions import allow_permission, ROLE
 from plane.db.models import IssueComment, ProjectMember, CommentReaction, Project, Issue
@@ -44,8 +45,7 @@ class IssueCommentViewSet(BaseViewSet):
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(issue_id=self.kwargs.get("issue_id"))
             .filter(
-                project__project_projectmember__member=self.request.user,
-                project__project_projectmember__is_active=True,
+                member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug"), prefix="project"),
                 project__archived_at__isnull=True,
             )
             .select_related("project")
@@ -187,8 +187,7 @@ class CommentReactionViewSet(BaseViewSet):
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(comment_id=self.kwargs.get("comment_id"))
             .filter(
-                project__project_projectmember__member=self.request.user,
-                project__project_projectmember__is_active=True,
+                member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug"), prefix="project"),
                 project__archived_at__isnull=True,
             )
             .order_by("-created_at")

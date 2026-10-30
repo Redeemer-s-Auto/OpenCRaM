@@ -34,6 +34,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 # Third party imports
 from rest_framework import status
 from rest_framework.response import Response
+from plane.sharing.board_access import member_or_shared_projects_q
 from plane.app.permissions import allow_permission, ROLE
 from plane.app.serializers import (
     CycleSerializer,
@@ -97,8 +98,7 @@ class CycleViewSet(BaseViewSet):
             .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(
-                project__project_projectmember__member=self.request.user,
-                project__project_projectmember__is_active=True,
+                member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug"), prefix="project"),
             )
             .filter(project__archived_at__isnull=True)
             .select_related("project", "workspace", "owned_by")

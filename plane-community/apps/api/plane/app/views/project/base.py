@@ -8,7 +8,8 @@ import json
 
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Exists, F, OuterRef, Prefetch, Q, Subquery, Count
+from django.db.models import Exists, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Count
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 # Third Party imports
@@ -40,9 +41,10 @@ from plane.db.models import (
     WorkspaceMember,
 )
 from plane.db.models.intake import IntakeIssueStatus
+from plane.sharing.board_access import project_share_level, shared_role_expr
 from plane.sharing.visibility import hidden_issue_ids
 from plane.utils.private_projects import visible_projects_q
-from plane.utils.project_tree import visible_parent_id_expr
+from plane.utils.project_tree import visible_parent_id_expr, visible_project_ids
 from plane.utils.host import base_host
 from plane.utils.order_queryset import PROJECT_ORDER_BY_ALLOWLIST, sanitize_order_by
 
@@ -75,13 +77,7 @@ class ProjectViewSet(BaseViewSet):
                     )
                 )
             )
-            .annotate(
-                member_role=ProjectMember.objects.filter(
-                    project_id=OuterRef("pk"),
-                    member_id=self.request.user.id,
-                    is_active=True,
-                ).values("role")
-            )
+            .annotate(member_role=self._member_role_expr())
             .annotate(
                 anchor=DeployBoard.objects.filter(
                     entity_name="project",
@@ -103,34 +99,27 @@ class ProjectViewSet(BaseViewSet):
             .distinct()
         )
 
+    def _member_role_expr(self):
+        """The user's project role; on a board a group share reaches, the share's stand-in role."""
+        membership = ProjectMember.objects.filter(
+            project_id=OuterRef("pk"),
+            member_id=self.request.user.id,
+            is_active=True,
+        ).values("role")[:1]
+        return Coalesce(
+            Subquery(membership),
+            shared_role_expr(self.request.user, slug=self.kwargs.get("slug")),
+            output_field=IntegerField(),
+        )
+
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def list_detail(self, request, slug):
         fields = [field for field in request.GET.get("fields", "").split(",") if field]
-        projects = self.get_queryset().order_by("sort_order", "name")
-        if WorkspaceMember.objects.filter(
-            member=request.user,
-            workspace__slug=slug,
-            is_active=True,
-            role=ROLE.GUEST.value,
-        ).exists():
-            projects = projects.filter(
-                project_projectmember__member=self.request.user,
-                project_projectmember__is_active=True,
-            )
-
-        if WorkspaceMember.objects.filter(
-            member=request.user,
-            workspace__slug=slug,
-            is_active=True,
-            role=ROLE.MEMBER.value,
-        ).exists():
-            projects = projects.filter(
-                Q(
-                    project_projectmember__member=self.request.user,
-                    project_projectmember__is_active=True,
-                )
-                | Q(network=2)
-            )
+        # One rule for "which boards can this person see": membership, network, private,
+        # and boards shared with the user's groups. See plane.utils.project_tree.
+        projects = (
+            self.get_queryset().filter(id__in=visible_project_ids(request.user, slug=slug)).order_by("sort_order", "name")
+        )
 
         if request.GET.get("per_page", False) and request.GET.get("cursor", False):
             return self.paginate(
@@ -159,13 +148,7 @@ class ProjectViewSet(BaseViewSet):
             Project.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(visible_projects_q(self.request.user))
             .select_related("workspace", "workspace__owner", "default_assignee", "project_lead")
-            .annotate(
-                member_role=ProjectMember.objects.filter(
-                    project_id=OuterRef("pk"),
-                    member_id=self.request.user.id,
-                    is_active=True,
-                ).values("role")
-            )
+            .annotate(member_role=self._member_role_expr())
             .annotate(
                 intake_count=Count(
                     "project_intakeissue",
@@ -206,30 +189,8 @@ class ProjectViewSet(BaseViewSet):
             "updated_by",
         )
 
-        if WorkspaceMember.objects.filter(
-            member=request.user,
-            workspace__slug=slug,
-            is_active=True,
-            role=ROLE.GUEST.value,
-        ).exists():
-            projects = projects.filter(
-                project_projectmember__member=self.request.user,
-                project_projectmember__is_active=True,
-            )
-
-        if WorkspaceMember.objects.filter(
-            member=request.user,
-            workspace__slug=slug,
-            is_active=True,
-            role=ROLE.MEMBER.value,
-        ).exists():
-            projects = projects.filter(
-                Q(
-                    project_projectmember__member=self.request.user,
-                    project_projectmember__is_active=True,
-                )
-                | Q(network=2)
-            )
+        # One rule for "which boards can this person see" (plane.utils.project_tree).
+        projects = projects.filter(id__in=visible_project_ids(request.user, slug=slug))
         # parent_id is a model field, so the masked value is annotated under another name.
         projects = list(projects)
         for project in projects:
@@ -245,7 +206,8 @@ class ProjectViewSet(BaseViewSet):
 
         member_ids = [str(project_member.member_id) for project_member in project.members_list]
 
-        if str(request.user.id) not in member_ids:
+        # A board shared with one of the user's groups opens like a board they belong to.
+        if str(request.user.id) not in member_ids and not project_share_level(request.user, pk, slug=slug):
             if project.network == ProjectNetwork.SECRET.value:
                 return Response(
                     {"error": "You do not have permission"},

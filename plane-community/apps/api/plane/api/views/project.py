@@ -21,6 +21,7 @@ from drf_spectacular.types import OpenApiTypes
 
 
 # Module imports
+from plane.sharing.board_access import member_or_shared_projects_q
 from plane.db.models import (
     Cycle,
     Intake,
@@ -90,11 +91,7 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
         return (
             Project.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(
-                Q(
-                    project_projectmember__member=self.request.user,
-                    project_projectmember__is_active=True,
-                )
-                | Q(network=2)
+                member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug")) | Q(network=2)
             )
             .filter(visible_projects_q(self.request.user))
             .select_related("project_lead")
@@ -362,11 +359,7 @@ class ProjectListLiteAPIEndpoint(BaseAPIView):
         return (
             Project.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(
-                Q(
-                    project_projectmember__member=self.request.user,
-                    project_projectmember__is_active=True,
-                )
-                | Q(network=2)
+                member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug")) | Q(network=2)
             )
             .filter(visible_projects_q(self.request.user))
             .distinct()
@@ -451,11 +444,7 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
         return (
             Project.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(
-                Q(
-                    project_projectmember__member=self.request.user,
-                    project_projectmember__is_active=True,
-                )
-                | Q(network=2)
+                member_or_shared_projects_q(self.request.user, slug=self.kwargs.get("slug")) | Q(network=2)
             )
             .filter(visible_projects_q(self.request.user))
             .select_related("workspace", "workspace__owner", "default_assignee", "project_lead")

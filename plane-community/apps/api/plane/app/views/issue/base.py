@@ -45,6 +45,7 @@ from plane.bgtasks.issue_description_version_task import issue_description_versi
 from plane.bgtasks.recent_visited_task import recent_visited_task
 from plane.bgtasks.webhook_task import model_activity
 from plane.app.serializers.issue import hide_issue_refs
+from plane.sharing.board_access import shared_project_ids
 from plane.sharing.models import AccessLevel
 from plane.sharing.visibility import can_view_issue, visible_issues
 from plane.utils.uuid import is_valid_uuid
@@ -1091,6 +1092,8 @@ class IssueDetailEndpoint(BaseAPIView):
                     project__guest_view_all_features=False,
                     created_by=self.request.user,
                 )
+                # Boards shared with one of the user's groups: the share grants every card.
+                | Q(project_id__in=shared_project_ids(self.request.user, slug=slug))
             )
             .values("id")
         )

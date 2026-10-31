@@ -32,6 +32,7 @@ import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 import useIssuePeekOverviewRedirection from "@/hooks/use-issue-peek-overview-redirection";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 import { RowAddButton } from "../row-add-button";
+import { RowDragGrip } from "../row-drag-grip";
 import type { TRowInlineAdd } from "../row-line-tools";
 import { InlineRowTitle, RowLineMenu, isBlankName } from "../row-line-tools";
 import { calculateIdentifierWidth } from "../utils";
@@ -208,6 +209,7 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
                 {onInlineAdd && !issue?.tempId && <RowAddButton onAdd={onInlineAdd} />}
               </div>
             )}
+            {hasAddColumn && isDraggingAllowed && !issue?.tempId && <RowDragGrip />}
             {issue?.tempId !== undefined && (
               <div className="absolute top-0 left-0 z-[99999] h-full w-full animate-pulse bg-surface-1/20" />
             )}
@@ -285,6 +287,7 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
                   {onInlineAdd && !issue?.tempId && <RowAddButton onAdd={onInlineAdd} />}
                 </div>
               )}
+              {hasAddColumn && isDraggingAllowed && !issue?.tempId && <RowDragGrip />}
               {/* select checkbox */}
               {projectId && canSelectIssues && !isEpic && (
                 <Tooltip

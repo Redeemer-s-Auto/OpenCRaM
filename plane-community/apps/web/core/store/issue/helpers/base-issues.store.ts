@@ -34,6 +34,8 @@ import { convertToISODateString } from "@plane/utils";
 import { CycleService } from "@/services/cycle.service";
 import { IssueArchiveService, IssueService } from "@/services/issue";
 import { ModuleService } from "@/services/module.service";
+// undo
+import { issueChangeLabel, pickOldValues, sameValue, undoStack } from "@/store/undo/undo-stack";
 //
 import type { IIssueRootStore } from "../root.store";
 import {
@@ -45,6 +47,7 @@ import {
   getSubGroupIssueKeyActions,
 } from "./base-issues-utils";
 import type { IBaseIssueFilterStore } from "./issue-filter-helper.store";
+import { issueMatchesRichFilters } from "./local-filter-match";
 
 export type TIssueDisplayFilterOptions = Exclude<TIssueGroupByOptions, null> | "target_date";
 
@@ -530,17 +533,169 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
     id?: string,
     shouldUpdateList = true
   ) {
+    const shouldRecord = undoStack.canRecord() && !this.isArchived;
     // perform an API call
     const response = await this.issueService.createIssue(workspaceSlug, projectId, data);
 
     // add Issue to Store
     this.addIssue(response, shouldUpdateList);
 
+    // Ctrl+Z deletes the new row; Ctrl+Shift+Z makes it again
+    if (shouldRecord) this.recordIssueCreated(workspaceSlug, projectId, response, shouldUpdateList);
+
     // If shouldUpdateList is true, call fetchParentStats
     // oxlint-disable-next-line no-unused-expressions
     shouldUpdateList && (await this.fetchParentStats(workspaceSlug, projectId));
 
     return response;
+  }
+
+  // ---- undo / redo (store/undo/undo-stack.ts) ----
+
+  /** Fields sent again when a deleted card is made again. */
+  private static readonly RECREATE_KEYS: (keyof TIssue)[] = [
+    "name",
+    "description_html",
+    "state_id",
+    "priority",
+    "assignee_ids",
+    "label_ids",
+    "start_date",
+    "target_date",
+    "parent_id",
+    "estimate_point",
+    "sort_order",
+    "is_divider",
+    "type_id",
+    "custom_fields",
+  ];
+
+  /**
+   * Makes a deleted card again from its last known values (the server has no undelete for
+   * cards). It gets a new id; the undo stack is told so older entries follow it.
+   */
+  async recreateIssue(workspaceSlug: string, projectId: string, snapshot: TIssue, addToList: boolean) {
+    const payload: Partial<TIssue> = {};
+    BaseIssuesStore.RECREATE_KEYS.forEach((key) => {
+      const value = snapshot[key];
+      if (value !== undefined && value !== null) set(payload, key, value);
+    });
+    // computed and archived fields are refused or ignored by the server; send only live ones
+    if (payload.custom_fields) {
+      const customField = this.rootIssueStore.rootStore.customField;
+      const live = Object.fromEntries(
+        Object.entries(payload.custom_fields).filter(([fieldId]) => {
+          const field = customField.getFieldById(fieldId);
+          return !!field && !field.archived_at;
+        })
+      );
+      payload.custom_fields = live as TIssue["custom_fields"];
+    }
+    // a blank line is allowed only when asked for (the server refuses an empty name otherwise)
+    if (!(snapshot.name ?? "").trim()) {
+      payload.name = "";
+      if (!snapshot.is_divider) set(payload, "blank_line", true);
+    }
+    const response = await this.issueService.createIssue(workspaceSlug, projectId, payload);
+    this.addIssue(response, addToList);
+    undoStack.alias(snapshot.id, response.id);
+    this.fetchParentStats(workspaceSlug, projectId);
+    return response;
+  }
+
+  /** Deletes a card without recording it (used by undo / redo). */
+  private async deleteIssueForUndo(workspaceSlug: string, projectId: string, issueId: string) {
+    const snapshot = await this.snapshotForDelete(workspaceSlug, projectId, issueId);
+    await this.removeIssue(workspaceSlug, projectId, issueId);
+    return snapshot;
+  }
+
+  private recordIssueCreated(workspaceSlug: string, projectId: string, created: TIssue, addToList: boolean) {
+    let snapshot: TIssue = clone(created);
+    undoStack.record({
+      label: created.is_divider ? "New divider" : "New row",
+      undo: async () => {
+        const id = undoStack.resolve(created.id);
+        // keep what was typed into the row after it was made, for redo
+        snapshot = (await this.deleteIssueForUndo(workspaceSlug, projectId, id)) ?? snapshot;
+      },
+      redo: async () => {
+        await this.recreateIssue(workspaceSlug, projectId, snapshot, addToList);
+      },
+    });
+  }
+
+  private recordIssueUpdate(
+    workspaceSlug: string,
+    projectId: string,
+    issueId: string,
+    issueBeforeUpdate: TIssue,
+    data: Partial<TIssue>,
+    wasInList: boolean
+  ) {
+    const keys = Object.keys(data);
+    // body text has the editor's own undo (Ctrl+Z inside the editor); autosaves are not recorded here
+    if (keys.some((key) => key.startsWith("description"))) return;
+    const oldData = pickOldValues(issueBeforeUpdate, keys) as unknown as Partial<TIssue>;
+    const newData = pickOldValues(data, keys) as unknown as Partial<TIssue>;
+    if (sameValue(oldData, newData)) return;
+    const customField = this.rootIssueStore.rootStore.customField;
+    undoStack.record({
+      label: issueChangeLabel(
+        newData as unknown as Record<string, unknown>,
+        issueBeforeUpdate as unknown as Record<string, unknown>,
+        (fieldId) => customField.getFieldById(fieldId)?.name
+      ),
+      undo: async () => {
+        const id = undoStack.resolve(issueId);
+        await this.issueUpdate(workspaceSlug, projectId, id, oldData);
+        // a card that left this list with the change (Completed -> Checked) comes back
+        if (wasInList && !this.isIssueInList(id) && this.rootIssueStore.issues.getIssueById(id)) {
+          runInAction(() => this.addIssueToList(id));
+        }
+      },
+      redo: async () => {
+        await this.issueUpdate(workspaceSlug, projectId, undoStack.resolve(issueId), newData);
+      },
+    });
+  }
+
+  private recordIssuesDeleted(workspaceSlug: string, projectId: string, snapshots: TIssue[], wasInList: boolean[]) {
+    if (snapshots.length === 0) return;
+    let current = snapshots;
+    undoStack.record({
+      label: snapshots.length === 1 ? (snapshots[0].is_divider ? "Delete divider" : "Delete row") : "Delete rows",
+      undo: async () => {
+        // parents first, so a child made again can point at its parent's new id
+        const ordered = [...current].sort((a, b) => Number(!!a.parent_id) - Number(!!b.parent_id));
+        for (const snapshot of ordered) {
+          const parentId = snapshot.parent_id ? undoStack.resolve(snapshot.parent_id) : snapshot.parent_id;
+          await this.recreateIssue(
+            workspaceSlug,
+            projectId,
+            { ...snapshot, id: undoStack.resolve(snapshot.id), parent_id: parentId } as TIssue,
+            wasInList[current.indexOf(snapshot)] ?? true
+          );
+        }
+      },
+      redo: async () => {
+        const next: TIssue[] = [];
+        for (const snapshot of current) {
+          const id = undoStack.resolve(snapshot.id);
+          const latest = await this.deleteIssueForUndo(workspaceSlug, projectId, id);
+          next.push(latest ? ({ ...snapshot, ...latest, id: snapshot.id } as TIssue) : snapshot);
+        }
+        current = next;
+      },
+    });
+  }
+
+  /** The full card (with its description) before it is deleted, so undo can make it again. */
+  private async snapshotForDelete(workspaceSlug: string, projectId: string, issueId: string) {
+    const local = clone(this.rootIssueStore.issues.getIssueById(issueId));
+    if (local && local.description_html !== undefined) return local;
+    const full = await this.issueService.retrieve(workspaceSlug, projectId, issueId).catch(() => undefined);
+    return full ? ({ ...local, ...full } as TIssue) : local;
   }
 
   /**
@@ -561,6 +716,11 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
   ) {
     // Store Before state of the issue
     const issueBeforeUpdate = clone(this.rootIssueStore.issues.getIssueById(issueId));
+    // true when the edit made the card leave this list because it no longer fits the filter
+    let leftList = false;
+    // Ctrl+Z writes the old values back (not while an undo / redo itself runs)
+    const shouldRecord = shouldSync && !this.isArchived && undoStack.canRecord() && !!issueBeforeUpdate;
+    const wasInList = shouldRecord ? this.isIssueInList(issueId) : false;
     try {
       // Update the Respective Stores
       this.rootIssueStore.issues.updateIssue(issueId, data);
@@ -568,6 +728,10 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
 
       // Check if should Sync
       if (!shouldSync) return;
+
+      // A card that no longer fits the list's filter (Active -> Completed, Completed -> Checked)
+      // leaves at once, here, instead of reloading the whole list.
+      leftList = this.removeIssueIfFilteredOut(issueId, issueBeforeUpdate);
 
       // update parent stats optimistically
       this.updateParentStats(issueBeforeUpdate, {
@@ -578,14 +742,45 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
       // call API to update the issue
       await this.issueService.patchIssue(workspaceSlug, projectId, issueId, data);
 
+      if (shouldRecord && issueBeforeUpdate)
+        this.recordIssueUpdate(workspaceSlug, projectId, issueId, issueBeforeUpdate, data, wasInList);
+
       // call fetch Parent Stats
       this.fetchParentStats(workspaceSlug, projectId);
     } catch (error) {
       // If errored out update store again to revert the change
       this.rootIssueStore.issues.updateIssue(issueId, issueBeforeUpdate ?? {});
-      this.updateIssueList(issueBeforeUpdate, { ...issueBeforeUpdate, ...data } as TIssue);
+      if (leftList) this.addIssueToList(issueId);
+      else this.updateIssueList(issueBeforeUpdate, { ...issueBeforeUpdate, ...data } as TIssue);
       throw error;
     }
+  }
+
+  /** True when the card's id is in this store's list (any group). */
+  isIssueInList(issueId: string): boolean {
+    const walk = (node: unknown): boolean => {
+      if (Array.isArray(node)) return node.includes(issueId);
+      if (node && typeof node === "object") return Object.values(node).some(walk);
+      return false;
+    };
+    return walk(this.groupedIssueIds);
+  }
+
+  /**
+   * After an edit: drop just this card from the list when it fitted the list's filter before
+   * and no longer does. Judged in the browser (local-filter-match); when it cannot tell, the
+   * card stays. Returns true when the card was removed.
+   */
+  removeIssueIfFilteredOut(issueId: string, issueBeforeUpdate: TIssue | undefined): boolean {
+    const richFilters = this.issueFilterStore?.issueFilters?.richFilters;
+    if (!richFilters || isEmpty(richFilters)) return false;
+    const stateMap = this.rootIssueStore.stateMap;
+    const issue = this.rootIssueStore.issues.getIssueById(issueId);
+    if (issueMatchesRichFilters(issueBeforeUpdate, richFilters, stateMap) === false) return false;
+    if (issueMatchesRichFilters(issue, richFilters, stateMap) !== false) return false;
+    if (!this.isIssueInList(issueId)) return false;
+    this.removeIssueFromList(issueId);
+    return true;
   }
 
   /**
@@ -595,6 +790,10 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
    * @param issueId
    */
   async removeIssue(workspaceSlug: string, projectId: string, issueId: string) {
+    // Ctrl+Z makes the card again from this copy (taken before it is gone)
+    const shouldRecord = undoStack.canRecord() && !this.isArchived;
+    const undoSnapshot = shouldRecord ? await this.snapshotForDelete(workspaceSlug, projectId, issueId) : undefined;
+    const wasInList = shouldRecord ? this.isIssueInList(issueId) : false;
     // Store Before state of the issue
     const issueBeforeRemoval = clone(this.rootIssueStore.issues.getIssueById(issueId));
     // update parent stats optimistically
@@ -610,6 +809,8 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
     this.fetchParentStats(workspaceSlug, projectId);
     // Remove issue from main issue Map store
     this.rootIssueStore.issues.removeIssue(issueId);
+
+    if (undoSnapshot) this.recordIssuesDeleted(workspaceSlug, projectId, [undoSnapshot], [wasInList]);
   }
 
   /**
@@ -619,6 +820,8 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
    * @param issueId
    */
   async issueArchive(workspaceSlug: string, projectId: string, issueId: string) {
+    const shouldRecord = undoStack.canRecord() && !this.isArchived;
+    const wasInList = this.isIssueInList(issueId);
     const issueBeforeArchive = clone(this.rootIssueStore.issues.getIssueById(issueId));
     // update parent stats optimistically
     this.updateParentStats(issueBeforeArchive, undefined);
@@ -633,6 +836,37 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
       });
       // Since Archived remove the issue Id from the current store
       this.removeIssueFromList(issueId);
+    });
+    if (shouldRecord) this.recordIssuesArchived(workspaceSlug, projectId, [issueId], wasInList);
+  }
+
+  /** Brings archived cards back (undo of archive) without recording it. */
+  private async unarchiveForUndo(workspaceSlug: string, projectId: string, issueIds: string[], addToList: boolean) {
+    for (const issueId of issueIds) {
+      await this.issueArchiveService.restoreIssue(workspaceSlug, projectId, issueId);
+      runInAction(() => {
+        this.rootIssueStore.issues.updateIssue(issueId, { archived_at: null });
+        if (addToList && !this.isIssueInList(issueId) && this.rootIssueStore.issues.getIssueById(issueId))
+          this.addIssueToList(issueId);
+      });
+    }
+    this.fetchParentStats(workspaceSlug, projectId);
+  }
+
+  private recordIssuesArchived(workspaceSlug: string, projectId: string, issueIds: string[], wasInList: boolean) {
+    if (issueIds.length === 0) return;
+    undoStack.record({
+      label: issueIds.length === 1 ? "Archive" : "Archive rows",
+      undo: () =>
+        this.unarchiveForUndo(
+          workspaceSlug,
+          projectId,
+          issueIds.map((id) => undoStack.resolve(id)),
+          wasInList
+        ),
+      redo: async () => {
+        for (const id of issueIds) await this.issueArchive(workspaceSlug, projectId, undoStack.resolve(id));
+      },
     });
   }
 
@@ -676,8 +910,23 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
    * @returns
    */
   async removeBulkIssues(workspaceSlug: string, projectId: string, issueIds: string[]) {
+    // copies for Ctrl+Z (made again from these)
+    const shouldRecord = undoStack.canRecord() && !this.isArchived;
+    const undoSnapshots: TIssue[] = [];
+    const undoInList: boolean[] = [];
+    if (shouldRecord) {
+      const snapshots = await Promise.all(
+        issueIds.map((issueId) => this.snapshotForDelete(workspaceSlug, projectId, issueId))
+      );
+      snapshots.forEach((snapshot, index) => {
+        if (!snapshot) return;
+        undoSnapshots.push(snapshot);
+        undoInList.push(this.isIssueInList(issueIds[index]));
+      });
+    }
     // Make API call to bulk delete issues
     const response = await this.issueService.bulkDeleteIssues(workspaceSlug, projectId, { issue_ids: issueIds });
+    if (shouldRecord) this.recordIssuesDeleted(workspaceSlug, projectId, undoSnapshots, undoInList);
     // call fetch parent stats
     this.fetchParentStats(workspaceSlug, projectId);
     // Remove issues from the store
@@ -697,7 +946,9 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
    * @param issueIds
    */
   bulkArchiveIssues = async (workspaceSlug: string, projectId: string, issueIds: string[]) => {
+    const shouldRecord = undoStack.canRecord() && !this.isArchived;
     const response = await this.issueService.bulkArchiveIssues(workspaceSlug, projectId, { issue_ids: issueIds });
+    if (shouldRecord) this.recordIssuesArchived(workspaceSlug, projectId, [...issueIds], true);
 
     runInAction(() => {
       issueIds.forEach((issueId) => {
@@ -721,8 +972,33 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
    */
   bulkUpdateProperties = async (workspaceSlug: string, projectId: string, data: TBulkOperationsPayload) => {
     const issueIds = data.issue_ids;
+    // old values of the changed properties, card by card, for Ctrl+Z
+    const shouldRecord = undoStack.canRecord() && !this.isArchived;
+    const propertyKeys = Object.keys(data.properties ?? {});
+    const oldValues = shouldRecord
+      ? issueIds.map((issueId) => {
+          const issue = this.rootIssueStore.issues.getIssueById(issueId);
+          if (!issue) return undefined;
+          return { issueId, values: pickOldValues(issue, propertyKeys) as unknown as Partial<TIssue> };
+        })
+      : [];
+    const payload = pickOldValues(data, Object.keys(data)) as unknown as TBulkOperationsPayload;
     // make request to update issue properties
     await this.issueService.bulkOperations(workspaceSlug, projectId, data);
+    if (shouldRecord)
+      undoStack.record({
+        label: "Bulk edit",
+        undo: async () => {
+          for (const entry of oldValues) {
+            if (entry) await this.issueUpdate(workspaceSlug, projectId, undoStack.resolve(entry.issueId), entry.values);
+          }
+        },
+        redo: () =>
+          this.bulkUpdateProperties(workspaceSlug, projectId, {
+            ...payload,
+            issue_ids: payload.issue_ids.map((id) => undoStack.resolve(id)),
+          }),
+      });
     // update issues in the store
     runInAction(() => {
       issueIds.forEach((issueId) => {

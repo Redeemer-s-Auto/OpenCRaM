@@ -29,6 +29,8 @@ import { usePlatformOS } from "@/hooks/use-platform-os";
 // types
 import { buildInlineAddData } from "../quick-add/inline-row";
 import type { TRowAddPlacement } from "../row-add-button";
+import type { TRowAddKind } from "../row-line-tools";
+import { blankRowFields, requestRowTitleFocus } from "../row-line-tools";
 import { HIGHLIGHT_CLASS, getIssueBlockId, isIssueNew } from "../utils";
 import { IssueBlock } from "./block";
 import type { TRenderQuickActions } from "./list-view-types";
@@ -57,8 +59,6 @@ type Props = {
   /** The ids of the list this row is in, in order: the new card's sort_order lands between neighbours. */
   siblingIds?: string[];
 };
-
-const NEW_ROW_NAME = "Untitled";
 
 export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
   const {
@@ -106,16 +106,18 @@ export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
     issuesMap[issueId]?.project_id === routerProjectId.toString() &&
     canEditProperties(routerProjectId.toString());
 
-  // One click, one finished row: it is made at once, so the row looks like every other row and has its own +.
-  const handleInlineAdd = (placement: TRowAddPlacement) => {
+  // One click, one finished row: a blank line (or a divider) made at once, right next to this row,
+  // with its own +. The cursor goes into its title so it can be typed straight away.
+  const handleInlineAdd = (placement: TRowAddPlacement, kind: TRowAddKind = "line") => {
     const issue = issuesMap[issueId];
     if (!issue || !siblingIds || !quickAddCallback || !routerProjectId) return;
     const data = buildInlineAddData(issue, placement, siblingIds, (id) => issuesMap[id], groupQuickAddData);
     const projectId = routerProjectId.toString();
-    quickAddCallback(projectId, { ...createIssuePayload(projectId, { ...data, name: NEW_ROW_NAME }) } as TIssue).catch(
-      (error: { message?: string }) =>
+    quickAddCallback(projectId, { ...createIssuePayload(projectId, { ...data, ...blankRowFields(kind) }) } as TIssue)
+      .then((created) => requestRowTitleFocus(created?.id))
+      .catch((error: { message?: string }) =>
         setToast({ type: TOAST_TYPE.ERROR, title: "Could not add the line", message: error?.message ?? "Try again." })
-    );
+      );
   };
 
   useEffect(() => {

@@ -13,6 +13,8 @@ import type { TCustomField } from "@plane/types";
 import { CustomFieldService } from "@/services/issue";
 // store
 import type { CoreRootStore } from "./root.store";
+// undo
+import { pickOldValues, sameValue, undoStack } from "./undo/undo-stack";
 
 export interface ICustomFieldStore {
   fieldMap: Record<string, TCustomField>;
@@ -93,14 +95,33 @@ export class CustomFieldStore implements ICustomFieldStore {
   };
 
   createField = async (workspaceSlug: string, projectId: string, data: Partial<TCustomField>) => {
+    const shouldRecord = undoStack.canRecord();
     const field = await this.service.create(workspaceSlug, projectId, data);
     runInAction(() => set(this.fieldMap, [field.id], field));
+    // Ctrl+Z archives the new property (values kept); Ctrl+Shift+Z brings it back
+    if (shouldRecord)
+      undoStack.record({
+        label: "New property",
+        undo: () => this.archiveField(workspaceSlug, projectId, field.id),
+        redo: () => this.restoreField(workspaceSlug, projectId, field.id),
+      });
     return field;
   };
 
   updateField = async (workspaceSlug: string, projectId: string, fieldId: string, data: Partial<TCustomField>) => {
+    const before = this.fieldMap[fieldId];
+    const shouldRecord = undoStack.canRecord() && !!before;
+    const keys = Object.keys(data);
+    const oldData = before ? (pickOldValues(before, keys) as unknown as Partial<TCustomField>) : {};
+    const newData = pickOldValues(data, keys) as unknown as Partial<TCustomField>;
     const field = await this.service.update(workspaceSlug, projectId, fieldId, data);
     runInAction(() => set(this.fieldMap, [field.id], field));
+    if (shouldRecord && !sameValue(oldData, newData))
+      undoStack.record({
+        label: keys.length === 1 && keys[0] === "name" ? "Rename property" : "Property settings change",
+        undo: () => this.updateField(workspaceSlug, projectId, fieldId, oldData),
+        redo: () => this.updateField(workspaceSlug, projectId, fieldId, newData),
+      });
     return field;
   };
 
@@ -113,13 +134,27 @@ export class CustomFieldStore implements ICustomFieldStore {
   };
 
   archiveField = async (workspaceSlug: string, projectId: string, fieldId: string) => {
+    const shouldRecord = undoStack.canRecord();
     const field = await this.service.archive(workspaceSlug, projectId, fieldId);
     runInAction(() => set(this.fieldMap, [field.id], field));
+    if (shouldRecord)
+      undoStack.record({
+        label: "Archive property",
+        undo: () => this.restoreField(workspaceSlug, projectId, fieldId),
+        redo: () => this.archiveField(workspaceSlug, projectId, fieldId),
+      });
   };
 
   restoreField = async (workspaceSlug: string, projectId: string, fieldId: string) => {
+    const shouldRecord = undoStack.canRecord();
     const field = await this.service.restore(workspaceSlug, projectId, fieldId);
     runInAction(() => set(this.fieldMap, [field.id], field));
+    if (shouldRecord)
+      undoStack.record({
+        label: "Restore property",
+        undo: () => this.archiveField(workspaceSlug, projectId, fieldId),
+        redo: () => this.restoreField(workspaceSlug, projectId, fieldId),
+      });
   };
 
   deleteField = async (workspaceSlug: string, projectId: string, fieldId: string, confirmName: string) => {
@@ -134,7 +169,14 @@ export class CustomFieldStore implements ICustomFieldStore {
     if (index < 0 || target < 0 || target >= fields.length) return;
     const ids = fields.map((f) => f.id);
     [ids[index], ids[target]] = [ids[target], ids[index]];
+    const shouldRecord = undoStack.canRecord();
     const response = await this.service.reorder(workspaceSlug, projectId, ids);
     runInAction(() => response.forEach((field) => set(this.fieldMap, [field.id], field)));
+    if (shouldRecord)
+      undoStack.record({
+        label: "Move property",
+        undo: () => this.moveField(workspaceSlug, projectId, fieldId, direction === "up" ? "down" : "up"),
+        redo: () => this.moveField(workspaceSlug, projectId, fieldId, direction),
+      });
   };
 }

@@ -161,6 +161,8 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
     completed_at = models.DateTimeField(null=True)
     archived_at = models.DateField(null=True)
     is_draft = models.BooleanField(default=False)
+    # Task lists: a section header row (bold line, no state or properties). Blank name = spacer line.
+    is_divider = models.BooleanField(default=False)
     external_source = models.CharField(max_length=255, null=True, blank=True)
     external_id = models.CharField(max_length=255, blank=True, null=True)
     type = models.ForeignKey(

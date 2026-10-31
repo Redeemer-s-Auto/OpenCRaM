@@ -15,6 +15,7 @@ import type { IIssueDisplayFilterOptions, IIssueDisplayProperties } from "@plane
 import { EIssuesStoreType, EIssueLayoutTypes } from "@plane/types";
 // components
 import { WorkItemsModal } from "@/components/analytics/work-items/modal";
+import { PropertiesButton } from "@/components/custom-fields/properties-button";
 import {
   DisplayFiltersSelection,
   FiltersDropdown,
@@ -97,6 +98,21 @@ export const ProjectIssuesMobileHeader = observer(function ProjectIssuesMobileHe
             />
           </FiltersDropdown>
         </div>
+        <PropertiesButton
+          variant="mobile"
+          workspaceSlug={workspaceSlug?.toString() ?? ""}
+          projectId={projectId?.toString() ?? ""}
+          layout={activeLayout}
+          displayProperties={issueFilters?.displayProperties ?? {}}
+          displayPropertiesToRender={
+            activeLayout
+              ? ISSUE_DISPLAY_FILTERS_BY_PAGE.issues.layoutOptions[activeLayout]?.display_properties
+              : undefined
+          }
+          handleUpdate={handleDisplayProperties}
+          cycleViewDisabled={!currentProjectDetails?.cycle_view}
+          moduleViewDisabled={!currentProjectDetails?.module_view}
+        />
 
         <button
           onClick={() => setAnalyticsModal(true)}

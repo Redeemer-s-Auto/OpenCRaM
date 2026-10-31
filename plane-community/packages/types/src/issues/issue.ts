@@ -81,6 +81,10 @@ export type TBaseIssue = {
   is_draft: boolean;
   is_epic?: boolean;
   is_intake?: boolean;
+  /** Task lists: a section header row. A blank name makes it a thin spacer line. */
+  is_divider?: boolean;
+  /** Create only: the row's + sends a blank line, the one case a normal card may have an empty name. */
+  blank_line?: boolean;
 
   /** Custom field values, keyed by field id. Only the project's live fields. */
   custom_fields?: TCustomFieldValues;

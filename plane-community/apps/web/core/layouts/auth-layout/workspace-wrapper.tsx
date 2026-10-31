@@ -21,6 +21,7 @@ import { cn } from "@plane/utils";
 import WorkSpaceNotAvailable from "@/app/assets/workspace/workspace-not-available.png?url";
 // components
 import { LogoSpinner } from "@/components/common/logo-spinner";
+import { UndoShortcuts } from "@/components/undo/undo-shortcuts";
 // constants
 import {
   WORKSPACE_MEMBERS,
@@ -233,5 +234,11 @@ export const WorkspaceAuthWrapper = observer(function WorkspaceAuthWrapper(props
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {/* Ctrl+Z / Ctrl+Shift+Z for every change in Notes, one list per screen */}
+      <UndoShortcuts />
+      {children}
+    </>
+  );
 });

@@ -11,6 +11,7 @@ import type { TIssue, IIssueDisplayProperties, TIssueMap, TGroupedIssues } from 
 import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 // types
 import { IssueBlockRoot } from "./block-root";
+import { DividerJumpBar } from "./divider-jump-bar";
 import type { TRenderQuickActions } from "./list-view-types";
 
 interface Props {
@@ -51,6 +52,10 @@ export function IssueBlocksList(props: Props) {
 
   return (
     <div className="relative h-full w-full">
+      {/* bookmarks: one chip per named divider, tap to jump there */}
+      {Array.isArray(issueIds) && issueIds.length > 0 && (
+        <DividerJumpBar issueIds={issueIds} issuesMap={issuesMap} groupId={groupId} />
+      )}
       {issueIds &&
         issueIds.length > 0 &&
         issueIds.map((issueId: string, index: number) => (

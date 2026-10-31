@@ -13,6 +13,8 @@ import type { TDocumentPayload, TLogoProps, TNameDescriptionLoader, TPage } from
 // plane web store
 import { ExtendedBasePage } from "@/store/pages/extended-base-page";
 import type { RootStore } from "@/store/root.store";
+// undo
+import { undoStack } from "@/store/undo/undo-stack";
 // local imports
 import { PageEditorInstance } from "./page-editor-info";
 
@@ -372,6 +374,7 @@ export class BasePage extends ExtendedBasePage implements TBasePage {
    */
   lock = async ({ shouldSync = true }) => {
     const pageIsLocked = this.is_locked;
+    const shouldRecord = shouldSync && !pageIsLocked && undoStack.canRecord();
     runInAction(() => (this.is_locked = true));
 
     if (shouldSync) {
@@ -382,6 +385,12 @@ export class BasePage extends ExtendedBasePage implements TBasePage {
         throw error;
       });
     }
+    if (shouldRecord)
+      undoStack.record({
+        label: "Lock page",
+        undo: () => this.unlock({ shouldSync: true }),
+        redo: () => this.lock({ shouldSync: true }),
+      });
   };
 
   /**
@@ -389,6 +398,7 @@ export class BasePage extends ExtendedBasePage implements TBasePage {
    */
   unlock = async ({ shouldSync = true }) => {
     const pageIsLocked = this.is_locked;
+    const shouldRecord = shouldSync && !!pageIsLocked && undoStack.canRecord();
     runInAction(() => (this.is_locked = false));
 
     if (shouldSync) {
@@ -399,6 +409,12 @@ export class BasePage extends ExtendedBasePage implements TBasePage {
         throw error;
       });
     }
+    if (shouldRecord)
+      undoStack.record({
+        label: "Unlock page",
+        undo: () => this.lock({ shouldSync: true }),
+        redo: () => this.unlock({ shouldSync: true }),
+      });
   };
 
   /**
@@ -415,10 +431,17 @@ export class BasePage extends ExtendedBasePage implements TBasePage {
       if (this.rootStore.favorite.entityMap[this.id]) this.rootStore.favorite.removeFavoriteFromStore(this.id);
 
       if (shouldSync) {
+        const shouldRecord = undoStack.canRecord();
         const response = await this.services.archive();
         runInAction(() => {
           this.archived_at = response.archived_at;
         });
+        if (shouldRecord)
+          undoStack.record({
+            label: "Archive page",
+            undo: () => this.restore({ shouldSync: true }),
+            redo: () => this.archive({ shouldSync: true }),
+          });
       }
     } catch (error) {
       console.error(error);
@@ -440,7 +463,14 @@ export class BasePage extends ExtendedBasePage implements TBasePage {
       });
 
       if (shouldSync) {
+        const shouldRecord = undoStack.canRecord();
         await this.services.restore();
+        if (shouldRecord)
+          undoStack.record({
+            label: "Restore page",
+            undo: () => this.archive({ shouldSync: true }),
+            redo: () => this.restore({ shouldSync: true }),
+          });
       }
     } catch (error) {
       console.error(error);

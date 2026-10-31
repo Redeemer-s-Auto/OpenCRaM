@@ -24,6 +24,7 @@ import { EIssuesStoreType, EViewAccess, EIssueLayoutTypes } from "@plane/types";
 import { Breadcrumbs, Header, BreadcrumbNavigationSearchDropdown } from "@plane/ui";
 // components
 import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
+import { PropertiesButton } from "@/components/custom-fields/properties-button";
 import { SwitcherIcon, SwitcherLabel } from "@/components/common/switcher-label";
 import { DisplayFiltersSelection, FiltersDropdown, LayoutSelection } from "@/components/issues/issue-layouts/filters";
 import { ViewQuickActions } from "@/components/views/quick-actions";
@@ -195,6 +196,22 @@ export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader
                 moduleViewDisabled={!currentProjectDetails?.module_view}
               />
             </FiltersDropdown>
+          )}
+          {!viewDetails.is_locked && (
+            <PropertiesButton
+              workspaceSlug={workspaceSlug?.toString() ?? ""}
+              projectId={projectId?.toString() ?? ""}
+              layout={activeLayout}
+              displayProperties={issueFilters?.displayProperties ?? {}}
+              displayPropertiesToRender={
+                activeLayout
+                  ? ISSUE_DISPLAY_FILTERS_BY_PAGE.issues.layoutOptions[activeLayout]?.display_properties
+                  : undefined
+              }
+              handleUpdate={handleDisplayProperties}
+              cycleViewDisabled={!currentProjectDetails?.cycle_view}
+              moduleViewDisabled={!currentProjectDetails?.module_view}
+            />
           )}
         </>
         {canUserCreateIssue && (

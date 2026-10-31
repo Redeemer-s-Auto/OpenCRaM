@@ -5,33 +5,14 @@
  */
 
 import { useCallback } from "react";
-import { useParams } from "next/navigation";
-import { EIssuesStoreType } from "@plane/types";
-// hooks
-import { useIssues } from "@/hooks/store/use-issues";
-import { useIssueStoreType } from "@/hooks/use-issue-layout-store";
 
 /**
- * Reload the list the user is looking at, keeping its paging.
+ * Kept for the callers that still chain it after a save; it no longer reloads anything.
  *
- * A saved view filters on the server (for example "Completed" = done and Seen not ticked),
- * so a card whose Seen box was just ticked must leave the list at once. Stores other than a
- * board or a board view keep their optimistic update only.
+ * It used to reload the whole list after a tick, so a card that left a saved view's filter
+ * (Completed -> Checked) would go. That reload emptied the list first (the page flashed to the
+ * loader, every row was drawn again, and only the first page came back). The issue store now
+ * does it in place: `issueUpdate` drops just that card when it no longer fits the list's filter
+ * (store/issue/helpers/base-issues.store.ts, removeIssueIfFilteredOut).
  */
-export const useRefetchWorkItems = () => {
-  const { workspaceSlug, projectId, viewId } = useParams();
-  const storeType = useIssueStoreType();
-  const { issues: projectIssues } = useIssues(EIssuesStoreType.PROJECT);
-  const { issues: viewIssues } = useIssues(EIssuesStoreType.PROJECT_VIEW);
-
-  return useCallback(async () => {
-    if (!workspaceSlug || !projectId) return;
-    const slug = workspaceSlug.toString();
-    const project = projectId.toString();
-    if (storeType === EIssuesStoreType.PROJECT_VIEW && viewId) {
-      await viewIssues.fetchIssuesWithExistingPagination(slug, project, viewId.toString(), "mutation");
-    } else if (storeType === EIssuesStoreType.PROJECT) {
-      await projectIssues.fetchIssuesWithExistingPagination(slug, project, "mutation");
-    }
-  }, [workspaceSlug, projectId, viewId, storeType, projectIssues, viewIssues]);
-};
+export const useRefetchWorkItems = () => useCallback(async () => {}, []);

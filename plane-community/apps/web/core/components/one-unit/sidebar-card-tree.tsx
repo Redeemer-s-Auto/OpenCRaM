@@ -134,10 +134,40 @@ function TreeNode(props: { workspaceSlug: string; node: TCardNode; depth: number
   );
 }
 
-/** Sidebar tree under a project: its top cards, each opening to its sub-cards (from any project). */
+/** localStorage key: "1" when a person has the Cards tree of this board open. */
+const openKey = (projectId: string) => `card-tree-open:${projectId}`;
+
+const readOpen = (projectId: string) => {
+  try {
+    return window.localStorage.getItem(openKey(projectId)) === "1";
+  } catch {
+    return false;
+  }
+};
+
+const writeOpen = (projectId: string, open: boolean) => {
+  try {
+    if (open) window.localStorage.setItem(openKey(projectId), "1");
+    else window.localStorage.removeItem(openKey(projectId));
+  } catch {
+    // private mode or storage off: the tree still opens, it just forgets
+  }
+};
+
+/**
+ * Sidebar tree under a project: its top cards, each opening to its sub-cards (from any project).
+ * Closed until opened (then remembered per board), so opening a big board does not also load
+ * its card tree in the sidebar.
+ */
 export function SidebarCardTree(props: { workspaceSlug: string; projectId: string }) {
   const { workspaceSlug, projectId } = props;
-  const [open, setOpen] = useState(true);
+  const [open, setOpenState] = useState(() => readOpen(projectId));
+  const setOpen = (update: (value: boolean) => boolean) =>
+    setOpenState((value) => {
+      const next = update(value);
+      writeOpen(projectId, next);
+      return next;
+    });
   const loadRoots = useCallback(
     (offset: number, limit?: number) => cardTreeService.projectRoots(workspaceSlug, projectId, offset, limit),
     [workspaceSlug, projectId]

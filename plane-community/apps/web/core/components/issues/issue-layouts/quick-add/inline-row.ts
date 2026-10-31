@@ -11,6 +11,19 @@ import type { TRowAddPlacement } from "../row-add-button";
 const SORT_ORDER_GAP = 65535;
 
 /**
+ * A sort_order one gap past the last of ``issues``: the end of a list ordered by sort_order.
+ * (The server alone would place a new card at the end of its own state only.)
+ */
+export const endOfListSortOrder = (issues: (TIssue | undefined)[]): number => {
+  const last = issues.reduce<number | undefined>((max, issue) => {
+    const order = issue?.sort_order;
+    if (typeof order !== "number" || !Number.isFinite(order)) return max;
+    return max === undefined || order > max ? order : max;
+  }, undefined);
+  return (last ?? 0) + SORT_ORDER_GAP;
+};
+
+/**
  * Pre-filled values for a card added right above or below ``row`` with the row's + button.
  *
  * The new card sits beside the row it was added from: same state, and the same priority, labels,

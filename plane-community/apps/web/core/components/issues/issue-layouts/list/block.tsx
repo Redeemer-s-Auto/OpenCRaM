@@ -31,8 +31,9 @@ import { useProject } from "@/hooks/store/use-project";
 import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 import useIssuePeekOverviewRedirection from "@/hooks/use-issue-peek-overview-redirection";
 import { usePlatformOS } from "@/hooks/use-platform-os";
-import type { TRowAddPlacement } from "../row-add-button";
 import { RowAddButton } from "../row-add-button";
+import type { TRowInlineAdd } from "../row-line-tools";
+import { InlineRowTitle, RowLineMenu, isBlankName } from "../row-line-tools";
 import { calculateIdentifierWidth } from "../utils";
 // card shortcuts: a shortcut card shows its target's live title
 import { ShortcutAwareTitle, shortcutAwareName } from "@/components/card-links/shortcut-title";
@@ -57,8 +58,8 @@ interface IssueBlockProps {
   isEpic?: boolean;
   /** The list keeps a column for the + on every row, so sub-rows line up with their parent. */
   hasAddColumn?: boolean;
-  /** Click adds a card below this row, Alt+click above. */
-  onInlineAdd?: (placement: TRowAddPlacement) => void;
+  /** Click adds a blank line below this row, Alt+click above; the line menu can add a divider. */
+  onInlineAdd?: TRowInlineAdd;
 }
 
 export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
@@ -170,6 +171,87 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
     isEpic,
     isArchived: !!issue?.archived_at,
   });
+
+  const handleNotDraggable = () => {
+    if (!isDraggingAllowed) {
+      setToast({
+        type: TOAST_TYPE.WARNING,
+        title: "Cannot move work item",
+        message: !canEditIssueProperties
+          ? "You are not allowed to move this work item"
+          : "Drag and drop is disabled for the current grouping",
+      });
+    }
+  };
+
+  // Divider: a full-width bold section header (no state, check mark or properties), still draggable,
+  // with the same + at the left. Its text is typed in place; a blank divider is a thin spacer line.
+  if (issue.is_divider) {
+    const isBlankDivider = isBlankName(issue.name);
+    return (
+      <div id={`issue-${issue.id}`} className="w-full" data-divider-row={issue.id}>
+        <Row
+          ref={issueRef}
+          className={cn(
+            "group/list-block relative flex items-center gap-1 bg-layer-transparent transition-colors hover:bg-layer-transparent-hover",
+            isBlankDivider ? "min-h-6 py-0.5" : "min-h-11 py-2",
+            {
+              "bg-accent-primary/5 hover:bg-accent-primary/10": isIssueSelected,
+              "bg-layer-1": isCurrentBlockDragging,
+            }
+          )}
+          onDragStart={handleNotDraggable}
+        >
+          <div className="flex flex-shrink-0 items-center gap-1" style={isSubIssue ? { marginLeft } : {}}>
+            {hasAddColumn && (
+              <div className="grid w-6 flex-shrink-0 place-items-center">
+                {onInlineAdd && !issue?.tempId && <RowAddButton onAdd={onInlineAdd} />}
+              </div>
+            )}
+            {issue?.tempId !== undefined && (
+              <div className="absolute top-0 left-0 z-[99999] h-full w-full animate-pulse bg-surface-1/20" />
+            )}
+          </div>
+          <div className="min-w-0 flex-grow">
+            <InlineRowTitle
+              issue={issue}
+              updateIssue={updateIssue}
+              isReadOnly={!canEditIssueProperties}
+              isDivider
+              className={cn("text-primary", isBlankDivider ? "text-11" : "text-14 font-semibold")}
+            />
+          </div>
+          {!issue?.tempId && (
+            <>
+              <RowLineMenu
+                issue={issue}
+                onInlineAdd={onInlineAdd}
+                updateIssue={updateIssue}
+                isReadOnly={!canEditIssueProperties}
+              />
+              {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions */}
+              <div
+                className="flex flex-shrink-0 items-center opacity-0 transition-opacity group-hover/list-block:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                {quickActions({
+                  issue,
+                  parentRef: issueRef,
+                })}
+              </div>
+            </>
+          )}
+        </Row>
+      </div>
+    );
+  }
+
+  // A blank line: an empty row whose text is typed in place, with a faint placeholder.
+  const isBlankLine = isBlankName(issue.name) && !issue.is_divider;
+
   return (
     <ControlLink
       id={`issue-${issue.id}`}
@@ -192,17 +274,7 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
             "lg:flex-row lg:items-center": !isSidebarCollapsed,
           }
         )}
-        onDragStart={() => {
-          if (!isDraggingAllowed) {
-            setToast({
-              type: TOAST_TYPE.WARNING,
-              title: "Cannot move work item",
-              message: !canEditIssueProperties
-                ? "You are not allowed to move this work item"
-                : "Drag and drop is disabled for the current grouping",
-            });
-          }
-        }}
+        onDragStart={handleNotDraggable}
       >
         <div className="flex w-full gap-2 truncate">
           <div className="flex flex-grow items-center gap-0.5 truncate">
@@ -278,23 +350,38 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
               )}
             </div>
 
-            <Tooltip
-              tooltipContent={shortcutAwareName(issue.id, issue.name)}
-              isMobile={isMobile}
-              position="top-start"
-              disabled={isCurrentBlockDragging}
-              renderByDefault={false}
-            >
-              <p className="cursor-pointer truncate text-body-xs-medium text-primary">
-                <ShortcutAwareTitle
-                  workspaceSlug={workspaceSlug}
-                  projectId={issue.project_id}
-                  issueId={issue.id}
-                  name={issue.name}
-                />
-              </p>
-            </Tooltip>
+            {isBlankLine ? (
+              <div className="min-w-0 flex-grow text-body-xs-medium text-primary">
+                <InlineRowTitle issue={issue} updateIssue={updateIssue} isReadOnly={!canEditIssueProperties} />
+              </div>
+            ) : (
+              <Tooltip
+                tooltipContent={shortcutAwareName(issue.id, issue.name)}
+                isMobile={isMobile}
+                position="top-start"
+                disabled={isCurrentBlockDragging}
+                renderByDefault={false}
+              >
+                <p className="cursor-pointer truncate text-body-xs-medium text-primary">
+                  <ShortcutAwareTitle
+                    workspaceSlug={workspaceSlug}
+                    projectId={issue.project_id}
+                    issueId={issue.id}
+                    name={issue.name}
+                  />
+                </p>
+              </Tooltip>
+            )}
           </div>
+          {/* line menu: add a blank line / divider here, turn into a divider (always shown on a phone) */}
+          {!issue?.tempId && (
+            <RowLineMenu
+              issue={issue}
+              onInlineAdd={onInlineAdd}
+              updateIssue={updateIssue}
+              isReadOnly={!canEditIssueProperties}
+            />
+          )}
           {!issue?.tempId && (
             <div
               className={cn("block rounded-sm border border-strong", {

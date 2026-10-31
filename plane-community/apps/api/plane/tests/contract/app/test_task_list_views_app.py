@@ -292,8 +292,9 @@ class TestHiddenViews:
 class TestPlusButtonChain:
     """The + at the left of a row makes a card at once, between the row and its neighbour.
 
-    The web app sends the payload below (the row's state, sort_order midway to the neighbour).
-    Five clicks in a row, each on the newest row, must give five normal cards in order.
+    The web app sends the payload below (a blank name with blank_line, the row's state, sort_order
+    midway to the neighbour). Five clicks in a row, each on the newest row, must give five blank
+    lines in order. A blank name is refused without blank_line, except for a divider.
     """
 
     def _add_next_to(self, client, workspace, project, row, neighbour, below=True):
@@ -304,7 +305,13 @@ class TestPlusButtonChain:
             order = row.sort_order + gap if below else row.sort_order - gap
         response = client.post(
             ISSUES_URL.format(slug=workspace.slug, project_id=project.id),
-            {"name": "Untitled", "state_id": str(row.state_id), "priority": "none", "sort_order": order},
+            {
+                "name": "",
+                "blank_line": True,
+                "state_id": str(row.state_id),
+                "priority": "none",
+                "sort_order": order,
+            },
             format="json",
         )
         assert response.status_code == status.HTTP_201_CREATED, response.data
@@ -320,7 +327,7 @@ class TestPlusButtonChain:
         for _ in range(5):
             row = self._add_next_to(session_client, workspace, project, row, None if row is last else last)
             made.append(row)
-        assert [c.name for c in made] == ["Untitled"] * 5
+        assert [c.name for c in made] == [""] * 5
         assert {c.state_id for c in made} == {states["todo"].id}
         assert all(c.parent_id is None for c in made)
         orders = [first.sort_order] + [c.sort_order for c in made] + [last.sort_order]
@@ -328,7 +335,8 @@ class TestPlusButtonChain:
         listing = session_client.get(ISSUES_URL.format(slug=workspace.slug, project_id=project.id), {"order_by": "sort_order"})
         assert listing.status_code == status.HTTP_200_OK
         names = [r["name"] for r in _rows(listing.data)]
-        assert names == ["first"] + ["Untitled"] * 5 + ["last"]
+        assert names == ["first"] + [""] * 5 + ["last"]
+        assert all(r["is_divider"] is False for r in _rows(listing.data))
 
     def test_five_clicks_on_the_last_row_keep_adding_below(self, session_client, workspace, project, create_user, states):
         row = _make_issue("only", project, states["todo"], create_user)
@@ -336,4 +344,40 @@ class TestPlusButtonChain:
         for _ in range(5):
             row = self._add_next_to(session_client, workspace, project, row, None)
             count += 1
-        assert Issue.objects.filter(project=project, name="Untitled").count() == count == 5
+        assert Issue.objects.filter(project=project, name="").count() == count == 5
+
+    def test_blank_name_without_blank_line_is_still_refused(self, session_client, workspace, project, states):
+        url = ISSUES_URL.format(slug=workspace.slug, project_id=project.id)
+        for name in ["", "   "]:
+            response = session_client.post(url, {"name": name, "state_id": str(states["todo"].id)}, format="json")
+            assert response.status_code == status.HTTP_400_BAD_REQUEST
+            assert "name" in response.data
+        assert not Issue.objects.filter(project=project).exists()
+
+    def test_a_named_card_cannot_be_blanked_but_a_blank_line_can_be_named(
+        self, session_client, workspace, project, create_user, states
+    ):
+        named = _make_issue("named", project, states["todo"], create_user)
+        url = ISSUE_URL.format(slug=workspace.slug, project_id=project.id, pk=named.id)
+        assert session_client.patch(url, {"name": ""}, format="json").status_code == status.HTTP_400_BAD_REQUEST
+        assert Issue.objects.get(pk=named.id).name == "named"
+        blank = self._add_next_to(session_client, workspace, project, named, None)
+        url = ISSUE_URL.format(slug=workspace.slug, project_id=project.id, pk=blank.id)
+        assert session_client.patch(url, {"name": "Sat 9/12-"}, format="json").status_code == OK
+        assert Issue.objects.get(pk=blank.id).name == "Sat 9/12-"
+
+    def test_dividers_may_be_blank_and_show_in_the_listing(self, session_client, workspace, project, states):
+        url = ISSUES_URL.format(slug=workspace.slug, project_id=project.id)
+        for name in ["Mon 9/14-", ""]:
+            response = session_client.post(
+                url, {"name": name, "is_divider": True, "state_id": str(states["todo"].id)}, format="json"
+            )
+            assert response.status_code == status.HTTP_201_CREATED, response.data
+        assert Issue.objects.filter(project=project, is_divider=True).count() == 2
+        rows = _rows(session_client.get(url).data)
+        assert sorted(r["name"] for r in rows if r["is_divider"]) == ["", "Mon 9/14-"]
+        # A named card turned into a divider and back.
+        card = Issue.objects.filter(project=project, name="Mon 9/14-").first()
+        card_url = ISSUE_URL.format(slug=workspace.slug, project_id=project.id, pk=card.id)
+        assert session_client.patch(card_url, {"is_divider": False}, format="json").status_code == OK
+        assert Issue.objects.get(pk=card.id).is_divider is False

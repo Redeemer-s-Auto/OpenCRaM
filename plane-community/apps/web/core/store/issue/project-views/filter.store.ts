@@ -30,6 +30,8 @@ import { IssueFilterHelperStore } from "../helpers/issue-filter-helper.store";
 // helpers
 // types
 import type { IIssueRootStore } from "../root.store";
+// undo
+import { deepCopy, displayChangeLabel, pickOldValues, sameValue, undoStack } from "@/store/undo/undo-stack";
 // constants
 
 export interface IProjectViewIssuesFilter extends IBaseIssueFilterStore {
@@ -194,10 +196,22 @@ export class ProjectViewIssuesFilter extends IssueFilterHelperStore implements I
     viewId,
     filters
   ) => {
+    // Ctrl+Z puts the old filter back (an unchanged expression is not an action)
+    const undoBefore = deepCopy(this.filters[viewId]?.richFilters);
+    const shouldRecord = undoStack.canRecord() && !sameValue(undoBefore, filters);
     try {
       runInAction(() => {
         set(this.filters, [viewId, "richFilters"], filters);
       });
+      if (shouldRecord) {
+        const after = deepCopy(filters);
+        const before = undoBefore ?? ({} as TWorkItemFilterExpression);
+        undoStack.record({
+          label: "Filter change",
+          undo: () => this.applyRichFiltersForUndo(workspaceSlug, projectId, viewId, before),
+          redo: () => this.applyRichFiltersForUndo(workspaceSlug, projectId, viewId, after),
+        });
+      }
 
       this.rootIssueStore.projectViewIssues.fetchIssuesWithExistingPagination(
         workspaceSlug,
@@ -220,6 +234,22 @@ export class ProjectViewIssuesFilter extends IssueFilterHelperStore implements I
   ) => {
     try {
       if (isEmpty(this.filters) || isEmpty(this.filters[viewId])) return;
+
+      // Ctrl+Z puts the old layout / grouping / sort / shown properties back
+      const undoKind =
+        type === EIssueFilterType.DISPLAY_FILTERS
+          ? "display_filters"
+          : type === EIssueFilterType.DISPLAY_PROPERTIES
+            ? "display_properties"
+            : undefined;
+      const undoBefore =
+        undoKind && undoStack.canRecord()
+          ? deepCopy(
+              undoKind === "display_filters"
+                ? this.filters[viewId].displayFilters
+                : this.filters[viewId].displayProperties
+            )
+          : undefined;
 
       const _filters = {
         richFilters: this.filters[viewId].richFilters,
@@ -325,6 +355,8 @@ export class ProjectViewIssuesFilter extends IssueFilterHelperStore implements I
         default:
           break;
       }
+      if (undoKind && undoBefore)
+        this.recordDisplayChange(workspaceSlug, projectId, viewId, type, undoKind, undoBefore, filters);
     } catch (error) {
       if (viewId) this.fetchFilters(workspaceSlug, projectId, viewId);
       throw error;
@@ -341,4 +373,39 @@ export class ProjectViewIssuesFilter extends IssueFilterHelperStore implements I
     if (!viewDetails) return;
     this.mutateFilters(workspaceSlug, viewId, viewDetails);
   });
+
+  // ---- undo / redo (store/undo/undo-stack.ts) ----
+
+  private recordDisplayChange(
+    workspaceSlug: string,
+    projectId: string,
+    viewId: string,
+    type: TSupportedFilterTypeForUpdate,
+    kind: "display_filters" | "display_properties",
+    before: object,
+    filters: TSupportedFilterForUpdate
+  ) {
+    const keys = Object.keys(filters ?? {});
+    const oldValues = pickOldValues(before, keys) as unknown as TSupportedFilterForUpdate;
+    const newValues = pickOldValues(filters as object, keys) as unknown as TSupportedFilterForUpdate;
+    if (sameValue(oldValues, newValues)) return;
+    undoStack.record({
+      label: displayChangeLabel(kind, keys),
+      undo: () => this.updateFilters(workspaceSlug, projectId, type, deepCopy(oldValues), viewId),
+      redo: () => this.updateFilters(workspaceSlug, projectId, type, deepCopy(newValues), viewId),
+    });
+  }
+
+  /** Puts a filter expression back on the view and in its filter bar (undo / redo). */
+  private async applyRichFiltersForUndo(
+    workspaceSlug: string,
+    projectId: string,
+    viewId: string,
+    filters: TWorkItemFilterExpression
+  ) {
+    this.rootIssueStore.rootStore.workItemFilters
+      .getFilter(EIssuesStoreType.PROJECT_VIEW, viewId)
+      ?.resetExpression(deepCopy(filters), false);
+    await this.updateFilterExpression(workspaceSlug, projectId, viewId, deepCopy(filters));
+  }
 }

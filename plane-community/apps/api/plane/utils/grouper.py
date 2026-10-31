@@ -127,6 +127,7 @@ def issue_on_results(
         "attachment_count",
         "link_count",
         "is_draft",
+        "is_divider",
         "archived_at",
         "state__group",
     ]

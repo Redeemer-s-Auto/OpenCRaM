@@ -9,11 +9,14 @@ import { observable, action, makeObservable, runInAction, computed } from "mobx"
 import { computedFn } from "mobx-utils";
 // types
 import type { IProjectView, TTaskListViewsResponse, TViewFilters } from "@plane/types";
+import { EIssuesStoreType } from "@plane/types";
 // constants
 // helpers
 import { getValidatedViewFilters, getViewName, orderViews, shouldFilterView } from "@plane/utils";
 // services
 import { ViewService } from "@/services/view.service";
+// undo
+import { deepCopy, pickOldValues, sameValue, undoStack } from "./undo/undo-stack";
 // store
 import type { CoreRootStore } from "./root.store";
 
@@ -206,14 +209,62 @@ export class ProjectViewStore implements IProjectViewStore {
    * @returns Promise<IProjectView>
    */
   async createView(workspaceSlug: string, projectId: string, data: Partial<IProjectView>): Promise<IProjectView> {
+    const shouldRecord = undoStack.canRecord();
     const response = await this.viewService.createView(workspaceSlug, projectId, getValidatedViewFilters(data));
 
     runInAction(() => {
       set(this.viewMap, [response.id], response);
     });
 
+    if (shouldRecord) {
+      // Ctrl+Z deletes the new view; Ctrl+Shift+Z makes it again
+      let snapshot: IProjectView = deepCopy(response);
+      undoStack.record({
+        label: "New view",
+        undo: async () => {
+          const id = undoStack.resolve(response.id);
+          snapshot = deepCopy(this.getViewById(id) ?? snapshot);
+          await this.deleteView(workspaceSlug, projectId, id);
+        },
+        redo: () => this.recreateView(workspaceSlug, projectId, snapshot),
+      });
+    }
+
     return response;
   }
+
+  // ---- undo / redo (store/undo/undo-stack.ts) ----
+
+  /** Makes a deleted view again from its last values. It gets a new id; the undo stack follows it. */
+  recreateView = async (workspaceSlug: string, projectId: string, snapshot: IProjectView) => {
+    const payload: Partial<IProjectView> = {
+      name: snapshot.name,
+      description: snapshot.description,
+      access: snapshot.access,
+      rich_filters: snapshot.rich_filters,
+      display_filters: snapshot.display_filters,
+      display_properties: snapshot.display_properties,
+      logo_props: snapshot.logo_props,
+      is_hidden: snapshot.is_hidden,
+      ...(snapshot.sort_order !== undefined ? { sort_order: snapshot.sort_order } : {}),
+    };
+    const response = await this.viewService.createView(workspaceSlug, projectId, getValidatedViewFilters(payload));
+    runInAction(() => set(this.viewMap, [response.id], response));
+    undoStack.alias(snapshot.id, response.id);
+    return response;
+  };
+
+  /** After undo / redo changed a view's filters, the open view shows them too. */
+  private syncOpenViewFilters = (workspaceSlug: string, projectId: string, viewId: string) => {
+    const view = this.getViewById(viewId);
+    const issueRoot = this.rootStore.issue;
+    if (!view || issueRoot.viewId !== viewId) return;
+    issueRoot.projectViewIssuesFilter.mutateFilters(workspaceSlug, viewId, view);
+    this.rootStore.workItemFilters
+      .getFilter(EIssuesStoreType.PROJECT_VIEW, viewId)
+      ?.resetExpression(deepCopy(view.rich_filters), true);
+    void issueRoot.projectViewIssues.fetchIssuesWithExistingPagination(workspaceSlug, projectId, viewId, "mutation");
+  };
 
   /**
    * Adds the task-list views (Active / Completed / Checked) and the Seen checkbox to a board,
@@ -244,12 +295,36 @@ export class ProjectViewStore implements IProjectViewStore {
     data: Partial<IProjectView>
   ): Promise<IProjectView> {
     const currentView = this.getViewById(viewId);
+    const shouldRecord = undoStack.canRecord() && !!currentView;
+    const keys = Object.keys(data);
+    const oldData = currentView ? (pickOldValues(currentView, keys) as unknown as Partial<IProjectView>) : {};
+    const newData = pickOldValues(data, keys) as unknown as Partial<IProjectView>;
 
     runInAction(() => {
       set(this.viewMap, [viewId], { ...currentView, ...data });
     });
 
     const response = await this.viewService.patchView(workspaceSlug, projectId, viewId, data);
+
+    if (shouldRecord && !sameValue(oldData, newData)) {
+      const touchesFilters = keys.some((k) => ["rich_filters", "display_filters", "display_properties"].includes(k));
+      const label =
+        keys.length === 1 && keys[0] === "is_hidden"
+          ? newData.is_hidden
+            ? "Hide view"
+            : "Show view"
+          : keys.length === 1 && keys[0] === "name"
+            ? "Rename view"
+            : keys.length === 1 && keys[0] === "sort_order"
+              ? "Move view"
+              : "View change";
+      const apply = async (values: Partial<IProjectView>) => {
+        const id = undoStack.resolve(viewId);
+        await this.updateView(workspaceSlug, projectId, id, values);
+        if (touchesFilters) this.syncOpenViewFilters(workspaceSlug, projectId, id);
+      };
+      undoStack.record({ label, undo: () => apply(oldData), redo: () => apply(newData) });
+    }
 
     return response;
   }
@@ -262,12 +337,29 @@ export class ProjectViewStore implements IProjectViewStore {
    * @returns
    */
   deleteView = async (workspaceSlug: string, projectId: string, viewId: string): Promise<any> => {
+    const shouldRecord = undoStack.canRecord();
+    const snapshot = deepCopy(this.getViewById(viewId));
     await this.viewService.deleteView(workspaceSlug, projectId, viewId).then(() => {
       runInAction(() => {
         delete this.viewMap[viewId];
         if (this.rootStore.favorite.entityMap[viewId]) this.rootStore.favorite.removeFavoriteFromStore(viewId);
       });
     });
+    if (shouldRecord && snapshot) {
+      // the server has no undelete for views: Ctrl+Z makes it again with the same settings
+      let current: IProjectView = snapshot;
+      undoStack.record({
+        label: "Delete view",
+        undo: async () => {
+          await this.recreateView(workspaceSlug, projectId, { ...current, id: undoStack.resolve(snapshot.id) });
+        },
+        redo: async () => {
+          const id = undoStack.resolve(snapshot.id);
+          current = deepCopy(this.getViewById(id) ?? current);
+          await this.deleteView(workspaceSlug, projectId, id);
+        },
+      });
+    }
   };
 
   /**

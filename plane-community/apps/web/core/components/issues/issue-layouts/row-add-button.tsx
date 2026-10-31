@@ -63,13 +63,16 @@ export function RowAddButton(props: Props) {
         type="button"
         aria-label={ROW_ADD_TOOLTIP}
         className={cn(
-          "grid size-6 flex-shrink-0 place-items-center rounded-sm text-placeholder opacity-0 transition-opacity select-none",
+          "relative grid size-6 flex-shrink-0 place-items-center rounded-sm text-placeholder opacity-0 transition-opacity select-none",
           "hover:bg-layer-transparent-hover hover:text-tertiary focus-visible:opacity-100",
           "group-hover/list-block:opacity-100 [@media(hover:none)]:opacity-100",
+          // a phone: always shown, with a 44px touch target that does not widen the row
+          "[@media(hover:none)]:touch-manipulation [@media(hover:none)]:after:absolute [@media(hover:none)]:after:-inset-2.5 [@media(hover:none)]:after:content-['']",
           className
         )}
         onClick={handleClick}
         onMouseDown={stop}
+        onPointerDown={(e) => e.stopPropagation()}
         onContextMenu={stop}
         onTouchStart={(e) => {
           e.stopPropagation();

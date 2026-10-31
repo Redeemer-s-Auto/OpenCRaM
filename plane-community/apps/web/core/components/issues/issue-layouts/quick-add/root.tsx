@@ -12,13 +12,19 @@ import type { UseFormRegister } from "react-hook-form";
 import { useForm } from "react-hook-form";
 // plane imports
 import { useTranslation } from "@plane/i18n";
+import { SeparatorHorizontal } from "lucide-react";
 import { PlusIcon } from "@plane/propel/icons";
-import { setPromiseToast } from "@plane/propel/toast";
-import type { IProject, TIssue, EIssueLayoutTypes } from "@plane/types";
+import { TOAST_TYPE, setPromiseToast, setToast } from "@plane/propel/toast";
+import type { IProject, TIssue } from "@plane/types";
+import { EIssueLayoutTypes } from "@plane/types";
 import { cn, createIssuePayload } from "@plane/utils";
+// hooks
+import { useIssues } from "@/hooks/store/use-issues";
 // local imports
 import { QuickAddIssueFormRoot } from "./form";
+import { endOfListSortOrder } from "./inline-row";
 import { CreateIssueToastActionItems } from "../../create-issue-toast-action-items";
+import { blankRowFields, requestRowTitleFocus } from "../row-line-tools";
 
 export type TQuickAddIssueForm = {
   ref: React.RefObject<HTMLFormElement>;
@@ -67,6 +73,8 @@ export const QuickAddIssueRoot = observer(function QuickAddIssueRoot(props: TQui
   const { t } = useTranslation();
   // router
   const { workspaceSlug, projectId } = useParams();
+  // store
+  const { issueMap } = useIssues();
   // states
   const [isOpen, setIsOpen] = useState(isQuickAddOpen ?? false);
   // form info
@@ -135,7 +143,42 @@ export const QuickAddIssueRoot = observer(function QuickAddIssueRoot(props: TQui
     }
   };
 
+  // List layout: a divider (section header) added at the end of the list, its name typed in place.
+  const canAddDivider = layout === EIssueLayoutTypes.LIST && !!quickAddCallback && !isEpic;
+  const handleAddDivider = () => {
+    if (!quickAddCallback || !projectId) return;
+    const boardId = projectId.toString();
+    const sort_order = endOfListSortOrder(Object.values(issueMap).filter((issue) => issue?.project_id === boardId));
+    const payload = createIssuePayload(boardId, {
+      // oxlint-disable-next-line unicorn/no-useless-fallback-in-spread
+      ...(prePopulatedData ?? {}),
+      ...blankRowFields("divider"),
+      sort_order,
+    });
+    quickAddCallback(boardId, payload)
+      .then((created) => requestRowTitleFocus(created?.id))
+      .catch((error: { message?: string }) =>
+        setToast({ type: TOAST_TYPE.ERROR, title: "Could not add the divider", message: error?.message ?? "Try again." })
+      );
+  };
+
   if (!projectId) return null;
+
+  const addButtons = (
+    <>
+      {QuickAddButton && <QuickAddButton isEpic={isEpic} onClick={() => handleIsOpen(true)} />}
+      {customQuickAddButton && <>{customQuickAddButton}</>}
+      {!QuickAddButton && !customQuickAddButton && (
+        <button
+          className="flex w-full cursor-pointer items-center gap-2 bg-layer-transparent px-2 py-3 hover:bg-layer-transparent-hover"
+          onClick={() => handleIsOpen(true)}
+        >
+          <PlusIcon className="h-3.5 w-3.5 stroke-2" />
+          <span className="text-13 font-medium">{t(`${isEpic ? "epic.new" : "issue.new"}`)}</span>
+        </button>
+      )}
+    </>
+  );
 
   return (
     <div
@@ -158,20 +201,21 @@ export const QuickAddIssueRoot = observer(function QuickAddIssueRoot(props: TQui
           onClose={() => handleIsOpen(false)}
           isEpic={isEpic}
         />
+      ) : canAddDivider ? (
+        <div className="flex items-stretch">
+          <div className="min-w-0 flex-grow">{addButtons}</div>
+          <button
+            type="button"
+            className="flex flex-shrink-0 items-center gap-1.5 bg-layer-transparent px-3 text-13 font-medium text-tertiary hover:bg-layer-transparent-hover hover:text-primary"
+            onClick={handleAddDivider}
+            title="Add a divider (section header) at the end of the list"
+          >
+            <SeparatorHorizontal className="h-3.5 w-3.5" />
+            <span>Add divider</span>
+          </button>
+        </div>
       ) : (
-        <>
-          {QuickAddButton && <QuickAddButton isEpic={isEpic} onClick={() => handleIsOpen(true)} />}
-          {customQuickAddButton && <>{customQuickAddButton}</>}
-          {!QuickAddButton && !customQuickAddButton && (
-            <button
-              className="flex w-full cursor-pointer items-center gap-2 bg-layer-transparent px-2 py-3 hover:bg-layer-transparent-hover"
-              onClick={() => handleIsOpen(true)}
-            >
-              <PlusIcon className="h-3.5 w-3.5 stroke-2" />
-              <span className="text-13 font-medium">{t(`${isEpic ? "epic.new" : "issue.new"}`)}</span>
-            </button>
-          )}
-        </>
+        addButtons
       )}
     </div>
   );

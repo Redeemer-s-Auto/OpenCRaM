@@ -165,6 +165,7 @@ class SubIssuesEndpoint(BaseAPIView):
                 "attachment_count",
                 "link_count",
                 "is_draft",
+                "is_divider",
                 "archived_at",
                 "state_group",
             )

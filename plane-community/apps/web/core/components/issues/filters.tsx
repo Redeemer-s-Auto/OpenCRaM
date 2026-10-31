@@ -18,6 +18,7 @@ import { useIssues } from "@/hooks/store/use-issues";
 // plane web imports
 import type { TProject } from "@plane/types";
 // local imports
+import { PropertiesButton } from "../custom-fields/properties-button";
 import { WorkItemsModal } from "../analytics/work-items/modal";
 import { WorkItemFiltersToggle } from "../work-item-filters/filters-toggle";
 import {
@@ -127,6 +128,18 @@ export const HeaderFilters = observer(function HeaderFilters(props: Props) {
           isEpic={storeType === EIssuesStoreType.EPIC}
         />
       </FiltersDropdown>
+      {storeType !== EIssuesStoreType.EPIC && (
+        <PropertiesButton
+          workspaceSlug={workspaceSlug}
+          projectId={projectId}
+          layout={activeLayout}
+          displayProperties={issueFilters?.displayProperties ?? {}}
+          displayPropertiesToRender={layoutDisplayFiltersOptions?.display_properties}
+          handleUpdate={handleDisplayProperties}
+          cycleViewDisabled={!currentProjectDetails?.cycle_view}
+          moduleViewDisabled={!currentProjectDetails?.module_view}
+        />
+      )}
       {canUserCreateIssue ? (
         <Button className="hidden px-2 md:block" onClick={() => setAnalyticsModal(true)} variant="secondary" size="lg">
           <div className="hidden @4xl:flex">{t("common.analytics")}</div>

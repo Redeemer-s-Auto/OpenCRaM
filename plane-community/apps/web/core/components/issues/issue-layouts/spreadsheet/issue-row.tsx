@@ -37,6 +37,8 @@ import type { TRenderQuickActions } from "../list/list-view-types";
 import { buildInlineAddData } from "../quick-add/inline-row";
 import type { TRowAddPlacement } from "../row-add-button";
 import { RowAddButton } from "../row-add-button";
+import type { TRowAddKind, TRowInlineAdd } from "../row-line-tools";
+import { InlineRowTitle, RowLineMenu, blankRowFields, isBlankName, requestRowTitleFocus } from "../row-line-tools";
 import { isIssueNew } from "../utils";
 import { CustomFieldCells, SeenCell } from "@/components/custom-fields/spreadsheet-columns";
 import { IssueColumn } from "./issue-column";
@@ -64,8 +66,6 @@ interface Props {
   /** The ids of the table's rows, in order: the new card's sort_order lands between neighbours. */
   siblingIds?: string[];
 }
-
-const NEW_ROW_NAME = "Untitled";
 
 export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: Props) {
   const {
@@ -113,14 +113,16 @@ export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: 
     canEditProperties(routerProjectId.toString());
 
   // One click, one finished row: it is made at once, so the row looks like every other row and has its own +.
-  const handleInlineAdd = (placement: TRowAddPlacement) => {
+  // A blank line (or a divider) made at once next to this row; the cursor goes into its title.
+  const handleInlineAdd = (placement: TRowAddPlacement, kind: TRowAddKind = "line") => {
     if (!siblingIds || !quickAddCallback || !routerProjectId) return;
     const data = buildInlineAddData(issue, placement, siblingIds, (id) => issueMap[id]);
     const projectId = routerProjectId.toString();
-    quickAddCallback(projectId, { ...createIssuePayload(projectId, { ...data, name: NEW_ROW_NAME }) } as TIssue).catch(
-      (error: { message?: string }) =>
+    quickAddCallback(projectId, { ...createIssuePayload(projectId, { ...data, ...blankRowFields(kind) }) } as TIssue)
+      .then((created) => requestRowTitleFocus(created?.id))
+      .catch((error: { message?: string }) =>
         setToast({ type: TOAST_TYPE.ERROR, title: "Could not add the line", message: error?.message ?? "Try again." })
-    );
+      );
   };
 
   return (
@@ -209,8 +211,8 @@ interface IssueRowDetailsProps {
   isEpic?: boolean;
   /** The table keeps a column for the + on every row, so sub-rows line up with their parent. */
   hasAddColumn?: boolean;
-  /** Click adds a card below this row, Alt+click above. */
-  onInlineAdd?: (placement: TRowAddPlacement) => void;
+  /** Click adds a blank line below this row, Alt+click above; the line menu can add a divider. */
+  onInlineAdd?: TRowInlineAdd;
 }
 
 const IssueRowDetails = observer(function IssueRowDetails(props: IssueRowDetailsProps) {
@@ -410,21 +412,42 @@ const IssueRowDetails = observer(function IssueRowDetails(props: IssueRowDetails
               <div className="my-auto flex h-full w-full items-center justify-between gap-2 truncate">
                 <div className="line-clamp-1 w-full text-14 text-primary">
                   <div className="w-full overflow-hidden">
-                    <Tooltip tooltipContent={shortcutAwareName(issueDetail.id, issueDetail.name)} isMobile={isMobile}>
-                      <div
-                        className="h-full w-full cursor-pointer truncate pr-4 text-left text-13 text-primary focus:outline-none"
-                        tabIndex={-1}
-                      >
-                        <ShortcutAwareTitle
-                          workspaceSlug={workspaceSlug?.toString()}
-                          projectId={issueDetail.project_id}
-                          issueId={issueDetail.id}
-                          name={issueDetail.name}
+                    {issueDetail.is_divider || isBlankName(issueDetail.name) ? (
+                      // blank lines and dividers: the title is typed in place
+                      <div className="h-full w-full pr-4 text-left text-13 text-primary">
+                        <InlineRowTitle
+                          issue={issueDetail}
+                          updateIssue={updateIssue}
+                          isReadOnly={disableUserActions}
+                          isDivider={!!issueDetail.is_divider}
+                          className={cn({ "text-14 font-semibold": issueDetail.is_divider })}
                         />
                       </div>
-                    </Tooltip>
+                    ) : (
+                      <Tooltip tooltipContent={shortcutAwareName(issueDetail.id, issueDetail.name)} isMobile={isMobile}>
+                        <div
+                          className="h-full w-full cursor-pointer truncate pr-4 text-left text-13 text-primary focus:outline-none"
+                          tabIndex={-1}
+                        >
+                          <ShortcutAwareTitle
+                            workspaceSlug={workspaceSlug?.toString()}
+                            projectId={issueDetail.project_id}
+                            issueId={issueDetail.id}
+                            name={issueDetail.name}
+                          />
+                        </div>
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
+                {!issueDetail.tempId && (
+                  <RowLineMenu
+                    issue={issueDetail}
+                    onInlineAdd={onInlineAdd}
+                    updateIssue={updateIssue}
+                    isReadOnly={disableUserActions}
+                  />
+                )}
                 <div
                   className={`opacity-0 transition-opacity group-hover:opacity-100 ${isMenuActive ? "!opacity-100" : ""}`}
                   onClick={(e) => e.stopPropagation()}

@@ -216,6 +216,7 @@ class IssueListEndpoint(BaseAPIView):
                 "attachment_count",
                 "link_count",
                 "is_draft",
+                "is_divider",
                 "archived_at",
                 "deleted_at",
             )
@@ -491,6 +492,7 @@ class IssueViewSet(BaseViewSet):
                     "attachment_count",
                     "link_count",
                     "is_draft",
+                    "is_divider",
                     "archived_at",
                     "deleted_at",
                 )
@@ -928,6 +930,7 @@ class IssuePaginatedViewSet(BaseViewSet):
             "created_by",
             "updated_by",
             "is_draft",
+            "is_divider",
             "archived_at",
             "module_ids",
             "label_ids",

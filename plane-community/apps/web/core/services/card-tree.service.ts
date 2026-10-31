@@ -40,28 +40,35 @@ export type TCardAncestor = Pick<
 >;
 
 export class CardTreeService extends APIService {
+  /** Card-tree requests still on the wire, by URL + params: a second identical ask shares the first. */
+  private inFlight = new Map<string, Promise<TCardPage>>();
+
   constructor() {
     super(API_BASE_URL);
   }
 
-  /** Top cards of a project (no parent, or a parent in another project / out of sight). */
-  async projectRoots(workspaceSlug: string, projectId: string, offset = 0, limit?: number): Promise<TCardPage> {
-    return this.get(`/api/workspaces/${workspaceSlug}/card-tree/`, {
-      params: { project_id: projectId, offset, limit },
-    })
-      .then((response) => response?.data)
+  private treePage(workspaceSlug: string, params: Record<string, string | number | undefined>): Promise<TCardPage> {
+    const key = `${workspaceSlug}|${JSON.stringify(params)}`;
+    const pending = this.inFlight.get(key);
+    if (pending) return pending;
+    const request = this.get(`/api/workspaces/${workspaceSlug}/card-tree/`, { params })
+      .then((response) => response?.data as TCardPage)
       .catch((error) => {
         throw error?.response?.data;
-      });
+      })
+      .finally(() => this.inFlight.delete(key));
+    this.inFlight.set(key, request);
+    return request;
+  }
+
+  /** Top cards of a project (no parent, or a parent in another project / out of sight). */
+  async projectRoots(workspaceSlug: string, projectId: string, offset = 0, limit?: number): Promise<TCardPage> {
+    return this.treePage(workspaceSlug, { project_id: projectId, offset, limit });
   }
 
   /** Visible sub-cards of a card, from any project. */
   async children(workspaceSlug: string, parentId: string, offset = 0, limit?: number): Promise<TCardPage> {
-    return this.get(`/api/workspaces/${workspaceSlug}/card-tree/`, { params: { parent_id: parentId, offset, limit } })
-      .then((response) => response?.data)
-      .catch((error) => {
-        throw error?.response?.data;
-      });
+    return this.treePage(workspaceSlug, { parent_id: parentId, offset, limit });
   }
 
   /** Cards above a card, root first; stops at the first one the viewer may not see. */

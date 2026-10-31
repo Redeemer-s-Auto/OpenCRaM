@@ -152,6 +152,10 @@ class IssueCreateSerializer(BaseSerializer):
     workspace_id = serializers.UUIDField(source="workspace.id", read_only=True)
     # {field_id: value}; see plane.utils.custom_fields
     custom_fields = serializers.DictField(write_only=True, required=False)
+    # A blank name is allowed only for a blank line (the row's + button sends blank_line: true),
+    # a divider, or a card that is already blank; see validate().
+    name = serializers.CharField(max_length=255, allow_blank=True)
+    blank_line = serializers.BooleanField(write_only=True, required=False)
 
     class Meta:
         model = Issue
@@ -184,6 +188,14 @@ class IssueCreateSerializer(BaseSerializer):
     def validate(self, attrs):
         allow_triage = self.context.get("allow_triage_state", False)
         state_manager = State.triage_objects if allow_triage else State.objects
+
+        blank_line = attrs.pop("blank_line", False)
+        if "name" in attrs and not attrs["name"].strip():
+            is_divider = attrs.get("is_divider", getattr(self.instance, "is_divider", False))
+            already_blank = self.instance is not None and not (self.instance.name or "").strip()
+            if not (blank_line or is_divider or already_blank):
+                raise serializers.ValidationError({"name": ["This field may not be blank."]})
+            attrs["name"] = ""
 
         if (
             attrs.get("start_date", None) is not None
@@ -908,6 +920,7 @@ class IssueSerializer(DynamicBaseSerializer):
             "attachment_count",
             "link_count",
             "is_draft",
+            "is_divider",
             "archived_at",
             "custom_fields",
         ]

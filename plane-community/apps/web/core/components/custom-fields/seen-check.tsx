@@ -16,7 +16,6 @@ import { usePlatformOS } from "@/hooks/use-platform-os";
 // local
 import { getSeenField } from "./helpers";
 import { buildCustomFieldsPayload } from "./issue-properties";
-import { useRefetchWorkItems } from "./use-refetch-work-items";
 
 /** The board's Seen checkbox field, or undefined when the board is not a task-style board. */
 export const useSeenField = (projectId: string | null | undefined) => {
@@ -35,13 +34,12 @@ type Props = {
 /**
  * The check mark at the right end of a task list row: the board's "Seen" box, ticked by the owner
  * once a completed task has been noticed. Renders nothing on a board without the Seen field.
- * The tap target is a full row height on phones. Ticking saves at once and reloads the list, so a
- * card that no longer fits the view's filter (Completed -> Checked) leaves without a page reload.
+ * The tap target is a full row height on phones. Ticking updates the store at once (then saves), and
+ * a card that no longer fits the view's filter (Completed -> Checked) leaves without a list reload.
  */
 export const SeenCheck = observer(function SeenCheck(props: Props) {
   const { issue, updateIssue, isReadOnly, className } = props;
   const { isMobile } = usePlatformOS();
-  const refetch = useRefetchWorkItems();
   const field = useSeenField(issue.project_id);
   if (!field) return null;
 
@@ -68,12 +66,12 @@ export const SeenCheck = observer(function SeenCheck(props: Props) {
           checked={checked}
           disabled={!canEdit}
           onChange={(e) => {
-            const saved = updateIssue?.(
+            // The store ticks the box at once and drops this card from a view it no longer fits.
+            void updateIssue?.(
               issue.project_id,
               issue.id,
               buildCustomFieldsPayload(issue.custom_fields, field.id, e.target.checked)
-            );
-            if (saved) void saved.then(() => refetch());
+            )?.catch(() => undefined);
           }}
           aria-label={field.name}
           className="size-5 sm:size-4"

@@ -31,6 +31,26 @@ import { getComputedDisplayFilters, getComputedDisplayProperties } from "@plane/
 // lib
 import { storage } from "@/lib/local-storage";
 
+/**
+ * Equality for the `issueFilters` computed of the filter stores. computedIssueFilters builds a new
+ * object on every run, and it reruns whenever a key is ADDED to displayProperties (isEmpty reads
+ * the key list), e.g. the first time a custom field is shown from the Properties panel. A new
+ * object re-rendered the list root and with it every row of the board (2,000+ rows froze the tab).
+ * The four parts are the store's own observable objects, so "same parts" means "same filters";
+ * rows that show a property still react to that property's key directly.
+ */
+export const sameIssueFilters = (a: IIssueFilters | undefined, b: IIssueFilters | undefined): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const sameRich = a.richFilters === b.richFilters || (isEmpty(a.richFilters) && isEmpty(b.richFilters));
+  return (
+    sameRich &&
+    a.displayFilters === b.displayFilters &&
+    a.displayProperties === b.displayProperties &&
+    a.kanbanFilters === b.kanbanFilters
+  );
+};
+
 interface ILocalStoreIssueFilters {
   key: EIssuesStoreType;
   workspaceSlug: string;

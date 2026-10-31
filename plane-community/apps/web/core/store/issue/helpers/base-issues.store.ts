@@ -638,8 +638,28 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
     if (keys.some((key) => key.startsWith("description"))) return;
     const oldData = pickOldValues(issueBeforeUpdate, keys) as unknown as Partial<TIssue>;
     const newData = pickOldValues(data, keys) as unknown as Partial<TIssue>;
-    if (sameValue(oldData, newData)) return;
     const customField = this.rootIssueStore.rootStore.customField;
+    // A custom field the card never had a value for is not in the old values: write back an
+    // empty value (false for a check box) so the undo clears it instead of leaving it as it is.
+    if (data.custom_fields && typeof data.custom_fields === "object") {
+      const oldFields = (issueBeforeUpdate.custom_fields ?? {}) as Record<string, unknown>;
+      const sent = data.custom_fields as Record<string, unknown>;
+      const restored: Record<string, unknown> = {};
+      const changed: Record<string, unknown> = {};
+      Object.keys(sent).forEach((fieldId) => {
+        const had = oldFields[fieldId];
+        const empty = customField.getFieldById(fieldId)?.field_type === "checkbox" ? false : null;
+        const before = had !== undefined && had !== null ? had : empty;
+        // only the fields this edit really changed: the whole map is sent, and an undo must not
+        // write back values a teammate changed in the meantime
+        if (sameValue(before, sent[fieldId] ?? empty)) return;
+        restored[fieldId] = before;
+        changed[fieldId] = sent[fieldId];
+      });
+      (oldData as Record<string, unknown>).custom_fields = restored;
+      (newData as Record<string, unknown>).custom_fields = changed;
+    }
+    if (sameValue(oldData, newData)) return;
     undoStack.record({
       label: issueChangeLabel(
         newData as unknown as Record<string, unknown>,

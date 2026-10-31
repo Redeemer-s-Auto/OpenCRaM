@@ -26,7 +26,7 @@ import { handleIssueQueryParamsByLayout } from "@plane/utils";
 // services
 import { ViewService } from "@/services/view.service";
 import type { IBaseIssueFilterStore } from "../helpers/issue-filter-helper.store";
-import { IssueFilterHelperStore } from "../helpers/issue-filter-helper.store";
+import { IssueFilterHelperStore, sameIssueFilters } from "../helpers/issue-filter-helper.store";
 // helpers
 // types
 import type { IIssueRootStore } from "../root.store";
@@ -78,7 +78,8 @@ export class ProjectViewIssuesFilter extends IssueFilterHelperStore implements I
       // observables
       filters: observable,
       // computed
-      issueFilters: computed,
+      // same filter parts = same value, so adding a display-property key does not re-render every row
+      issueFilters: computed({ equals: sameIssueFilters }),
       appliedFilters: computed,
       // actions
       fetchFilters: action,

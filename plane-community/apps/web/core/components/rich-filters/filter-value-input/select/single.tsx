@@ -34,31 +34,35 @@ export const SingleSelectFilterValueInput = observer(function SingleSelectFilter
   const [loading, setLoading] = useState<boolean>(false);
   // derived values
   const formattedOptions = useMemo(() => getFormattedOptions<string>(options), [options]);
+  // A saved value can be a real boolean (checkbox filters store false/true) while the options
+  // use string ids "true"/"false". Compare as strings, and treat only null/undefined/"" as empty,
+  // so a saved false shows "Not checked" and does not start open.
+  const rawValue = condition.value as unknown;
+  const value: string | undefined =
+    rawValue === null || rawValue === undefined || rawValue === "" ? undefined : String(rawValue);
 
   useEffect(() => {
     loadOptions({ config, setOptions, setLoading });
   }, [config]);
 
-  const handleSelectChange = (value: string) => {
-    if (value === condition.value) {
+  const handleSelectChange = (selected: string) => {
+    if (selected === value) {
       onChange(null);
     } else {
-      onChange(value);
+      onChange(selected);
     }
   };
 
   return (
     <CustomSearchSelect
       {...getCommonCustomSearchSelectProps(isDisabled)}
-      value={condition.value}
+      value={value}
       onChange={handleSelectChange}
       options={formattedOptions}
       multiple={false}
       disabled={loading || isDisabled}
-      customButton={
-        <SelectedOptionsDisplay<string> selectedValue={condition.value} options={options} displayCount={1} />
-      }
-      defaultOpen={!condition.value}
+      customButton={<SelectedOptionsDisplay<string> selectedValue={value as string} options={options} displayCount={1} />}
+      defaultOpen={value === undefined}
     />
   );
 });

@@ -4,11 +4,12 @@
 
 """The task-list views: one definition, used by the board action and the load script.
 
-A task list is a board whose cards move through three tabs:
+A task list is a board whose cards move through these tabs, left to right:
 
-- **Active**: state group is not completed and not cancelled.
+- **Active**: state group is not completed and the "Seen" checkbox is not ticked.
 - **Completed**: state group is completed and the "Seen" checkbox is not ticked.
-- **Checked** (hidden from the tab bar): the "Seen" checkbox is ticked.
+- **Checked**: the "Seen" checkbox is ticked, whatever the state.
+- **All**: the board's own page with no filter (drawn last by the tab bar, not a saved view).
 
 Team members finish a task by changing its state; the card lands in Completed. The
 owner ticks "Seen" to say the completion was noticed; the card moves to Checked.
@@ -25,7 +26,7 @@ SEEN_FIELD_NAME = "Seen"
 SEEN_EXTERNAL_SOURCE = "task_list"
 SEEN_EXTERNAL_ID = "seen"
 
-ACTIVE_STATE_GROUPS = ["backlog", "unstarted", "started"]
+ACTIVE_STATE_GROUPS = ["backlog", "unstarted", "started", "cancelled"]
 COMPLETED_STATE_GROUPS = ["completed"]
 
 VIEW_ACTIVE = "Active"
@@ -45,9 +46,9 @@ def view_definitions(seen_field_id):
     on_card = {f"cardfield_{seen_field_id}": True, f"customfield_{seen_field_id}": True}
     return {
         VIEW_ACTIVE: {
-            "description": "Tasks still to do: state is not completed and not cancelled.",
-            "rich_filters": {"and": [{"state_group__in": ACTIVE_STATE_GROUPS}]},
-            "display_properties": {},
+            "description": "Tasks still to do: not completed and not checked off as seen.",
+            "rich_filters": {"and": [{"state_group__in": ACTIVE_STATE_GROUPS}, {seen: False}]},
+            "display_properties": on_card,
             "is_hidden": False,
         },
         VIEW_COMPLETED: {
@@ -57,10 +58,10 @@ def view_definitions(seen_field_id):
             "is_hidden": False,
         },
         VIEW_CHECKED: {
-            "description": "Tasks checked off as seen. Hidden from the tabs by default.",
+            "description": "Tasks checked off as seen, in any state.",
             "rich_filters": {"and": [{seen: True}]},
             "display_properties": on_card,
-            "is_hidden": True,
+            "is_hidden": False,
         },
     }
 

@@ -16,10 +16,11 @@ import { ChevronRightIcon } from "@plane/propel/icons";
 // types
 import { Tooltip } from "@plane/propel/tooltip";
 import type { IIssueDisplayProperties, TIssue } from "@plane/types";
-import { EIssueLayoutTypes, EIssueServiceType } from "@plane/types";
+import { EIssueServiceType } from "@plane/types";
 // ui
 import { ControlLink, Row } from "@plane/ui";
-import { cn, generateWorkItemLink } from "@plane/utils";
+import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { cn, createIssuePayload, generateWorkItemLink } from "@plane/utils";
 // components
 import { MultipleSelectEntityAction } from "@/components/core/multiple-select";
 import RenderIfVisible from "@/components/core/render-if-visible-HOC";
@@ -33,7 +34,6 @@ import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // local components
 import type { TRenderQuickActions } from "../list/list-view-types";
-import { QuickAddIssueRoot } from "../quick-add";
 import { buildInlineAddData } from "../quick-add/inline-row";
 import type { TRowAddPlacement } from "../row-add-button";
 import { RowAddButton } from "../row-add-button";
@@ -65,7 +65,7 @@ interface Props {
   siblingIds?: string[];
 }
 
-type TInlineAdd = { placement: TRowAddPlacement; data: Partial<TIssue> };
+const NEW_ROW_NAME = "Untitled";
 
 export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: Props) {
   const {
@@ -89,7 +89,6 @@ export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: 
   } = props;
   // states
   const [isExpanded, setExpanded] = useState<boolean>(false);
-  const [inlineAdd, setInlineAdd] = useState<TInlineAdd | null>(null);
   // router
   const { projectId: routerProjectId } = useParams();
   // store hooks
@@ -113,38 +112,19 @@ export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: 
     issue.project_id === routerProjectId.toString() &&
     canEditProperties(routerProjectId.toString());
 
+  // One click, one finished row: it is made at once, so the row looks like every other row and has its own +.
   const handleInlineAdd = (placement: TRowAddPlacement) => {
-    if (!siblingIds) return;
-    setInlineAdd({ placement, data: buildInlineAddData(issue, placement, siblingIds, (id) => issueMap[id]) });
+    if (!siblingIds || !quickAddCallback || !routerProjectId) return;
+    const data = buildInlineAddData(issue, placement, siblingIds, (id) => issueMap[id]);
+    const projectId = routerProjectId.toString();
+    quickAddCallback(projectId, { ...createIssuePayload(projectId, { ...data, name: NEW_ROW_NAME }) } as TIssue).catch(
+      (error: { message?: string }) =>
+        setToast({ type: TOAST_TYPE.ERROR, title: "Could not add the line", message: error?.message ?? "Try again." })
+    );
   };
-
-  const inlineAddRow = inlineAdd && quickAddCallback && (
-    <tr className="bg-surface-1">
-      <td colSpan={100} className="border-b-[0.5px] border-subtle">
-        <QuickAddIssueRoot
-          layout={EIssueLayoutTypes.SPREADSHEET}
-          isQuickAddOpen
-          setIsQuickAddOpen={(open) => {
-            if (!open) setInlineAdd(null);
-          }}
-          prePopulatedData={inlineAdd.data}
-          quickAddCallback={async (projectId, data) => {
-            try {
-              return await quickAddCallback(projectId, data);
-            } finally {
-              // One line per click: the next line needs its own place between neighbours.
-              setInlineAdd(null);
-            }
-          }}
-          isEpic={isEpic}
-        />
-      </td>
-    </tr>
-  );
 
   return (
     <>
-      {inlineAdd?.placement === "above" && inlineAddRow}
       {/* first column/ issue name and key column */}
       <RenderIfVisible
         as="tr"
@@ -184,7 +164,6 @@ export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: 
           onInlineAdd={canInlineAdd ? handleInlineAdd : undefined}
         />
       </RenderIfVisible>
-      {inlineAdd?.placement === "below" && inlineAddRow}
 
       {isExpanded &&
         !isEpic &&

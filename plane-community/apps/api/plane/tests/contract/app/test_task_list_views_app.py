@@ -121,7 +121,7 @@ class TestTaskListViewsEndpoint:
         assert first.data["field"]["name"] == "Seen"
         assert first.data["field"]["field_type"] == "checkbox"
         assert [v["name"] for v in first.data["views"]] == ["Active", "Completed", "Checked"]
-        assert [v["is_hidden"] for v in first.data["views"]] == [False, False, True]
+        assert [v["is_hidden"] for v in first.data["views"]] == [False, False, False]
         assert first.data["created"] == ["Active", "Completed", "Checked"]
 
         second = session_client.post(url)
@@ -137,11 +137,13 @@ class TestTaskListViewsEndpoint:
         data = session_client.post(url).data
         seen = seen_filter_key(data["field"]["id"])
         by_name = {v["name"]: v for v in data["views"]}
-        assert by_name["Active"]["rich_filters"] == {"and": [{"state_group__in": ["backlog", "unstarted", "started"]}]}
+        assert by_name["Active"]["rich_filters"] == {
+            "and": [{"state_group__in": ["backlog", "unstarted", "started", "cancelled"]}, {seen: False}]
+        }
         assert by_name["Completed"]["rich_filters"] == {"and": [{"state_group__in": ["completed"]}, {seen: False}]}
         assert by_name["Checked"]["rich_filters"] == {"and": [{seen: True}]}
-        # The Seen checkbox shows on the cards of Completed and Checked.
-        for name in ("Completed", "Checked"):
+        # The Seen checkbox shows on the cards of every tab.
+        for name in ("Active", "Completed", "Checked"):
             assert by_name[name]["display_properties"][f"cardfield_{data['field']['id']}"] is True
         assert view_definitions(data["field"]["id"]).keys() == {"Active", "Completed", "Checked"}
 
@@ -155,13 +157,13 @@ class TestTaskListViewsEndpoint:
         card = _make_issue("Oil change", project, states["todo"], create_user)
         first = ensure_task_list_views(project, create_user)
         checked = first["views"]["Checked"]
-        checked.is_hidden = False
+        checked.is_hidden = True
         checked.rich_filters = {}
         checked.save()
         again = ensure_task_list_views(project, create_user)
         assert again["updated"] == ["Checked"] and again["created"] == []
         checked.refresh_from_db()
-        assert checked.is_hidden is True
+        assert checked.is_hidden is False
         assert checked.rich_filters == view_definitions(str(first["field"].id))["Checked"]["rich_filters"]
         card.refresh_from_db()
         assert card.state_id == states["todo"].id
@@ -191,9 +193,33 @@ class TestTaskListFilters:
     def _view_names(self, client, workspace, project, view):
         return _names(client, workspace, project, view.rich_filters)
 
-    def test_active_is_not_completed_and_not_cancelled(self, session_client, workspace, project, setup):
+    def test_active_is_not_completed_and_not_checked(self, session_client, workspace, project, setup):
         names = self._view_names(session_client, workspace, project, setup["views"]["Active"])
-        assert names == {"todo", "doing", "todo-seen"}
+        assert names == {"todo", "doing", "dropped"}
+
+    def test_all_shows_every_card(self, session_client, workspace, project, setup):
+        assert _names(session_client, workspace, project, {}) == set(setup["cards"])
+
+    def test_marking_completed_leaves_active_and_ticking_check_leaves_completed(
+        self, session_client, workspace, project, setup, states
+    ):
+        views, field, card = setup["views"], setup["field"], setup["cards"]["todo"]
+        active, completed, checked = (self._view_names(session_client, workspace, project, views[n]) for n in ("Active", "Completed", "Checked"))
+        assert "todo" in active and "todo" not in completed and "todo" not in checked
+        url = ISSUE_URL.format(slug=workspace.slug, project_id=project.id, pk=card.id)
+        assert session_client.patch(url, {"state_id": str(states["done"].id)}, format="json").status_code == OK
+        assert "todo" not in self._view_names(session_client, workspace, project, views["Active"])
+        assert "todo" in self._view_names(session_client, workspace, project, views["Completed"])
+        assert _tick_seen(session_client, workspace, project, card, field, True).status_code == OK
+        assert "todo" not in self._view_names(session_client, workspace, project, views["Active"])
+        assert "todo" not in self._view_names(session_client, workspace, project, views["Completed"])
+        assert "todo" in self._view_names(session_client, workspace, project, views["Checked"])
+        assert "todo" in _names(session_client, workspace, project, {})
+
+    def test_ticking_check_on_an_open_task_removes_it_from_active(self, session_client, workspace, project, setup):
+        assert _tick_seen(session_client, workspace, project, setup["cards"]["doing"], setup["field"], True).status_code == OK
+        assert "doing" not in self._view_names(session_client, workspace, project, setup["views"]["Active"])
+        assert "doing" in self._view_names(session_client, workspace, project, setup["views"]["Checked"])
 
     def test_completed_is_done_and_not_seen(self, session_client, workspace, project, setup):
         names = self._view_names(session_client, workspace, project, setup["views"]["Completed"])
@@ -243,6 +269,8 @@ class TestHiddenViews:
     ):
         views = ensure_task_list_views(project, create_user)["views"]
         checked = views["Checked"]
+        assert checked.is_hidden is False  # shown by default
+        IssueView.objects.filter(pk=checked.id).update(is_hidden=True)
         url = VIEW_URL.format(slug=workspace.slug, project_id=project.id, pk=checked.id)
         assert session_client.get(url).data["is_hidden"] is True
         # Another admin may toggle is_hidden alone, nothing else.
@@ -257,3 +285,55 @@ class TestHiddenViews:
         # The owner may.
         assert session_client.patch(url, {"is_hidden": True}, format="json").status_code == status.HTTP_200_OK
         assert IssueView.objects.get(pk=checked.id).is_hidden is True
+
+
+@pytest.mark.contract
+@pytest.mark.django_db
+class TestPlusButtonChain:
+    """The + at the left of a row makes a card at once, between the row and its neighbour.
+
+    The web app sends the payload below (the row's state, sort_order midway to the neighbour).
+    Five clicks in a row, each on the newest row, must give five normal cards in order.
+    """
+
+    def _add_next_to(self, client, workspace, project, row, neighbour, below=True):
+        gap = 65535
+        if neighbour is not None:
+            order = (row.sort_order + neighbour.sort_order) / 2
+        else:
+            order = row.sort_order + gap if below else row.sort_order - gap
+        response = client.post(
+            ISSUES_URL.format(slug=workspace.slug, project_id=project.id),
+            {"name": "Untitled", "state_id": str(row.state_id), "priority": "none", "sort_order": order},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+        return Issue.objects.get(pk=response.data["id"])
+
+    def test_five_plus_clicks_in_a_row_make_five_normal_cards_in_order(
+        self, session_client, workspace, project, create_user, states
+    ):
+        first = _make_issue("first", project, states["todo"], create_user)
+        last = _make_issue("last", project, states["todo"], create_user)
+        ensure_task_list_views(project, create_user)
+        row, made = first, []
+        for _ in range(5):
+            row = self._add_next_to(session_client, workspace, project, row, None if row is last else last)
+            made.append(row)
+        assert [c.name for c in made] == ["Untitled"] * 5
+        assert {c.state_id for c in made} == {states["todo"].id}
+        assert all(c.parent_id is None for c in made)
+        orders = [first.sort_order] + [c.sort_order for c in made] + [last.sort_order]
+        assert orders == sorted(orders) and len(set(orders)) == len(orders)
+        listing = session_client.get(ISSUES_URL.format(slug=workspace.slug, project_id=project.id), {"order_by": "sort_order"})
+        assert listing.status_code == status.HTTP_200_OK
+        names = [r["name"] for r in _rows(listing.data)]
+        assert names == ["first"] + ["Untitled"] * 5 + ["last"]
+
+    def test_five_clicks_on_the_last_row_keep_adding_below(self, session_client, workspace, project, create_user, states):
+        row = _make_issue("only", project, states["todo"], create_user)
+        count = 0
+        for _ in range(5):
+            row = self._add_next_to(session_client, workspace, project, row, None)
+            count += 1
+        assert Issue.objects.filter(project=project, name="Untitled").count() == count == 5

@@ -15,10 +15,11 @@ import { useParams } from "next/navigation";
 import { useOutsideClickDetector } from "@plane/hooks";
 // types
 import type { IIssueDisplayProperties, TIssue, TIssueMap } from "@plane/types";
-import { EIssueLayoutTypes, EIssueServiceType } from "@plane/types";
+import { EIssueServiceType } from "@plane/types";
 // components
 import { DropIndicator } from "@plane/ui";
-import { cn } from "@plane/utils";
+import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { createIssuePayload } from "@plane/utils";
 import RenderIfVisible from "@/components/core/render-if-visible-HOC";
 import { ListLoaderItemRow } from "@/components/ui/loader/layouts/list-layout-loader";
 // hooks
@@ -26,7 +27,6 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // types
-import { QuickAddIssueRoot } from "../quick-add";
 import { buildInlineAddData } from "../quick-add/inline-row";
 import type { TRowAddPlacement } from "../row-add-button";
 import { HIGHLIGHT_CLASS, getIssueBlockId, isIssueNew } from "../utils";
@@ -58,7 +58,7 @@ type Props = {
   siblingIds?: string[];
 };
 
-type TInlineAdd = { placement: TRowAddPlacement; data: Partial<TIssue> };
+const NEW_ROW_NAME = "Untitled";
 
 export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
   const {
@@ -87,7 +87,6 @@ export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
   const [isExpanded, setExpanded] = useState<boolean>(false);
   const [instruction, setInstruction] = useState<"DRAG_OVER" | "DRAG_BELOW" | undefined>(undefined);
   const [isCurrentBlockDragging, setIsCurrentBlockDragging] = useState(false);
-  const [inlineAdd, setInlineAdd] = useState<TInlineAdd | null>(null);
   // ref
   const issueBlockRef = useRef<HTMLDivElement | null>(null);
   // router
@@ -107,38 +106,17 @@ export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
     issuesMap[issueId]?.project_id === routerProjectId.toString() &&
     canEditProperties(routerProjectId.toString());
 
+  // One click, one finished row: it is made at once, so the row looks like every other row and has its own +.
   const handleInlineAdd = (placement: TRowAddPlacement) => {
     const issue = issuesMap[issueId];
-    if (!issue || !siblingIds) return;
-    setInlineAdd({
-      placement,
-      data: buildInlineAddData(issue, placement, siblingIds, (id) => issuesMap[id], groupQuickAddData),
-    });
+    if (!issue || !siblingIds || !quickAddCallback || !routerProjectId) return;
+    const data = buildInlineAddData(issue, placement, siblingIds, (id) => issuesMap[id], groupQuickAddData);
+    const projectId = routerProjectId.toString();
+    quickAddCallback(projectId, { ...createIssuePayload(projectId, { ...data, name: NEW_ROW_NAME }) } as TIssue).catch(
+      (error: { message?: string }) =>
+        setToast({ type: TOAST_TYPE.ERROR, title: "Could not add the line", message: error?.message ?? "Try again." })
+    );
   };
-
-  const inlineAddForm = inlineAdd && quickAddCallback && (
-    <QuickAddIssueRoot
-      layout={EIssueLayoutTypes.LIST}
-      isQuickAddOpen
-      setIsQuickAddOpen={(open) => {
-        if (!open) setInlineAdd(null);
-      }}
-      prePopulatedData={inlineAdd.data}
-      containerClassName={cn(
-        "bg-surface-1",
-        inlineAdd.placement === "above" ? "border-b border-subtle" : "border-t border-subtle"
-      )}
-      quickAddCallback={async (projectId, data) => {
-        try {
-          return await quickAddCallback(projectId, data);
-        } finally {
-          // One line per click: the next line needs its own place between neighbours.
-          setInlineAdd(null);
-        }
-      }}
-      isEpic={isEpic}
-    />
-  );
 
   useEffect(() => {
     const blockElement = issueBlockRef.current;
@@ -192,7 +170,6 @@ export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
   return (
     <div className="relative" ref={issueBlockRef} id={getIssueBlockId(issueId, groupId)}>
       <DropIndicator classNames={"absolute top-0 z-[2]"} isVisible={instruction === "DRAG_OVER"} />
-      {inlineAdd?.placement === "above" && inlineAddForm}
       <RenderIfVisible
         key={`${issueId}`}
         root={containerRef}
@@ -223,7 +200,6 @@ export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
           onInlineAdd={canInlineAdd ? handleInlineAdd : undefined}
         />
       </RenderIfVisible>
-      {inlineAdd?.placement === "below" && inlineAddForm}
 
       {isExpanded &&
         !isEpic &&

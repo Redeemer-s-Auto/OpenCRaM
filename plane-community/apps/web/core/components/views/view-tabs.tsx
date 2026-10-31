@@ -40,7 +40,7 @@ const writeLastTab = (projectId: string, value: string) => {
   }
 };
 
-/** Tabs in the order the views were made (the task-list set: Active, Completed, then Checked). */
+/** Tabs in the order the views were made (the task-list set: Active, Completed, then Checked; All is drawn last). */
 const byBoardOrder = (a: IProjectView, b: IProjectView) =>
   (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.created_at).localeCompare(String(b.created_at));
 
@@ -133,15 +133,6 @@ export const ProjectViewTabs = observer(function ProjectViewTabs(props: Props) {
         role="tablist"
         aria-label="Views"
       >
-        <Link
-          href={`${boardPath}/issues`}
-          className={tabClass(!activeViewId)}
-          role="tab"
-          aria-selected={!activeViewId}
-          onClick={() => writeLastTab(projectId, ALL_TAB)}
-        >
-          All
-        </Link>
         {shown.map((view) => {
           const active = view.id === activeViewId;
           return (
@@ -158,6 +149,16 @@ export const ProjectViewTabs = observer(function ProjectViewTabs(props: Props) {
             </Link>
           );
         })}
+        {/* All is the last tab: the board's own page, no filter */}
+        <Link
+          href={`${boardPath}/issues`}
+          className={tabClass(!activeViewId)}
+          role="tab"
+          aria-selected={!activeViewId}
+          onClick={() => writeLastTab(projectId, ALL_TAB)}
+        >
+          All
+        </Link>
       </div>
       <CustomMenu
         customButton={
@@ -201,7 +202,7 @@ export const ProjectViewTabs = observer(function ProjectViewTabs(props: Props) {
               <ListChecks className="size-3.5" />
               <span>
                 <span className="block">Add task list views</span>
-                <span className="block text-11 text-tertiary">Active, Completed, Checked + a Seen box</span>
+                <span className="block text-11 text-tertiary">Active, Completed, Checked, All + a Seen box</span>
               </span>
             </span>
           </CustomMenu.MenuItem>

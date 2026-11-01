@@ -88,7 +88,7 @@ export const SubIssuesListItem = observer(function SubIssuesListItem(props: Prop
   const displayProperties = subIssueFilters?.displayProperties ?? {};
 
   //
-  const handleIssuePeekOverview = (issue: TIssue) => handleRedirection(workspaceSlug, issue, isMobile);
+  const handleIssuePeekOverview = (issue: TIssue) => handleRedirection(workspaceSlug, issue, isMobile, undefined, "peek");
 
   if (!issue) return <></>;
 

@@ -31,7 +31,9 @@ const useIssuePeekOverviewRedirection = (isEpic: boolean = false) => {
     workspaceSlug: string | undefined,
     issue: TIssue | undefined,
     isMobile = false,
-    nestingLevel?: number
+    nestingLevel?: number,
+    // a page inside a parent page always opens in the side panel on a plain click
+    forceMode?: "peek"
   ) => {
     if (!issue) return;
     const { project_id, id, archived_at, tempId } = issue;
@@ -53,7 +55,7 @@ const useIssuePeekOverviewRedirection = (isEpic: boolean = false) => {
         router.push(shortcut.status === "visible" ? linkedCardHref(workspaceSlug, shortcut.card) : workItemLink);
         return;
       }
-      if (isMobile || getCardOpenMode() === "page") {
+      if (isMobile || (forceMode !== "peek" && getCardOpenMode() === "page")) {
         router.push(workItemLink);
       } else {
         setPeekIssue({ workspaceSlug, projectId: project_id, issueId: id, nestingLevel, isArchived: !!archived_at });

@@ -39,7 +39,7 @@ function PageRow(props: {
   depth: number;
   open: Set<string>;
   toggle: (id: string) => void;
-  onOpen: (row: TCardNode) => void;
+  onOpen: (row: TCardNode, nested: boolean) => void;
   hrefFor: (row: TCardNode) => string;
 }) {
   const { row, depth, open, toggle, onOpen, hrefFor } = props;
@@ -68,7 +68,7 @@ function PageRow(props: {
           onClick={(event) => {
             if (event.metaKey || event.ctrlKey || event.shiftKey) return;
             event.preventDefault();
-            onOpen(row);
+            onOpen(row, depth > 0);
           }}
           className="flex min-w-0 flex-1 items-center gap-2"
         >
@@ -173,13 +173,20 @@ export const PageListLayout = observer(function PageListLayout() {
   );
 
   const onOpen = useCallback(
-    (row: TCardNode) =>
-      handleRedirection(workspaceSlug, {
-        id: row.id,
-        project_id: row.project_id,
-        sequence_id: row.sequence_id,
-        archived_at: null,
-      } as unknown as TIssue),
+    (row: TCardNode, nested: boolean) =>
+      handleRedirection(
+        workspaceSlug,
+        {
+          id: row.id,
+          project_id: row.project_id,
+          sequence_id: row.sequence_id,
+          archived_at: null,
+        } as unknown as TIssue,
+        false,
+        undefined,
+        // a page inside a parent page opens in the side panel on a plain click
+        nested ? "peek" : undefined
+      ),
     [handleRedirection, workspaceSlug]
   );
 

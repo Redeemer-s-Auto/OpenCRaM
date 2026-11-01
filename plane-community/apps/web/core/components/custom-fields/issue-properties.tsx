@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { useState } from "react";
 import { observer } from "mobx-react";
 import type { TCustomField, TCustomFieldValues, TIssue } from "@plane/types";
 // components
@@ -13,7 +14,7 @@ import { useCustomField } from "@/hooks/store/use-custom-field";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // local
 import { AddCustomFieldButton } from "./add-field-button";
-import { getFieldDetails } from "./helpers";
+import { getFieldDetails, isEmptyValue } from "./helpers";
 import type { TCustomFieldInputValue } from "./value-input";
 import { CustomFieldValueInput } from "./value-input";
 
@@ -51,9 +52,18 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
     fetchIssue,
   } = useIssueDetail();
 
+  const [showEmpty, setShowEmpty] = useState(false);
   const fields = getProjectFields(projectId);
   const issue = getIssueById(issueId);
   if (!fields || !issue) return null;
+
+  // A property with no value is hidden; a quiet link below the list shows them so they can be filled in.
+  const isBlank = (field: TCustomField) => {
+    const value = issue.custom_fields?.[field.id];
+    return isEmptyValue(value) || (field.field_type === "checkbox" && value === false);
+  };
+  const blankCount = fields.filter(isBlank).length;
+  const shownFields = showEmpty ? fields : fields.filter((field) => !isBlank(field));
 
   const handleChange = async (field: TCustomField, value: TCustomFieldInputValue) => {
     await update(workspaceSlug, projectId, issueId, buildCustomFieldsPayload(issue.custom_fields, field.id, value));
@@ -68,7 +78,7 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
 
   return (
     <>
-      {fields.map((field) => (
+      {shownFields.map((field) => (
         <SidebarPropertyListItem
           key={field.id}
           icon={getFieldDetails(field).icon}
@@ -84,6 +94,15 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
           />
         </SidebarPropertyListItem>
       ))}
+      {blankCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowEmpty((value) => !value)}
+          className="px-2 py-1 text-left text-11 text-tertiary hover:text-secondary"
+        >
+          {showEmpty ? "Hide empty properties" : `Show ${blankCount} empty ${blankCount === 1 ? "property" : "properties"}`}
+        </button>
+      )}
       <AddCustomFieldButton workspaceSlug={workspaceSlug} projectId={projectId} variant="row" />
     </>
   );

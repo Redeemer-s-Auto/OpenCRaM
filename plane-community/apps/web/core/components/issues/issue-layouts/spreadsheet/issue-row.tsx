@@ -40,7 +40,8 @@ import { RowAddButton } from "../row-add-button";
 import type { TRowAddKind, TRowInlineAdd } from "../row-line-tools";
 import { InlineRowTitle, RowLineMenu, blankRowFields, isBlankName, requestRowTitleFocus } from "../row-line-tools";
 import { isIssueNew } from "../utils";
-import { CustomFieldCells, SeenCell } from "@/components/custom-fields/spreadsheet-columns";
+import { CustomFieldCells } from "@/components/custom-fields/spreadsheet-columns";
+import { SeenCheck } from "@/components/custom-fields/seen-check";
 import { IssueColumn } from "./issue-column";
 // card shortcuts: a shortcut card shows its target's live title
 import { ShortcutAwareTitle, shortcutAwareName } from "@/components/card-links/shortcut-title";
@@ -335,6 +336,10 @@ const IssueRowDetails = observer(function IssueRowDetails(props: IssueRowDetails
                 {onInlineAdd && !issueDetail.tempId && <RowAddButton onAdd={onInlineAdd} />}
               </div>
             )}
+            {/* task lists: the check mark, right after the + */}
+            {!isEpic && !issueDetail.tempId && (
+              <SeenCheck issue={issueDetail} updateIssue={updateIssue} isReadOnly={disableUserActions} />
+            )}
             {/* Identifier section - conditionally rendered */}
             {displayProperties?.key && (
               <div className="flex h-full min-w-24 flex-shrink-0 items-center">
@@ -484,8 +489,6 @@ const IssueRowDetails = observer(function IssueRowDetails(props: IssueRowDetails
             disableUserActions={disableUserActions}
             updateIssue={updateIssue}
           />
-          {/* task lists: the check mark at the right end of the row */}
-          <SeenCell issueDetail={issueDetail} disableUserActions={disableUserActions} updateIssue={updateIssue} />
         </>
       )}
     </>

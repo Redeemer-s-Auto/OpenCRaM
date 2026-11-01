@@ -225,9 +225,6 @@ export function ListLayout(props: TLayoutProps) {
     <ul className="divide-y divide-subtle">
       {data.results.map((card) => (
         <li key={card.id} className="flex items-center gap-3 px-2 py-1.5">
-          <span className="w-16 shrink-0 text-11 text-tertiary">
-            {card.project_identifier}-{card.sequence_id}
-          </span>
           <div className="min-w-0 flex-1">
             <Name card={card} workspaceSlug={workspaceSlug} editable={editable} onPatch={onPatch} />
           </div>

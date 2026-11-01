@@ -109,7 +109,7 @@ export function CardPicker(props: Props) {
             <LinkedCardIcon card={row} />
             <span className="truncate text-primary">{row.name || "Untitled"}</span>
             <span className="ml-auto flex-shrink-0 text-11 text-tertiary">
-              {row.project_name} · {row.project_identifier}-{row.sequence_id}
+              {row.project_name}
             </span>
           </button>
         ))}

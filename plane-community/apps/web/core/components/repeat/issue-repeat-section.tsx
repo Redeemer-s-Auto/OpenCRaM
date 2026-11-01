@@ -64,7 +64,6 @@ const IssueLink = observer(function IssueLink(props: { workspaceSlug: string; is
   });
   return (
     <Link href={href} className="truncate text-accent-primary hover:underline">
-      {identifier ? `${identifier}-${issue.sequence_id} ` : ""}
       {issue.name}
     </Link>
   );

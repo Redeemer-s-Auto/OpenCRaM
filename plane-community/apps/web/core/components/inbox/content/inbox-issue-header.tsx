@@ -259,7 +259,7 @@ export const InboxIssueActionsHeader = observer(function InboxIssueActionsHeader
           fetchIssueDetails={false}
           showActionItemsOnUpdate
           modalTitle={t("inbox_issue.actions.move", {
-            value: `${currentProjectDetails?.identifier}-${issue?.sequence_id}`,
+            value: `${issue?.name}`,
           })}
           primaryButtonText={{
             default: t("add_to_project"),
@@ -292,11 +292,6 @@ export const InboxIssueActionsHeader = observer(function InboxIssueActionsHeader
             <button onClick={embedRemoveCurrentNotification}>
               <MoveRight className="h-4 w-4 text-tertiary hover:text-secondary" />
             </button>
-          )}
-          {issue?.project_id && issue.sequence_id && (
-            <h3 className="flex-shrink-0 text-14 font-medium text-tertiary">
-              {getProjectById(issue.project_id)?.identifier}-{issue.sequence_id}
-            </h3>
           )}
           <InboxIssueStatus inboxIssue={inboxIssue} iconSize={12} />
           <div className="flex w-full items-center justify-end">

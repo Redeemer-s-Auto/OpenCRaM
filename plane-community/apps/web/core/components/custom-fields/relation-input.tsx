@@ -39,7 +39,7 @@ function CardChip(props: { card: TCustomFieldLinkedCard; workspaceSlug: string; 
         href={`/${workspaceSlug}/browse/${card.project_identifier}-${card.sequence_id}/`}
         onClick={(e) => e.stopPropagation()}
         className="truncate text-primary hover:underline"
-        title={`${card.project_identifier}-${card.sequence_id} ${card.name}`}
+        title={card.name}
       >
         {card.name}
       </Link>
@@ -160,9 +160,6 @@ export const RelationInput = observer(function RelationInput(props: Props) {
                 }}
                 className="flex w-full items-center gap-2 truncate rounded-sm px-2 py-1.5 text-left hover:bg-layer-transparent-hover"
               >
-                <span className="shrink-0 text-tertiary">
-                  {card.project_identifier}-{card.sequence_id}
-                </span>
                 <span className="truncate text-primary">{card.name}</span>
               </button>
             ))}

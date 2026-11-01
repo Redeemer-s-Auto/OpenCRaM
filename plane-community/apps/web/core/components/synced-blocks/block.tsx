@@ -86,9 +86,6 @@ function Chooser(props: Pick<TSyncedBlockRenderProps, "setId" | "removeCopy">) {
               className="flex w-full items-baseline gap-2 rounded-sm px-1.5 py-1 text-left text-body-xs-regular hover:bg-layer-1"
             >
               <span className="min-w-0 flex-1 truncate">{block.snippet || "(empty)"}</span>
-              <span className="shrink-0 text-11 text-tertiary">
-                {block.home.project_identifier}-{block.home.sequence_id}
-              </span>
             </button>
           </li>
         ))}
@@ -239,7 +236,7 @@ export const SyncedBlockView = observer(function SyncedBlockView(props: TSyncedB
               className="hover:underline"
               href={`/${slug}/browse/${data.home.project_identifier}-${data.home.sequence_id}/`}
             >
-              {data.home.project_identifier}-{data.home.sequence_id} {data.home.name}
+              {data.home.name}
             </a>
           )}
           {!data.can_edit && " (read only)"}

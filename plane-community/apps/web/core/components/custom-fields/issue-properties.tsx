@@ -15,6 +15,7 @@ import { useCustomField } from "@/hooks/store/use-custom-field";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // local
 import { AddCustomFieldButton } from "./add-field-button";
+import { bumpBodyVersion } from "./body-version";
 import { getFieldDetails, isEmptyValue } from "./helpers";
 import type { TCustomFieldInputValue } from "./value-input";
 import { CustomFieldValueInput } from "./value-input";
@@ -106,6 +107,7 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
       ...buildCustomFieldsPayload(issue.custom_fields, field.id, ""),
     });
     await fetchIssue(workspaceSlug, projectId, issueId);
+    bumpBodyVersion(issueId);
   };
 
   return (

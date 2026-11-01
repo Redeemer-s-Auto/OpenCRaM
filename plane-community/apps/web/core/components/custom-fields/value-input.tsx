@@ -98,6 +98,37 @@ function CommitInput(props: {
   );
 }
 
+/**
+ * A multi-line text box. The shared TextArea is always controlled (it shows its own empty value when
+ * none is passed), so the text is held here and saved when the box loses focus.
+ */
+function LongTextInput(props: {
+  initial: string;
+  placeholder: string;
+  disabled: boolean;
+  rows: number;
+  className?: string;
+  onCommit: (text: string) => void;
+}) {
+  const { initial, placeholder, disabled, rows, className, onCommit } = props;
+  const [text, setText] = useState(initial);
+  useEffect(() => setText(initial), [initial]);
+  return (
+    <TextArea
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => {
+        if (text !== initial) onCommit(text);
+      }}
+      placeholder={placeholder}
+      disabled={disabled}
+      mode="true-transparent"
+      rows={rows}
+      className={className}
+    />
+  );
+}
+
 export const CustomFieldValueInput = observer(function CustomFieldValueInput(props: Props) {
   const { field, value, onChange, projectId, disabled = false, variant = "sidebar" } = props;
   const placeholder = variant === "cell" ? "" : `Add ${field.name.toLowerCase()}`;
@@ -172,17 +203,12 @@ export const CustomFieldValueInput = observer(function CustomFieldValueInput(pro
 
     case "long_text":
       return (
-        <TextArea
-          defaultValue={(value as string) ?? ""}
-          key={(value as string) ?? ""}
+        <LongTextInput
+          initial={(value as string) ?? ""}
           placeholder={placeholder}
           disabled={disabled}
-          mode="true-transparent"
           rows={variant === "cell" ? 1 : 3}
-          onBlur={(e) => {
-            const text = e.target.value;
-            if (text !== ((value as string) ?? "")) onChange(text.trim() === "" ? null : text);
-          }}
+          onCommit={(text) => onChange(text.trim() === "" ? null : text)}
           className={cn("w-full rounded-sm px-2 py-1 hover:bg-layer-transparent-hover", textClass)}
         />
       );

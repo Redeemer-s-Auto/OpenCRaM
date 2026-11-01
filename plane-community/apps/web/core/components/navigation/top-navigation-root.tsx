@@ -26,6 +26,7 @@ import { IconButton } from "@plane/propel/icon-button";
 import { Menu as MenuIcon } from "lucide-react";
 // local imports
 import { StarUsOnGitHubLink } from "@/app/(all)/[workspaceSlug]/(projects)/star-us-link";
+import { useAfterFirstContent } from "@/lib/first-content";
 
 export const TopNavigationRoot = observer(function TopNavigationRoot() {
   // router
@@ -43,10 +44,11 @@ export const TopNavigationRoot = observer(function TopNavigationRoot() {
   // Only an "open" button: while the menu is open, a tap outside it (this bar included) closes it.
   const showMenuButton = hasDrawer && sidebarCollapsed !== false;
 
-  // Fetch notification count
+  // Fetch notification count (after the first cards: the badge is not needed to draw them)
+  const isAfterFirstContent = useAfterFirstContent();
   useSWR(
-    workspaceSlug ? "WORKSPACE_UNREAD_NOTIFICATION_COUNT" : null,
-    workspaceSlug ? () => getUnreadNotificationsCount(workspaceSlug.toString()) : null
+    workspaceSlug && isAfterFirstContent ? "WORKSPACE_UNREAD_NOTIFICATION_COUNT" : null,
+    workspaceSlug && isAfterFirstContent ? () => getUnreadNotificationsCount(workspaceSlug.toString()) : null
   );
 
   // Calculate notification count

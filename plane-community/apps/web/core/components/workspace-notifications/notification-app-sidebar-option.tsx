@@ -12,6 +12,7 @@ import { getNumberCount } from "@plane/utils";
 import { CountChip } from "@/components/common/count-chip";
 // hooks
 import { useWorkspaceNotifications } from "@/hooks/store/notifications";
+import { useAfterFirstContent } from "@/lib/first-content";
 
 type TNotificationAppSidebarOption = {
   workspaceSlug: string;
@@ -24,9 +25,10 @@ export const NotificationAppSidebarOption = observer(function NotificationAppSid
   // hooks
   const { unreadNotificationsCount, getUnreadNotificationsCount } = useWorkspaceNotifications();
 
+  const isAfterFirstContent = useAfterFirstContent();
   useSWR(
-    workspaceSlug ? "WORKSPACE_UNREAD_NOTIFICATION_COUNT" : null,
-    workspaceSlug ? () => getUnreadNotificationsCount(workspaceSlug) : null
+    workspaceSlug && isAfterFirstContent ? "WORKSPACE_UNREAD_NOTIFICATION_COUNT" : null,
+    workspaceSlug && isAfterFirstContent ? () => getUnreadNotificationsCount(workspaceSlug) : null
   );
 
   // derived values

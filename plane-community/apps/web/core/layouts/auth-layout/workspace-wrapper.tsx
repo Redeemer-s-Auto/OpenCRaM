@@ -41,6 +41,7 @@ import { useProjectState } from "@/hooks/store/use-project-state";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
 import { usePlatformOS } from "@/hooks/use-platform-os";
+import { useAfterFirstContent } from "@/lib/first-content";
 
 interface IWorkspaceAuthWrapper {
   children: ReactNode;
@@ -72,6 +73,8 @@ export const WorkspaceAuthWrapper = observer(function WorkspaceAuthWrapper(props
   const currentWorkspace =
     (allWorkspaces && allWorkspaces.find((workspace) => workspace?.slug === workspaceSlug)) || undefined;
   const currentWorkspaceInfo = workspaceSlug && workspaceInfoBySlug(workspaceSlug.toString());
+  // favorites and the workspace-wide states are not needed for the first cards: they load right after them
+  const isAfterFirstContent = useAfterFirstContent();
 
   // fetching user workspace information
   useSWR(
@@ -99,18 +102,18 @@ export const WorkspaceAuthWrapper = observer(function WorkspaceAuthWrapper(props
   );
   // fetch workspace favorite
   useSWR(
-    workspaceSlug && currentWorkspace && canPerformWorkspaceMemberActions
+    workspaceSlug && currentWorkspace && canPerformWorkspaceMemberActions && isAfterFirstContent
       ? WORKSPACE_FAVORITE(workspaceSlug.toString())
       : null,
-    workspaceSlug && currentWorkspace && canPerformWorkspaceMemberActions
+    workspaceSlug && currentWorkspace && canPerformWorkspaceMemberActions && isAfterFirstContent
       ? () => fetchFavorite(workspaceSlug.toString())
       : null,
     { revalidateIfStale: false, revalidateOnFocus: false }
   );
   // fetch workspace states
   useSWR(
-    workspaceSlug ? WORKSPACE_STATES(workspaceSlug.toString()) : null,
-    workspaceSlug ? () => fetchWorkspaceStates(workspaceSlug.toString()) : null,
+    workspaceSlug && isAfterFirstContent ? WORKSPACE_STATES(workspaceSlug.toString()) : null,
+    workspaceSlug && isAfterFirstContent ? () => fetchWorkspaceStates(workspaceSlug.toString()) : null,
     { revalidateIfStale: false, revalidateOnFocus: false }
   );
 

@@ -34,6 +34,7 @@ import { convertToISODateString } from "@plane/utils";
 import { CycleService } from "@/services/cycle.service";
 import { IssueArchiveService, IssueService } from "@/services/issue";
 import { ModuleService } from "@/services/module.service";
+import { markFirstContentReady } from "@/lib/first-content";
 // undo
 import { issueChangeLabel, pickOldValues, sameValue, undoStack } from "@/store/undo/undo-stack";
 //
@@ -488,6 +489,8 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
 
     // store Pagination options for next subsequent calls and data like next cursor etc
     this.storePreviousPaginationValues(issuesResponse, options);
+    // the first cards are in: the data that waited for them may load now
+    markFirstContentReady();
   }
 
   /**

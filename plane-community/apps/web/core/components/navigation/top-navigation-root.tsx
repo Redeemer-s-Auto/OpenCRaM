@@ -74,12 +74,15 @@ export const TopNavigationRoot = observer(function TopNavigationRoot() {
             onClick={() => toggleSidebar(false)}
           />
         )}
-        <BrandMark />
+        {/* Phones: the logo and the search box pushed the inbox, help and profile buttons off a 375 px screen. */}
+        <span className="hidden md:contents">
+          <BrandMark />
+        </span>
         {showGardenIcons ? <span className="garden-work-brand"><GardenWorkIcon className="size-5" /><span>{gardenOrgName}<span className="garden-work-brand-subtitle">WORKSPACE</span></span></span> : null}
         <WorkspaceMenuRoot variant="top-navigation" />
       </div>
       {/* Power K Search */}
-      <div className="shrink-0">
+      <div className="hidden shrink-0 md:block">
         <TopNavPowerK />
       </div>
       {/* Additional Actions */}

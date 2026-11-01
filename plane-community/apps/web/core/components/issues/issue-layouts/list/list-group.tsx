@@ -73,9 +73,12 @@ interface Props {
   isEpic?: boolean;
 }
 
+/** One shared empty list, so a group with no cards does not hand its rows a new array on every render. */
+const NO_ISSUE_IDS: string[] = [];
+
 export const ListGroup = observer(function ListGroup(props: Props) {
   const {
-    groupIssueIds = [],
+    groupIssueIds = NO_ISSUE_IDS,
     group,
     issuesMap,
     group_by,

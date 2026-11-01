@@ -33,8 +33,9 @@ export const blankRowFields = (kind: TRowAddKind = "line"): Partial<TIssue> =>
 
 // --- focus the title of a row that was just made -------------------------------------------------
 
-const ROW_TITLE_FOCUS_EVENT = "row-title-focus";
 let pendingFocusId: string | null = null;
+/** One focus callback per mounted row title, by card id: a request wakes only that row (no listener per row). */
+const rowTitleFocusers = new Map<string, () => void>();
 
 /**
  * Put the cursor in the title of a new row. The row may mount before or after the create call
@@ -43,7 +44,7 @@ let pendingFocusId: string | null = null;
 export const requestRowTitleFocus = (issueId: string | undefined) => {
   if (!issueId || typeof window === "undefined") return;
   pendingFocusId = issueId;
-  window.dispatchEvent(new CustomEvent<string>(ROW_TITLE_FOCUS_EVENT, { detail: issueId }));
+  rowTitleFocusers.get(issueId)?.();
 };
 
 // --- inline title ---------------------------------------------------------------------------------
@@ -78,11 +79,10 @@ export const InlineRowTitle = observer(function InlineRowTitle(props: TInlineRow
       inputRef.current?.focus();
     };
     if (pendingFocusId === issue.id) focus();
-    const handler = (e: Event) => {
-      if ((e as CustomEvent<string>).detail === issue.id) focus();
+    rowTitleFocusers.set(issue.id, focus);
+    return () => {
+      if (rowTitleFocusers.get(issue.id) === focus) rowTitleFocusers.delete(issue.id);
     };
-    window.addEventListener(ROW_TITLE_FOCUS_EVENT, handler);
-    return () => window.removeEventListener(ROW_TITLE_FOCUS_EVENT, handler);
   }, [issue.id]);
 
   if (isReadOnly || !updateIssue || issue.tempId) {

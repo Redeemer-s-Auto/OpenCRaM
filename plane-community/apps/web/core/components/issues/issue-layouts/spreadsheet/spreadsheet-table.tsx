@@ -108,6 +108,10 @@ export const SpreadsheetTable = observer(function SpreadsheetTable(props: Props)
   useIntersectionObserver(containerRef, isPaginating ? null : intersectionElement, loadMoreIssues, `100% 0% 100% 0%`);
 
   const handleKeyBoardNavigation = useTableKeyboardNavigation();
+  // Rows read the current ids on click; the getter never changes, so a new ids array re-renders no row.
+  const issueIdsRef = useRef(issueIds);
+  issueIdsRef.current = issueIds;
+  const getSiblingIds = useCallback(() => issueIdsRef.current, []);
 
   const ignoreFieldsForCounting: (keyof IIssueDisplayProperties)[] = ["key"];
   if (!isEstimateEnabled) ignoreFieldsForCounting.push("estimate");
@@ -143,7 +147,7 @@ export const SpreadsheetTable = observer(function SpreadsheetTable(props: Props)
             selectionHelpers={selectionHelpers}
             isEpic={isEpic}
             quickAddCallback={quickAddCallback}
-            siblingIds={issueIds}
+            getSiblingIds={getSiblingIds}
           />
         ))}
       </tbody>

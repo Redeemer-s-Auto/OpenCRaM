@@ -5,6 +5,7 @@
  */
 
 import type { MutableRefObject } from "react";
+import { useCallback, useRef } from "react";
 // components
 import type { TIssue, IIssueDisplayProperties, TIssueMap, TGroupedIssues } from "@plane/types";
 // hooks
@@ -49,6 +50,10 @@ export function IssueBlocksList(props: Props) {
     quickAddCallback,
     groupQuickAddData,
   } = props;
+  // Rows read the current ids on click; the getter never changes, so a new ids array re-renders no row.
+  const issueIdsRef = useRef(issueIds);
+  issueIdsRef.current = issueIds;
+  const getSiblingIds = useCallback(() => issueIdsRef.current ?? [], []);
 
   return (
     <div className="relative h-full w-full">
@@ -78,7 +83,7 @@ export function IssueBlocksList(props: Props) {
             isEpic={isEpic}
             quickAddCallback={quickAddCallback}
             groupQuickAddData={groupQuickAddData}
-            siblingIds={issueIds}
+            getSiblingIds={getSiblingIds}
           />
         ))}
     </div>

@@ -29,7 +29,6 @@ import {
   linkedCards,
 } from "./helpers";
 import { buildCustomFieldsPayload } from "./issue-properties";
-import { useRefetchWorkItems } from "./use-refetch-work-items";
 import { OptionChip } from "./value-input";
 
 /**
@@ -107,7 +106,6 @@ const CardFaceValue = observer(function CardFaceValue(props: {
   const { field, issue, updateIssue } = props;
   const { isMobile } = usePlatformOS();
   const { getUserDetails } = useMember();
-  const refetch = useRefetchWorkItems();
   const value = issue.custom_fields?.[field.id];
   const Icon = getFieldDetails(field).icon;
   const text = formatCustomFieldValue(field, value, (userId) => getUserDetails(userId)?.display_name);
@@ -142,8 +140,7 @@ const CardFaceValue = observer(function CardFaceValue(props: {
           checked={checked}
           disabled={!canEdit}
           onChange={(e) => {
-            const saved = save(e.target.checked);
-            if (saved) void saved.then(() => refetch());
+            void save(e.target.checked);
           }}
           aria-label={field.name}
         />

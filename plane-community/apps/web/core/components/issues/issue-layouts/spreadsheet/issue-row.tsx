@@ -63,8 +63,8 @@ interface Props {
   isEpic?: boolean;
   /** When set, the row gets a + that adds a card right above or below it (top-level rows only). */
   quickAddCallback?: (projectId: string | null | undefined, data: TIssue) => Promise<TIssue | undefined>;
-  /** The ids of the table's rows, in order: the new card's sort_order lands between neighbours. */
-  siblingIds?: string[];
+  /** The ids of the table's rows, in order (read on click, so a new array does not re-render every row). */
+  getSiblingIds?: () => string[];
 }
 
 export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: Props) {
@@ -85,7 +85,7 @@ export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: 
     shouldRenderByDefault,
     isEpic = false,
     quickAddCallback,
-    siblingIds,
+    getSiblingIds,
   } = props;
   // states
   const [isExpanded, setExpanded] = useState<boolean>(false);
@@ -106,7 +106,7 @@ export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: 
   // The + adds to the board in the URL, so it needs one, and the row must belong to it.
   const canInlineAdd =
     !!quickAddCallback &&
-    !!siblingIds &&
+    !!getSiblingIds &&
     nestingLevel === 0 &&
     !!routerProjectId &&
     issue.project_id === routerProjectId.toString() &&
@@ -115,8 +115,8 @@ export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: 
   // One click, one finished row: it is made at once, so the row looks like every other row and has its own +.
   // A blank line (or a divider) made at once next to this row; the cursor goes into its title.
   const handleInlineAdd = (placement: TRowAddPlacement, kind: TRowAddKind = "line") => {
-    if (!siblingIds || !quickAddCallback || !routerProjectId) return;
-    const data = buildInlineAddData(issue, placement, siblingIds, (id) => issueMap[id]);
+    if (!getSiblingIds || !quickAddCallback || !routerProjectId) return;
+    const data = buildInlineAddData(issue, placement, getSiblingIds(), (id) => issueMap[id]);
     const projectId = routerProjectId.toString();
     quickAddCallback(projectId, { ...createIssuePayload(projectId, { ...data, ...blankRowFields(kind) }) } as TIssue)
       .then((created) => requestRowTitleFocus(created?.id))

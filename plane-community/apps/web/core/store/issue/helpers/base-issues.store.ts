@@ -812,15 +812,24 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
   async removeIssue(workspaceSlug: string, projectId: string, issueId: string) {
     // Ctrl+Z makes the card again from this copy (taken before it is gone)
     const shouldRecord = undoStack.canRecord() && !this.isArchived;
-    const undoSnapshot = shouldRecord ? await this.snapshotForDelete(workspaceSlug, projectId, issueId) : undefined;
-    const wasInList = shouldRecord ? this.isIssueInList(issueId) : false;
-    // Store Before state of the issue
-    const issueBeforeRemoval = clone(this.rootIssueStore.issues.getIssueById(issueId));
-    // update parent stats optimistically
-    this.updateParentStats(issueBeforeRemoval, undefined);
+    const wasInList = this.isIssueInList(issueId);
+    // The row leaves the list at once: the undo copy (one GET for the card's body) and the DELETE
+    // no longer hold up what the user sees. It comes back if the delete fails.
+    if (wasInList) runInAction(() => this.removeIssueFromList(issueId));
+    let undoSnapshot: TIssue | undefined;
+    try {
+      undoSnapshot = shouldRecord ? await this.snapshotForDelete(workspaceSlug, projectId, issueId) : undefined;
+      // Store Before state of the issue
+      const issueBeforeRemoval = clone(this.rootIssueStore.issues.getIssueById(issueId));
+      // update parent stats optimistically
+      this.updateParentStats(issueBeforeRemoval, undefined);
 
-    // Male API call
-    await this.issueService.deleteIssue(workspaceSlug, projectId, issueId);
+      // Male API call
+      await this.issueService.deleteIssue(workspaceSlug, projectId, issueId);
+    } catch (error) {
+      if (wasInList && !this.isIssueInList(issueId)) runInAction(() => this.addIssueToList(issueId));
+      throw error;
+    }
     // Remove from Respective issue Id list
     runInAction(() => {
       this.removeIssueFromList(issueId);
@@ -832,6 +841,9 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
 
     if (undoSnapshot) this.recordIssuesDeleted(workspaceSlug, projectId, [undoSnapshot], [wasInList]);
   }
+
+  /** At most this many card GETs at once for the undo copies of a bulk delete. */
+  private static readonly SNAPSHOT_CONCURRENCY = 4;
 
   /**
    * This method is called to Archive an issue
@@ -862,14 +874,17 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
 
   /** Brings archived cards back (undo of archive) without recording it. */
   private async unarchiveForUndo(workspaceSlug: string, projectId: string, issueIds: string[], addToList: boolean) {
-    for (const issueId of issueIds) {
-      await this.issueArchiveService.restoreIssue(workspaceSlug, projectId, issueId);
-      runInAction(() => {
-        this.rootIssueStore.issues.updateIssue(issueId, { archived_at: null });
-        if (addToList && !this.isIssueInList(issueId) && this.rootIssueStore.issues.getIssueById(issueId))
-          this.addIssueToList(issueId);
-      });
-    }
+    // order does not matter: all cards at once, not one round trip after another
+    await Promise.all(
+      issueIds.map(async (issueId) => {
+        await this.issueArchiveService.restoreIssue(workspaceSlug, projectId, issueId);
+        runInAction(() => {
+          this.rootIssueStore.issues.updateIssue(issueId, { archived_at: null });
+          if (addToList && !this.isIssueInList(issueId) && this.rootIssueStore.issues.getIssueById(issueId))
+            this.addIssueToList(issueId);
+        });
+      })
+    );
     this.fetchParentStats(workspaceSlug, projectId);
   }
 
@@ -885,7 +900,7 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
           wasInList
         ),
       redo: async () => {
-        for (const id of issueIds) await this.issueArchive(workspaceSlug, projectId, undoStack.resolve(id));
+        await Promise.all(issueIds.map((id) => this.issueArchive(workspaceSlug, projectId, undoStack.resolve(id))));
       },
     });
   }
@@ -934,18 +949,36 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
     const shouldRecord = undoStack.canRecord() && !this.isArchived;
     const undoSnapshots: TIssue[] = [];
     const undoInList: boolean[] = [];
-    if (shouldRecord) {
-      const snapshots = await Promise.all(
-        issueIds.map((issueId) => this.snapshotForDelete(workspaceSlug, projectId, issueId))
+    const inList = issueIds.map((issueId) => this.isIssueInList(issueId));
+    // The rows leave the list at once and come back if the delete fails (see removeIssue).
+    runInAction(() => issueIds.forEach((issueId, index) => inList[index] && this.removeIssueFromList(issueId)));
+    let response: Awaited<ReturnType<IssueService["bulkDeleteIssues"]>>;
+    try {
+      if (shouldRecord) {
+        // a few GETs at a time, not one per card all at once
+        const snapshots: (TIssue | undefined)[] = [];
+        for (let start = 0; start < issueIds.length; start += BaseIssuesStore.SNAPSHOT_CONCURRENCY) {
+          const chunk = issueIds.slice(start, start + BaseIssuesStore.SNAPSHOT_CONCURRENCY);
+          snapshots.push(
+            ...(await Promise.all(chunk.map((issueId) => this.snapshotForDelete(workspaceSlug, projectId, issueId))))
+          );
+        }
+        snapshots.forEach((snapshot, index) => {
+          if (!snapshot) return;
+          undoSnapshots.push(snapshot);
+          undoInList.push(inList[index]);
+        });
+      }
+      // Make API call to bulk delete issues
+      response = await this.issueService.bulkDeleteIssues(workspaceSlug, projectId, { issue_ids: issueIds });
+    } catch (error) {
+      runInAction(() =>
+        issueIds.forEach((issueId, index) => {
+          if (inList[index] && !this.isIssueInList(issueId)) this.addIssueToList(issueId);
+        })
       );
-      snapshots.forEach((snapshot, index) => {
-        if (!snapshot) return;
-        undoSnapshots.push(snapshot);
-        undoInList.push(this.isIssueInList(issueIds[index]));
-      });
+      throw error;
     }
-    // Make API call to bulk delete issues
-    const response = await this.issueService.bulkDeleteIssues(workspaceSlug, projectId, { issue_ids: issueIds });
     if (shouldRecord) this.recordIssuesDeleted(workspaceSlug, projectId, undoSnapshots, undoInList);
     // call fetch parent stats
     this.fetchParentStats(workspaceSlug, projectId);
@@ -1009,9 +1042,14 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
       undoStack.record({
         label: "Bulk edit",
         undo: async () => {
-          for (const entry of oldValues) {
-            if (entry) await this.issueUpdate(workspaceSlug, projectId, undoStack.resolve(entry.issueId), entry.values);
-          }
+          // each card gets its own old values back; order does not matter, so all at once
+          await Promise.all(
+            oldValues.map((entry) =>
+              entry
+                ? this.issueUpdate(workspaceSlug, projectId, undoStack.resolve(entry.issueId), entry.values)
+                : undefined
+            )
+          );
         },
         redo: () =>
           this.bulkUpdateProperties(workspaceSlug, projectId, {

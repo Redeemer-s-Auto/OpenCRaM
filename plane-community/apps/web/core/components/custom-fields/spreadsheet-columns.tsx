@@ -23,7 +23,6 @@ import { AddCustomFieldButton } from "./add-field-button";
 import { getFieldDetails, isLinkedField, isSeenField } from "./helpers";
 import { buildCustomFieldsPayload } from "./issue-properties";
 import { SeenCheck, useSeenField } from "./seen-check";
-import { useRefetchWorkItems } from "./use-refetch-work-items";
 import { CustomFieldValueInput } from "./value-input";
 
 export const customFieldDisplayKey = (fieldId: string) => `customfield_${fieldId}` as const;
@@ -183,7 +182,6 @@ export const CustomFieldCells = observer(function CustomFieldCells(props: TCellP
   const { workspaceSlug, projectId } = useParams();
   const fields = useSpreadsheetCustomFields();
   const { fetchIssue } = useIssueDetail();
-  const refetch = useRefetchWorkItems();
 
   return (
     <>
@@ -211,8 +209,6 @@ export const CustomFieldCells = observer(function CustomFieldCells(props: TCellP
                   // New links change this card's rollups; the server works them out.
                   if (field.field_type === "relation" && workspaceSlug && issueDetail.project_id)
                     await fetchIssue(workspaceSlug.toString(), issueDetail.project_id, issueDetail.id);
-                  // A ticked box can move the card out of a filtered view (Completed -> Checked).
-                  if (field.field_type === "checkbox") await refetch();
                 }}
               />
             </div>

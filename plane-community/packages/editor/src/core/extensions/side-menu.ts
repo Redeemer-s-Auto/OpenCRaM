@@ -72,7 +72,13 @@ const absoluteRect = (node: Element) => {
 };
 
 /** A touch screen with no hover: the side menu stays beside the block that holds the caret. */
-const isTouchScreen = () => typeof window !== "undefined" && !!window.matchMedia?.("(hover: none)").matches;
+let noHoverQuery: MediaQueryList | null | undefined;
+const isTouchScreen = () => {
+  if (typeof window === "undefined") return false;
+  // One MediaQueryList for the page: this runs on every scroll event and keystroke.
+  if (noHoverQuery === undefined) noHoverQuery = window.matchMedia?.("(hover: none)") ?? null;
+  return !!noHoverQuery?.matches;
+};
 
 /** The block element that holds the selection, as the side menu would find it under the mouse. */
 const blockDOMAtSelection = (view: EditorView): Element | null => {
@@ -168,11 +174,16 @@ const SideMenu = (options: SideMenuPluginProps) => {
       }
 
       // A fixed menu drifts when the page scrolls under a finger; follow the block.
+      // One re-place per frame however many scroll events arrive (each one forces a layout).
+      let placeFrame: number | null = null;
       const scrollHandler = () => {
-        if (!currentNode || !isTouchScreen()) return;
-        requestAnimationFrame(() => currentNode && placeBeside(currentNode));
+        if (!currentNode || placeFrame !== null || !isTouchScreen()) return;
+        placeFrame = requestAnimationFrame(() => {
+          placeFrame = null;
+          if (currentNode) placeBeside(currentNode);
+        });
       };
-      document.addEventListener("scroll", scrollHandler, true);
+      document.addEventListener("scroll", scrollHandler, { capture: true, passive: true });
 
       return {
         update: (view) => {
@@ -180,11 +191,18 @@ const SideMenu = (options: SideMenuPluginProps) => {
           if (!isTouchScreen() || !view.editable) return;
           const node = blockDOMAtSelection(view);
           if (!node) return;
+          // Typing inside the same block does not move it: re-place only when the caret's block changes.
+          if (node === currentNode && editorSideMenu.classList.contains("side-menu-placed")) {
+            showSideMenu();
+            return;
+          }
           placeBeside(node);
           showSideMenu();
         },
         destroy: () => {
-          document.removeEventListener("scroll", scrollHandler, true);
+          document.removeEventListener("scroll", scrollHandler, { capture: true });
+          if (placeFrame !== null) cancelAnimationFrame(placeFrame);
+          placeFrame = null;
           currentNode = null;
           hideSideMenu();
         },

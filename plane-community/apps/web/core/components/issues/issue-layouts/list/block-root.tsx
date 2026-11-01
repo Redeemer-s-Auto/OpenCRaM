@@ -56,8 +56,11 @@ type Props = {
   /** When set, the row gets a + that adds a card right above or below it (top-level rows only). */
   quickAddCallback?: (projectId: string | null | undefined, data: TIssue) => Promise<TIssue | undefined>;
   groupQuickAddData?: Partial<TIssue>;
-  /** The ids of the list this row is in, in order: the new card's sort_order lands between neighbours. */
-  siblingIds?: string[];
+  /**
+   * The ids of the list this row is in, in order: the new card's sort_order lands between neighbours.
+   * A getter, read on click, so a new list array does not re-render every row.
+   */
+  getSiblingIds?: () => string[];
 };
 
 export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
@@ -81,7 +84,7 @@ export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
     isEpic = false,
     quickAddCallback,
     groupQuickAddData,
-    siblingIds,
+    getSiblingIds,
   } = props;
   // states
   const [isExpanded, setExpanded] = useState<boolean>(false);
@@ -100,7 +103,7 @@ export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
   // The + adds to the board in the URL, so it needs one, and the row must belong to it.
   const canInlineAdd =
     !!quickAddCallback &&
-    !!siblingIds &&
+    !!getSiblingIds &&
     !isSubIssue &&
     !!routerProjectId &&
     issuesMap[issueId]?.project_id === routerProjectId.toString() &&
@@ -110,8 +113,8 @@ export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
   // with its own +. The cursor goes into its title so it can be typed straight away.
   const handleInlineAdd = (placement: TRowAddPlacement, kind: TRowAddKind = "line") => {
     const issue = issuesMap[issueId];
-    if (!issue || !siblingIds || !quickAddCallback || !routerProjectId) return;
-    const data = buildInlineAddData(issue, placement, siblingIds, (id) => issuesMap[id], groupQuickAddData);
+    if (!issue || !getSiblingIds || !quickAddCallback || !routerProjectId) return;
+    const data = buildInlineAddData(issue, placement, getSiblingIds(), (id) => issuesMap[id], groupQuickAddData);
     const projectId = routerProjectId.toString();
     quickAddCallback(projectId, { ...createIssuePayload(projectId, { ...data, ...blankRowFields(kind) }) } as TIssue)
       .then((created) => requestRowTitleFocus(created?.id))

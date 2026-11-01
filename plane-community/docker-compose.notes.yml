@@ -20,6 +20,8 @@ services:
         ]
     environment:
       NOTES_API_HEALTH_PATH: ${NOTES_API_HEALTH_PATH:-/auth/firebase/health/}
+      # One worker queued every request (page loads of 30-100 s with a few users). Set in the env file.
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-1}
 
   # Look of the web app, baked in at build time (rebuild web after a change):
   #   NOTES_BRAND_THEME     garden (default, The Garden look) or hub (neutral, red accent, light + dark)

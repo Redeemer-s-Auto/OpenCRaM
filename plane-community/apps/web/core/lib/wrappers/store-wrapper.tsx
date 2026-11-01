@@ -43,6 +43,11 @@ function StoreWrapper(props: TStoreWrapper) {
   useEffect(() => {
     const localValue = localStorage && localStorage.getItem("app_sidebar_collapsed");
     const localBoolValue = localValue ? (localValue === "true" ? true : false) : false;
+    // Phones (below md): the sidebar is a drawer over the page, so every full page load starts with it closed.
+    if (sidebarCollapsed === undefined && window.innerWidth < 768) {
+      toggleSidebar(true);
+      return;
+    }
     if (localValue && sidebarCollapsed === undefined) toggleSidebar(localBoolValue);
   }, [sidebarCollapsed, setTheme, toggleSidebar]);
 

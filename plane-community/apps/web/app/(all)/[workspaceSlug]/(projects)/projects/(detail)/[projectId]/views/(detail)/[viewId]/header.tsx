@@ -26,7 +26,12 @@ import { Breadcrumbs, Header, BreadcrumbNavigationSearchDropdown } from "@plane/
 import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
 import { PropertiesButton } from "@/components/custom-fields/properties-button";
 import { SwitcherIcon, SwitcherLabel } from "@/components/common/switcher-label";
-import { DisplayFiltersSelection, FiltersDropdown, LayoutSelection } from "@/components/issues/issue-layouts/filters";
+import {
+  DisplayFiltersSelection,
+  FiltersDropdown,
+  LayoutSelection,
+  MobileLayoutSelection,
+} from "@/components/issues/issue-layouts/filters";
 import { ViewQuickActions } from "@/components/views/quick-actions";
 import { WorkItemFiltersToggle } from "@/components/work-item-filters/filters-toggle";
 // hooks
@@ -38,6 +43,15 @@ import { useUserPermissions } from "@/hooks/store/user";
 import { useAppRouter } from "@/hooks/use-app-router";
 // plane web imports
 import { CommonProjectBreadcrumbs } from "@/components/breadcrumbs/common";
+
+const VIEW_LAYOUTS = [
+  EIssueLayoutTypes.LIST,
+  EIssueLayoutTypes.KANBAN,
+  EIssueLayoutTypes.CALENDAR,
+  EIssueLayoutTypes.SPREADSHEET,
+  EIssueLayoutTypes.GALLERY,
+  EIssueLayoutTypes.GANTT,
+];
 
 export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader() {
   // refs
@@ -167,19 +181,24 @@ export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader
       </Header.LeftItem>
       <Header.RightItem className="items-center">
         <>
+          {/* Phones: the six layout icons ran off a 375 px screen, so a one-button menu stands in. */}
           {!viewDetails.is_locked && (
-            <LayoutSelection
-              layouts={[
-                EIssueLayoutTypes.LIST,
-                EIssueLayoutTypes.KANBAN,
-                EIssueLayoutTypes.CALENDAR,
-                EIssueLayoutTypes.SPREADSHEET,
-                EIssueLayoutTypes.GALLERY,
-                EIssueLayoutTypes.GANTT,
-              ]}
-              onChange={(layout) => handleLayoutChange(layout)}
-              selectedLayout={activeLayout}
-            />
+            <>
+              <div className="hidden md:flex">
+                <LayoutSelection
+                  layouts={VIEW_LAYOUTS}
+                  onChange={(layout) => handleLayoutChange(layout)}
+                  selectedLayout={activeLayout}
+                />
+              </div>
+              <div className="flex md:hidden">
+                <MobileLayoutSelection
+                  layouts={VIEW_LAYOUTS}
+                  onChange={(layout) => handleLayoutChange(layout)}
+                  activeLayout={activeLayout}
+                />
+              </div>
+            </>
           )}
           {viewId && <WorkItemFiltersToggle entityType={EIssuesStoreType.PROJECT_VIEW} entityId={viewId} />}
           {!viewDetails.is_locked && (

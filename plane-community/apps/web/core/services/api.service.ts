@@ -33,10 +33,7 @@ export abstract class APIService {
   }
 
   private setupInterceptors() {
-    this.axiosInstance.interceptors.response.use(
-      (response) => response,
-      redirectOnUnauthorized
-    );
+    this.axiosInstance.interceptors.response.use((response) => response, redirectOnUnauthorized);
   }
 
   get(url: string, params = {}, config: AxiosRequestConfig = {}) {

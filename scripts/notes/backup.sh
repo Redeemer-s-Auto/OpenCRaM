@@ -78,7 +78,23 @@ paused=()
 for svc in proxy web space live worker beat-worker api; do
   grep -qx "$svc" <<<"$running" && paused+=("$svc")
 done
-resume() { ((${#paused[@]})) && compose start "${paused[@]}" >/dev/null || true; }
+# Start the paused services again, and say so when that fails. On 2026-10-24 `compose start` failed here
+# ("dependency failed to start: container garden-work-plane-mq-1 is unhealthy"); the old `|| true` hid it,
+# the log said "app resumed", and the app stayed down for 5 days. Now: one retry after 60 s, then return 1.
+resume() {
+  ((${#paused[@]})) || return 0
+  local out try
+  for try in 1 2; do
+    if out="$(compose start "${paused[@]}" 2>&1)"; then
+      ((try == 1)) || echo "[notes backup] $(date +%T) start worked on the retry"
+      return 0
+    fi
+    echo "[notes backup] $(date +%T) start FAILED (try $try): $(tail -n 3 <<<"$out" | tr '\n' ' ')"
+    ((try == 1)) && sleep "${NOTES_RESUME_RETRY_SECONDS:-60}"
+  done
+  return 1
+}
+APP_DOWN=0
 RESUME_ARMED=1
 
 ((${#paused[@]})) && compose stop "${paused[@]}" >/dev/null
@@ -88,8 +104,12 @@ echo "[notes backup] $(date +%T) archiving uploads"
 docker run --rm -v garden_work_uploads:/source:ro -v "$DIR.partial:/backup" postgres:15.7-alpine \
   sh -c 'cd /source && tar -czf /backup/uploads.tar.gz .'
 RESUME_ARMED=0
-resume
-echo "[notes backup] $(date +%T) app resumed"
+if resume; then
+  echo "[notes backup] $(date +%T) app resumed"
+else
+  APP_DOWN=1
+  echo "[notes backup] $(date +%T) APP NOT RESUMED; finishing the backup, then reporting a failure"
+fi
 
 {
   echo "created_utc=$STAMP"
@@ -106,4 +126,11 @@ find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*' -mtime +"$KEEP_D
 find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '*.partial' -mtime +1 -exec rm -rf {} +
 SIZE="$(du -sh "$DIR" | cut -f1)"
 echo "[notes backup] $(date +%T) done: $DIR ($SIZE)"
+if ((APP_DOWN)); then
+  # The data is safe in $DIR, but the app is down: report ok:false so the hub emails, and exit non-zero.
+  echo "[notes backup] $(date +%T) FAILED: the app did not start again after the backup"
+  heartbeat false "$STAMP" "$SIZE" "backup saved in $DIR, but the app did NOT start again (compose start failed); see /var/log/notes-backup.log"
+  trap - EXIT
+  exit 3
+fi
 heartbeat true "$STAMP" "$SIZE" "pg_dump + uploads + SHA256SUMS in $DIR"

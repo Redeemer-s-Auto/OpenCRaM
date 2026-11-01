@@ -282,7 +282,7 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
               {!issue?.tempId && !isEpic && (
                 <SeenCheck issue={issue} updateIssue={updateIssue} isReadOnly={!canEditIssueProperties} />
               )}
-              {hasAddColumn && isDraggingAllowed && !issue?.tempId && <RowDragGrip />}
+              {hasAddColumn && isDraggingAllowed && !issue?.tempId && <RowDragGrip className="max-md:hidden" />}
               {/* select checkbox */}
               {projectId && canSelectIssues && !isEpic && (
                 <Tooltip
@@ -312,8 +312,8 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
                 </Tooltip>
               )}
 
-              {/* sub-issues chevron */}
-              <div className="grid size-4 flex-shrink-0 place-items-center">
+              {/* sub-issues chevron: no empty slot on a phone, so the title gets the room */}
+              <div className={cn("grid size-4 flex-shrink-0 place-items-center", { "max-md:hidden": subIssuesCount === 0 || isEpic })}>
                 {subIssuesCount > 0 && !isEpic && (
                   <button
                     type="button"

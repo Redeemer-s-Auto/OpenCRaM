@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useRef } from "react";
+import { Plus, SlidersHorizontal } from "lucide-react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 
@@ -137,7 +138,8 @@ export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader
 
   return (
     <Header>
-      <Header.LeftItem>
+      {/* Phones: the breadcrumbs give up width first, so the buttons on the right always fit. */}
+      <Header.LeftItem className="min-w-0 overflow-hidden">
         <Breadcrumbs isLoading={loader === "init-loader"}>
           <CommonProjectBreadcrumbs workspaceSlug={workspaceSlug?.toString()} projectId={projectId?.toString()} />
           <Breadcrumbs.Item
@@ -179,7 +181,7 @@ export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader
           <></>
         )}
       </Header.LeftItem>
-      <Header.RightItem className="items-center">
+      <Header.RightItem className="flex-shrink-0 items-center">
         <>
           {/* Phones: the six layout icons ran off a 375 px screen, so a one-button menu stands in. */}
           {!viewDetails.is_locked && (
@@ -202,7 +204,11 @@ export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader
           )}
           {viewId && <WorkItemFiltersToggle entityType={EIssuesStoreType.PROJECT_VIEW} entityId={viewId} />}
           {!viewDetails.is_locked && (
-            <FiltersDropdown title="Display" placement="bottom-end">
+            <FiltersDropdown
+              title="Display"
+              placement="bottom-end"
+              miniIcon={<SlidersHorizontal className="size-3.5" />}
+            >
               <DisplayFiltersSelection
                 layoutDisplayFiltersOptions={
                   activeLayout ? ISSUE_DISPLAY_FILTERS_BY_PAGE.issues.layoutOptions[activeLayout] : undefined
@@ -241,8 +247,12 @@ export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader
               toggleCreateIssueModal(true, EIssuesStoreType.PROJECT_VIEW);
             }}
             data-ph-element={WORK_ITEM_TRACKER_ELEMENTS.HEADER_ADD_BUTTON.PROJECT_VIEW}
+            aria-label="Add work item"
+            title="Add work item"
           >
-            Add work item
+            {/* Phones: a "+" alone, so the button stays on a 375 px screen. */}
+            <Plus className="size-4 md:hidden" />
+            <span className="hidden md:inline">Add work item</span>
           </Button>
         )}
         <div className="hidden md:block">

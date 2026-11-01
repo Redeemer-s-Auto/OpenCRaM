@@ -58,7 +58,8 @@ export function FilterItemContainer(props: FilterItemContainerProps) {
     <Tooltip tooltipContent={tooltipContent} position="bottom" disabled={!tooltipContent}>
       <div
         ref={itemRef}
-        className={cn("flex h-7 items-stretch overflow-hidden rounded-sm border transition-all duration-200", {
+        // flex-shrink-0: a chip never squeezes and cuts its own text; on a phone the filter row scrolls instead.
+        className={cn("flex h-7 flex-shrink-0 items-stretch overflow-hidden rounded-sm border transition-all duration-200", {
           "border-subtle bg-surface-1": variant === "default",
           "border-danger-strong bg-surface-2": variant === "error",
         })}

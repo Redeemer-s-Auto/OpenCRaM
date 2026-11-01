@@ -25,7 +25,7 @@ type Props = {
 /**
  * The + at the left of a row. Click adds a line below the row, Alt+click adds one above.
  * On a phone a tap adds below and a long press (500 ms) adds above. Shown on hover with a mouse
- * and always on a touch screen. Lives inside a row link, so every event stops here.
+ * and always on a touch screen or below 768 px. Lives inside a row link, so every event stops here.
  */
 export function RowAddButton(props: Props) {
   const { onAdd, className } = props;
@@ -66,6 +66,8 @@ export function RowAddButton(props: Props) {
           "relative grid size-6 flex-shrink-0 place-items-center rounded-sm text-placeholder opacity-0 transition-opacity select-none",
           "hover:bg-layer-transparent-hover hover:text-tertiary focus-visible:opacity-100",
           "group-hover/list-block:opacity-100 [@media(hover:none)]:opacity-100",
+          // a phone-width screen: always shown at 32px, even when the browser reports a mouse
+          "max-md:size-8 max-md:opacity-100",
           // a phone: always shown, with a 44px touch target that does not widen the row
           "[@media(hover:none)]:touch-manipulation [@media(hover:none)]:after:absolute [@media(hover:none)]:after:-inset-2.5 [@media(hover:none)]:after:content-['']",
           className

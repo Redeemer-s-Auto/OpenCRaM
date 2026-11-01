@@ -219,7 +219,13 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
       )}
       {/* basic properties */}
       {/* state */}
-      <WithDisplayPropertiesHOC displayProperties={displayProperties} displayPropertyKey="state">
+      {/* The "Backlog" chip is hidden on cards (every imported card sits there); the card page and the
+          Properties menu still show and change the state. */}
+      <WithDisplayPropertiesHOC
+        displayProperties={displayProperties}
+        displayPropertyKey="state"
+        shouldRenderProperty={() => stateDetails?.group !== "backlog"}
+      >
         {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions */}
         <div className="h-5" onFocus={handleEventPropagation} onClick={handleEventPropagation}>
           <StateDropdown

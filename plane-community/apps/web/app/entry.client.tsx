@@ -8,6 +8,7 @@ import { startTransition, StrictMode } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { HydratedRouter } from "react-router/dom";
 
+import { startEarlyBoardGets } from "@/lib/early-gets";
 import polyfills from "@/lib/polyfills";
 import { preloadMatchedRouteChunks } from "@/lib/preload-route-chunks";
 import { isStaleAssetErrorMessage, recoverFromStaleAsset } from "@/lib/stale-asset-error";
@@ -33,6 +34,8 @@ if (import.meta.env.PROD) {
 
 // Fetch every chunk of the page being opened in one go instead of one import level at a time.
 preloadMatchedRouteChunks();
+// Ask for the board's own details now, not after the JavaScript and the sign-in chain.
+startEarlyBoardGets();
 
 startTransition(() => {
   hydrateRoot(

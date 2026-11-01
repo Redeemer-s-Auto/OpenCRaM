@@ -236,7 +236,11 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
       </WithDisplayPropertiesHOC>
 
       {/* priority */}
-      <WithDisplayPropertiesHOC displayProperties={displayProperties} displayPropertyKey="priority">
+      <WithDisplayPropertiesHOC
+        displayProperties={displayProperties}
+        displayPropertyKey="priority"
+        shouldRenderProperty={() => !!issue?.priority && issue.priority !== "none"}
+      >
         {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions */}
         <div className="h-5" onFocus={handleEventPropagation} onClick={handleEventPropagation}>
           <PriorityDropdown
@@ -254,7 +258,7 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
       <WithDisplayPropertiesHOC
         displayProperties={displayProperties}
         displayPropertyKey={["start_date", "due_date"]}
-        shouldRenderProperty={() => isDateRangeEnabled}
+        shouldRenderProperty={() => isDateRangeEnabled && !!(issue.start_date || issue.target_date)}
       >
         {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions */}
         <div className="h-5" onFocus={handleEventPropagation} onClick={handleEventPropagation}>
@@ -290,7 +294,7 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
       <WithDisplayPropertiesHOC
         displayProperties={displayProperties}
         displayPropertyKey="start_date"
-        shouldRenderProperty={() => !isDateRangeEnabled}
+        shouldRenderProperty={() => !isDateRangeEnabled && !!issue.start_date}
       >
         {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions */}
         <div className="h-5" onFocus={handleEventPropagation} onClick={handleEventPropagation}>
@@ -314,7 +318,7 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
       <WithDisplayPropertiesHOC
         displayProperties={displayProperties}
         displayPropertyKey="due_date"
-        shouldRenderProperty={() => !isDateRangeEnabled}
+        shouldRenderProperty={() => !isDateRangeEnabled && !!issue.target_date}
       >
         {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions */}
         <div className="h-5" onFocus={handleEventPropagation} onClick={handleEventPropagation}>
@@ -339,7 +343,11 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
       </WithDisplayPropertiesHOC>
 
       {/* assignee */}
-      <WithDisplayPropertiesHOC displayProperties={displayProperties} displayPropertyKey="assignee">
+      <WithDisplayPropertiesHOC
+        displayProperties={displayProperties}
+        displayPropertyKey="assignee"
+        shouldRenderProperty={() => !!issue?.assignee_ids?.length}
+      >
         {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions */}
         <div className="h-5" onFocus={handleEventPropagation} onClick={handleEventPropagation}>
           <MemberDropdown
@@ -364,7 +372,11 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
           <>
             {/* modules */}
             {projectDetails?.module_view && (
-              <WithDisplayPropertiesHOC displayProperties={displayProperties} displayPropertyKey="modules">
+              <WithDisplayPropertiesHOC
+                displayProperties={displayProperties}
+                displayPropertyKey="modules"
+                shouldRenderProperty={() => !!issue?.module_ids?.length}
+              >
                 {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions */}
                 <div className="h-5" onFocus={handleEventPropagation} onClick={handleEventPropagation}>
                   <ModuleDropdown
@@ -385,7 +397,11 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
 
             {/* cycles */}
             {projectDetails?.cycle_view && (
-              <WithDisplayPropertiesHOC displayProperties={displayProperties} displayPropertyKey="cycle">
+              <WithDisplayPropertiesHOC
+                displayProperties={displayProperties}
+                displayPropertyKey="cycle"
+                shouldRenderProperty={() => !!issue?.cycle_id}
+              >
                 {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions */}
                 <div className="h-5" onFocus={handleEventPropagation} onClick={handleEventPropagation}>
                   <CycleDropdown
@@ -407,7 +423,11 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
 
       {/* estimates */}
       {projectId && areEstimateEnabledByProjectId(projectId?.toString()) && (
-        <WithDisplayPropertiesHOC displayProperties={displayProperties} displayPropertyKey="estimate">
+        <WithDisplayPropertiesHOC
+          displayProperties={displayProperties}
+          displayPropertyKey="estimate"
+          shouldRenderProperty={() => issue.estimate_point !== undefined && issue.estimate_point !== null}
+        >
           {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions */}
           <div className="h-5" onFocus={handleEventPropagation} onClick={handleEventPropagation}>
             <EstimateDropdown
@@ -508,7 +528,11 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
       </WithDisplayPropertiesHOC>
 
       {/* label */}
-      <WithDisplayPropertiesHOC displayProperties={displayProperties} displayPropertyKey="labels">
+      <WithDisplayPropertiesHOC
+        displayProperties={displayProperties}
+        displayPropertyKey="labels"
+        shouldRenderProperty={() => !!issue?.label_ids?.length}
+      >
         <IssuePropertyLabels
           projectId={issue?.project_id || null}
           value={issue?.label_ids || []}

@@ -18,6 +18,14 @@ import { APIService } from "@/services/api.service";
 const SHARED_VIEW_DETAILS_MS = 5000;
 const sharedViewDetails = new Map<string, { promise: Promise<IProjectView>; startedAt: number }>();
 const forgetSharedViewDetails = () => sharedViewDetails.clear();
+/**
+ * Runs a view write with the shared copy dropped when the write STARTS and again when it ENDS (success or
+ * failure), so a GET that started while the write was in flight is never handed out afterwards.
+ */
+const viewWrite = <T>(write: () => Promise<T>): Promise<T> => {
+  forgetSharedViewDetails();
+  return write().finally(forgetSharedViewDetails);
+};
 
 export class ViewService extends APIService {
   constructor() {
@@ -31,39 +39,43 @@ export class ViewService extends APIService {
 
   /** Adds (or refreshes) the Seen checkbox and the Active / Completed / Checked views. Admins only. */
   async addTaskListViews(workspaceSlug: string, projectId: string): Promise<TTaskListViewsResponse> {
-    forgetSharedViewDetails();
-    return this.post(`/api/workspaces/${workspaceSlug}/projects/${projectId}/views/task-list/`, {})
-      .then((response) => response?.data)
-      .catch((error) => {
-        throw error?.response?.data;
-      });
+    return viewWrite(() =>
+      this.post(`/api/workspaces/${workspaceSlug}/projects/${projectId}/views/task-list/`, {})
+        .then((response) => response?.data)
+        .catch((error) => {
+          throw error?.response?.data;
+        })
+    );
   }
 
   async createView(workspaceSlug: string, projectId: string, data: Partial<IProjectView>): Promise<any> {
-    forgetSharedViewDetails();
-    return this.post(`/api/workspaces/${workspaceSlug}/projects/${projectId}/views/`, data)
-      .then((response) => response?.data)
-      .catch((error) => {
-        throw error?.response?.data;
-      });
+    return viewWrite(() =>
+      this.post(`/api/workspaces/${workspaceSlug}/projects/${projectId}/views/`, data)
+        .then((response) => response?.data)
+        .catch((error) => {
+          throw error?.response?.data;
+        })
+    );
   }
 
   async patchView(workspaceSlug: string, projectId: string, viewId: string, data: Partial<IProjectView>): Promise<any> {
-    forgetSharedViewDetails();
-    return this.patch(`/api/workspaces/${workspaceSlug}/projects/${projectId}/views/${viewId}/`, data)
-      .then((response) => response?.data)
-      .catch((error) => {
-        throw error?.response?.data;
-      });
+    return viewWrite(() =>
+      this.patch(`/api/workspaces/${workspaceSlug}/projects/${projectId}/views/${viewId}/`, data)
+        .then((response) => response?.data)
+        .catch((error) => {
+          throw error?.response?.data;
+        })
+    );
   }
 
   async deleteView(workspaceSlug: string, projectId: string, viewId: string): Promise<any> {
-    forgetSharedViewDetails();
-    return this.delete(`/api/workspaces/${workspaceSlug}/projects/${projectId}/views/${viewId}/`)
-      .then((response) => response?.data)
-      .catch((error) => {
-        throw error?.response?.data;
-      });
+    return viewWrite(() =>
+      this.delete(`/api/workspaces/${workspaceSlug}/projects/${projectId}/views/${viewId}/`)
+        .then((response) => response?.data)
+        .catch((error) => {
+          throw error?.response?.data;
+        })
+    );
   }
 
   async getViews(workspaceSlug: string, projectId: string): Promise<IProjectView[]> {
@@ -78,10 +90,10 @@ export class ViewService extends APIService {
     const url = `/api/workspaces/${workspaceSlug}/projects/${projectId}/views/${viewId}/`;
     const shared = sharedViewDetails.get(url);
     if (shared && Date.now() - shared.startedAt < SHARED_VIEW_DETAILS_MS) return shared.promise;
-    const promise = this.get(url)
+    const promise: Promise<IProjectView> = this.get(url)
       .then((response) => response?.data)
       .catch((error) => {
-        sharedViewDetails.delete(url);
+        if (sharedViewDetails.get(url)?.promise === promise) sharedViewDetails.delete(url);
         throw error?.response?.data;
       });
     sharedViewDetails.set(url, { promise, startedAt: Date.now() });
@@ -103,20 +115,22 @@ export class ViewService extends APIService {
       view: string;
     }
   ): Promise<any> {
-    forgetSharedViewDetails();
-    return this.post(`/api/workspaces/${workspaceSlug}/projects/${projectId}/user-favorite-views/`, data)
-      .then((response) => response?.data)
-      .catch((error) => {
-        throw error?.response?.data;
-      });
+    return viewWrite(() =>
+      this.post(`/api/workspaces/${workspaceSlug}/projects/${projectId}/user-favorite-views/`, data)
+        .then((response) => response?.data)
+        .catch((error) => {
+          throw error?.response?.data;
+        })
+    );
   }
 
   async removeViewFromFavorites(workspaceSlug: string, projectId: string, viewId: string): Promise<any> {
-    forgetSharedViewDetails();
-    return this.delete(`/api/workspaces/${workspaceSlug}/projects/${projectId}/user-favorite-views/${viewId}/`)
-      .then((response) => response?.data)
-      .catch((error) => {
-        throw error?.response?.data;
-      });
+    return viewWrite(() =>
+      this.delete(`/api/workspaces/${workspaceSlug}/projects/${projectId}/user-favorite-views/${viewId}/`)
+        .then((response) => response?.data)
+        .catch((error) => {
+          throw error?.response?.data;
+        })
+    );
   }
 }

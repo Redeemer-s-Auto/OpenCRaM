@@ -874,8 +874,9 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
 
   /** Brings archived cards back (undo of archive) without recording it. */
   private async unarchiveForUndo(workspaceSlug: string, projectId: string, issueIds: string[], addToList: boolean) {
-    // order does not matter: all cards at once, not one round trip after another
-    await Promise.all(
+    // order does not matter: all cards at once, not one round trip after another. allSettled: one failed card
+    // does not stop the others, and the parent stats are refreshed either way; the first failure is re-thrown.
+    const results = await Promise.allSettled(
       issueIds.map(async (issueId) => {
         await this.issueArchiveService.restoreIssue(workspaceSlug, projectId, issueId);
         runInAction(() => {
@@ -886,6 +887,8 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
       })
     );
     this.fetchParentStats(workspaceSlug, projectId);
+    const failed = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
+    if (failed) throw failed.reason;
   }
 
   private recordIssuesArchived(workspaceSlug: string, projectId: string, issueIds: string[], wasInList: boolean) {

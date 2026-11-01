@@ -44,7 +44,7 @@ export const WorkItemDetailsHeader = observer(function WorkItemDetailsHeader() {
   if (!workspaceSlug || !projectId || !issueId) return null;
   return (
     <Header>
-      <Header.LeftItem>
+      <Header.LeftItem className="min-w-0 flex-nowrap overflow-hidden">
         <Breadcrumbs onBack={router.back} isLoading={loader === "init-loader"}>
           <CommonProjectBreadcrumbs workspaceSlug={workspaceSlug?.toString()} projectId={projectId?.toString()} />
           <Breadcrumbs.Item
@@ -66,10 +66,10 @@ export const WorkItemDetailsHeader = observer(function WorkItemDetailsHeader() {
           />
         </Breadcrumbs>
       </Header.LeftItem>
-      <Header.RightItem>
-        <CardOpenModeToggle className="hidden md:flex" />
+      <Header.RightItem className="flex-shrink-0 whitespace-nowrap">
+        <CardOpenModeToggle className="hidden flex-shrink-0 md:flex" />
         <AddShortcutButton
-          className="hidden md:flex"
+          className="hidden flex-shrink-0 whitespace-nowrap md:flex"
           workspaceSlug={workspaceSlug.toString()}
           issueId={issueId.toString()}
           projectId={projectId.toString()}

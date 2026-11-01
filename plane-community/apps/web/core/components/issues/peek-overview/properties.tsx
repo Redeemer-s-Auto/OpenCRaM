@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { useState } from "react";
 import { observer } from "mobx-react";
 // i18n
 import { useTranslation } from "@plane/i18n";
@@ -30,7 +31,7 @@ import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
 import { PriorityDropdown } from "@/components/dropdowns/priority";
 import { StateDropdown } from "@/components/dropdowns/state/dropdown";
 import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
-import { IssueCustomFieldProperties } from "@/components/custom-fields/issue-properties";
+import { HideWhenBlank, IssueCustomFieldProperties } from "@/components/custom-fields/issue-properties";
 // helpers
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useMember } from "@/hooks/store/use-member";
@@ -64,8 +65,10 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
   const { getStateById } = useProjectState();
   const { getUserDetails } = useMember();
   // derived values
+  const [showEmpty, setShowEmpty] = useState(false);
   const issue = getIssueById(issueId);
   if (!issue) return <></>;
+  const hiddenBuiltIns = showEmpty ? 0 : ((!issue?.assignee_ids?.length) ? 1 : 0) + ((!issue?.priority || issue?.priority === "none") ? 1 : 0) + ((!issue.start_date) ? 1 : 0) + ((!issue.target_date) ? 1 : 0) + ((issue.estimate_point === undefined || issue.estimate_point === null) ? 1 : 0) + ((!issue.module_ids?.length) ? 1 : 0) + ((!issue.cycle_id) ? 1 : 0) + ((!issue.parent_id) ? 1 : 0) + ((!issue.label_ids?.length) ? 1 : 0);
   const createdByDetails = getUserDetails(issue?.created_by);
   const projectDetails = getProjectById(issue.project_id);
   const isEstimateEnabled = projectDetails?.estimate;
@@ -96,6 +99,7 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
           />
         </SidebarPropertyListItem>
 
+        <HideWhenBlank hide={!showEmpty && (!issue?.assignee_ids?.length)}>
         <SidebarPropertyListItem icon={MembersPropertyIcon} label={t("common.assignees")}>
           <MemberDropdown
             value={issue?.assignee_ids ?? undefined}
@@ -113,7 +117,9 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
             dropdownArrowClassName="h-3.5 w-3.5 hidden group-hover:inline"
           />
         </SidebarPropertyListItem>
+        </HideWhenBlank>
 
+        <HideWhenBlank hide={!showEmpty && (!issue?.priority || issue?.priority === "none")}>
         <SidebarPropertyListItem icon={PriorityPropertyIcon} label={t("common.priority")}>
           <PriorityDropdown
             value={issue?.priority}
@@ -125,6 +131,7 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
             buttonClassName={`text-body-xs-medium whitespace-nowrap [&_svg]:size-3.5 ${!issue?.priority || issue?.priority === "none" ? "text-placeholder" : ""}`}
           />
         </SidebarPropertyListItem>
+        </HideWhenBlank>
 
         {createdByDetails && (
           <SidebarPropertyListItem
@@ -142,6 +149,7 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
           </SidebarPropertyListItem>
         )}
 
+        <HideWhenBlank hide={!showEmpty && (!issue.start_date)}>
         <SidebarPropertyListItem icon={StartDatePropertyIcon} label={t("common.order_by.start_date")}>
           <DateDropdown
             value={issue.start_date}
@@ -161,7 +169,9 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
             clearIconClassName="h-3 w-3 hidden group-hover:inline"
           />
         </SidebarPropertyListItem>
+        </HideWhenBlank>
 
+        <HideWhenBlank hide={!showEmpty && (!issue.target_date)}>
         <SidebarPropertyListItem icon={DueDatePropertyIcon} label={t("common.order_by.due_date")}>
           <div className="flex w-full items-center gap-2">
             <DateDropdown
@@ -186,8 +196,10 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
             />
           </div>
         </SidebarPropertyListItem>
+        </HideWhenBlank>
 
         {isEstimateEnabled && (
+          <HideWhenBlank hide={!showEmpty && (issue.estimate_point === undefined || issue.estimate_point === null)}>
           <SidebarPropertyListItem icon={EstimatePropertyIcon} label={t("common.estimate")}>
             <EstimateDropdown
               value={issue.estimate_point ?? undefined}
@@ -204,9 +216,11 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
               dropdownArrowClassName="h-3.5 w-3.5 hidden group-hover:inline"
             />
           </SidebarPropertyListItem>
+          </HideWhenBlank>
         )}
 
         {projectDetails?.module_view && (
+          <HideWhenBlank hide={!showEmpty && (!issue.module_ids?.length)}>
           <SidebarPropertyListItem icon={ModuleIcon} label={t("common.modules")}>
             <IssueModuleSelect
               className="w-full grow"
@@ -217,9 +231,11 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
               disabled={disabled}
             />
           </SidebarPropertyListItem>
+          </HideWhenBlank>
         )}
 
         {projectDetails?.cycle_view && (
+          <HideWhenBlank hide={!showEmpty && (!issue.cycle_id)}>
           <SidebarPropertyListItem icon={CycleIcon} label={t("common.cycle")} appendElement={null}>
             <IssueCycleSelect
               className="h-7.5 w-full grow"
@@ -230,8 +246,10 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
               disabled={disabled}
             />
           </SidebarPropertyListItem>
+          </HideWhenBlank>
         )}
 
+        <HideWhenBlank hide={!showEmpty && (!issue.parent_id)}>
         <SidebarPropertyListItem icon={ParentPropertyIcon} label={t("common.parent")}>
           <IssueParentSelectRoot
             className="h-7.5 w-full grow"
@@ -242,12 +260,18 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
             workspaceSlug={workspaceSlug}
           />
         </SidebarPropertyListItem>
+        </HideWhenBlank>
 
+        <HideWhenBlank hide={!showEmpty && (!issue.label_ids?.length)}>
         <SidebarPropertyListItem icon={LabelPropertyIcon} label={t("common.labels")}>
           <IssueLabel workspaceSlug={workspaceSlug} projectId={projectId} issueId={issueId} disabled={disabled} />
         </SidebarPropertyListItem>
+        </HideWhenBlank>
 
         <IssueCustomFieldProperties
+          hiddenBuiltIns={hiddenBuiltIns}
+          showEmpty={showEmpty}
+          onToggleEmpty={() => setShowEmpty((value) => !value)}
           workspaceSlug={workspaceSlug}
           projectId={projectId}
           issueId={issueId}

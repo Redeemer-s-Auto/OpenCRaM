@@ -18,7 +18,6 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useProject } from "@/hooks/store/use-project";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // components
-import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // local imports
 import { ParentIssuesListModal } from "../parent-issues-list-modal";
 
@@ -93,16 +92,9 @@ export const IssueParentSelect = observer(function IssueParentSelect(props: TIss
           <div className="flex items-center gap-1.5">
             <Tooltip tooltipHeading="Title" tooltipContent={parentIssue.name} isMobile={isMobile}>
               <Link href={workItemLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                {parentIssue?.project_id && parentIssueProjectDetails && (
-                  <IssueIdentifier
-                    projectId={parentIssue.project_id}
-                    issueTypeId={parentIssue.type_id}
-                    projectIdentifier={parentIssueProjectDetails?.identifier}
-                    issueSequenceId={parentIssue.sequence_id}
-                    size="xs"
-                    variant="secondary"
-                  />
-                )}
+                <span className="block max-w-48 truncate text-body-xs-medium text-secondary hover:underline">
+                  {parentIssue.name || "Untitled"}
+                </span>
               </Link>
             </Tooltip>
 

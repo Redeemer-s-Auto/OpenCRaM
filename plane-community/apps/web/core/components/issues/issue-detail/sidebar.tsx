@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { useState } from "react";
 import { observer } from "mobx-react";
 // i18n
 import { useTranslation } from "@plane/i18n";
@@ -38,7 +39,7 @@ import { useProjectState } from "@/hooks/store/use-project-state";
 // components
 import { IssueParentSelectRoot } from "@/components/issues/parent-select-root";
 import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
-import { IssueCustomFieldProperties } from "@/components/custom-fields/issue-properties";
+import { HideWhenBlank, IssueCustomFieldProperties } from "@/components/custom-fields/issue-properties";
 import { IssueRepeatSection } from "@/components/repeat";
 import { IssueSharingSection } from "@/components/sharing";
 import { IssueCycleSelect } from "./cycle-select";
@@ -65,8 +66,10 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
   } = useIssueDetail();
   const { getUserDetails } = useMember();
   const { getStateById } = useProjectState();
+  const [showEmpty, setShowEmpty] = useState(false);
   const issue = getIssueById(issueId);
   if (!issue) return <></>;
+  const hiddenBuiltIns = showEmpty ? 0 : ((!issue?.assignee_ids?.length) ? 1 : 0) + ((!issue?.priority || issue?.priority === "none") ? 1 : 0) + ((!issue.start_date) ? 1 : 0) + ((!issue.target_date) ? 1 : 0) + ((issue.estimate_point === undefined || issue.estimate_point === null) ? 1 : 0) + ((!issue.module_ids?.length) ? 1 : 0) + ((!issue.cycle_id) ? 1 : 0) + ((!issue.parent_id) ? 1 : 0) + ((!issue.label_ids?.length) ? 1 : 0);
 
   const createdByDetails = getUserDetails(issue.created_by);
 
@@ -101,6 +104,7 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
               />
             </SidebarPropertyListItem>
 
+            <HideWhenBlank hide={!showEmpty && (!issue?.assignee_ids?.length)}>
             <SidebarPropertyListItem icon={MembersPropertyIcon} label={t("common.assignees")}>
               <MemberDropdown
                 value={issue?.assignee_ids ?? undefined}
@@ -118,7 +122,9 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
                 dropdownArrowClassName="h-3.5 w-3.5 hidden group-hover:inline"
               />
             </SidebarPropertyListItem>
+            </HideWhenBlank>
 
+            <HideWhenBlank hide={!showEmpty && (!issue?.priority || issue?.priority === "none")}>
             <SidebarPropertyListItem icon={PriorityPropertyIcon} label={t("common.priority")}>
               <PriorityDropdown
                 value={issue?.priority}
@@ -130,6 +136,7 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
                 buttonClassName="size-full px-2 py-0.5 whitespace-nowrap [&_svg]:size-3.5"
               />
             </SidebarPropertyListItem>
+            </HideWhenBlank>
 
             {createdByDetails && (
               <SidebarPropertyListItem icon={UserCirclePropertyIcon} label={t("common.created_by")}>
@@ -140,6 +147,7 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
               </SidebarPropertyListItem>
             )}
 
+            <HideWhenBlank hide={!showEmpty && (!issue.start_date)}>
             <SidebarPropertyListItem icon={StartDatePropertyIcon} label={t("common.order_by.start_date")}>
               <DateDropdown
                 placeholder={t("issue.add.start_date")}
@@ -159,7 +167,9 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
                 clearIconClassName="h-3 w-3 hidden group-hover:inline"
               />
             </SidebarPropertyListItem>
+            </HideWhenBlank>
 
+            <HideWhenBlank hide={!showEmpty && (!issue.target_date)}>
             <SidebarPropertyListItem icon={DueDatePropertyIcon} label={t("common.order_by.due_date")}>
               <div className="flex w-full items-center gap-2">
                 <DateDropdown
@@ -184,8 +194,10 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
                 />
               </div>
             </SidebarPropertyListItem>
+            </HideWhenBlank>
 
             {projectId && areEstimateEnabledByProjectId(projectId) && (
+              <HideWhenBlank hide={!showEmpty && (issue.estimate_point === undefined || issue.estimate_point === null)}>
               <SidebarPropertyListItem icon={EstimatePropertyIcon} label={t("common.estimate")}>
                 <EstimateDropdown
                   value={issue?.estimate_point ?? undefined}
@@ -204,9 +216,11 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
                   dropdownArrowClassName="h-3.5 w-3.5 hidden group-hover:inline"
                 />
               </SidebarPropertyListItem>
+              </HideWhenBlank>
             )}
 
             {projectDetails?.module_view && (
+              <HideWhenBlank hide={!showEmpty && (!issue.module_ids?.length)}>
               <SidebarPropertyListItem icon={ModuleIcon} label={t("common.modules")}>
                 <IssueModuleSelect
                   className="w-full grow"
@@ -217,9 +231,11 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
                   disabled={!isEditable}
                 />
               </SidebarPropertyListItem>
+              </HideWhenBlank>
             )}
 
             {projectDetails?.cycle_view && (
+              <HideWhenBlank hide={!showEmpty && (!issue.cycle_id)}>
               <SidebarPropertyListItem icon={CycleIcon} label={t("common.cycle")} appendElement={null}>
                 <IssueCycleSelect
                   className="h-7.5 w-full grow"
@@ -230,8 +246,10 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
                   disabled={!isEditable}
                 />
               </SidebarPropertyListItem>
+              </HideWhenBlank>
             )}
 
+            <HideWhenBlank hide={!showEmpty && (!issue.parent_id)}>
             <SidebarPropertyListItem icon={ParentPropertyIcon} label={t("common.parent")}>
               <IssueParentSelectRoot
                 className="h-7.5 w-full grow"
@@ -242,7 +260,9 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
                 disabled={!isEditable}
               />
             </SidebarPropertyListItem>
+            </HideWhenBlank>
 
+            <HideWhenBlank hide={!showEmpty && (!issue.label_ids?.length)}>
             <SidebarPropertyListItem icon={LabelPropertyIcon} label={t("common.labels")}>
               <IssueLabel
                 workspaceSlug={workspaceSlug}
@@ -251,8 +271,12 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
                 disabled={!isEditable}
               />
             </SidebarPropertyListItem>
+            </HideWhenBlank>
 
             <IssueCustomFieldProperties
+          hiddenBuiltIns={hiddenBuiltIns}
+          showEmpty={showEmpty}
+          onToggleEmpty={() => setShowEmpty((value) => !value)}
               workspaceSlug={workspaceSlug}
               projectId={projectId}
               issueId={issueId}

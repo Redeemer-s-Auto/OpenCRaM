@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { observer } from "mobx-react";
 import type { TCustomField, TCustomFieldValues, TIssue } from "@plane/types";
@@ -17,6 +18,14 @@ import { AddCustomFieldButton } from "./add-field-button";
 import { getFieldDetails, isEmptyValue } from "./helpers";
 import type { TCustomFieldInputValue } from "./value-input";
 import { CustomFieldValueInput } from "./value-input";
+
+/**
+ * Hides a built-in property row while it has no value; the "N empty properties" link (in
+ * IssueCustomFieldProperties) shows them again.
+ */
+export function HideWhenBlank(props: { hide: boolean; children: ReactNode }) {
+  return props.hide ? null : <>{props.children}</>;
+}
 
 type TUpdate = (workspaceSlug: string, projectId: string, issueId: string, data: Partial<TIssue>) => Promise<void>;
 
@@ -41,18 +50,25 @@ type Props = {
   issueId: string;
   disabled: boolean;
   update: TUpdate;
+  /** Built-in rows hidden because they are blank (the parent decides), counted in the same link. */
+  hiddenBuiltIns?: number;
+  /** The show/hide state is owned by the parent so built-in and custom rows toggle together. */
+  showEmpty?: boolean;
+  onToggleEmpty?: () => void;
 };
 
 /** Custom field rows for the card side panel and the peek view. */
 export const IssueCustomFieldProperties = observer(function IssueCustomFieldProperties(props: Props) {
-  const { workspaceSlug, projectId, issueId, disabled, update } = props;
+  const { workspaceSlug, projectId, issueId, disabled, update, hiddenBuiltIns = 0 } = props;
   const { getProjectFields, fetchProjectFields } = useCustomField();
   const {
     issue: { getIssueById },
     fetchIssue,
   } = useIssueDetail();
 
-  const [showEmpty, setShowEmpty] = useState(false);
+  const [ownShowEmpty, setOwnShowEmpty] = useState(false);
+  const showEmpty = props.showEmpty ?? ownShowEmpty;
+  const toggleEmpty = props.onToggleEmpty ?? (() => setOwnShowEmpty((value) => !value));
   const fields = getProjectFields(projectId);
   const issue = getIssueById(issueId);
   if (!fields || !issue) return null;
@@ -62,7 +78,7 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
     const value = issue.custom_fields?.[field.id];
     return isEmptyValue(value) || (field.field_type === "checkbox" && value === false);
   };
-  const blankCount = fields.filter(isBlank).length;
+  const blankCount = fields.filter(isBlank).length + hiddenBuiltIns;
   const shownFields = showEmpty ? fields : fields.filter((field) => !isBlank(field));
 
   const handleChange = async (field: TCustomField, value: TCustomFieldInputValue) => {
@@ -122,7 +138,7 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
       {blankCount > 0 && (
         <button
           type="button"
-          onClick={() => setShowEmpty((value) => !value)}
+          onClick={toggleEmpty}
           className="px-2 py-1 text-left text-11 text-tertiary hover:text-secondary"
         >
           {showEmpty ? "Hide empty properties" : `${blankCount} empty ${blankCount === 1 ? "property" : "properties"}`}

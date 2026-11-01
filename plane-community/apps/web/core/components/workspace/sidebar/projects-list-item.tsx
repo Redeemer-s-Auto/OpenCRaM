@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import type { RefObject } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { draggable, dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
@@ -41,6 +42,7 @@ import { usePlatformOS } from "@/hooks/use-platform-os";
 // local imports
 import { HIGHLIGHT_CLASS, highlightIssueOnDrop } from "../../issues/issue-layouts/utils";
 import { ProjectNavigation } from "./project-navigation";
+import { useNearViewport } from "./use-near-viewport";
 import { SidebarCardTree } from "@/components/one-unit/sidebar-card-tree";
 import { useNavigationItems } from "@/components/navigation/use-navigation-items";
 
@@ -63,7 +65,7 @@ type Props = {
   landingHref?: string;
 };
 
-export const SidebarProjectsListItem = observer(function SidebarProjectsListItem(props: Props) {
+const SidebarProjectsListItemFull = observer(function SidebarProjectsListItemFull(props: Props) {
   const {
     projectId,
     handleCopyText,
@@ -89,6 +91,12 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
   // states
   const [leaveProjectModalOpen, setLeaveProjectModal] = useState(false);
   const [publishModalOpen, setPublishModal] = useState(false);
+  // The two modals, the "..." menu, the drag-handle tooltip and the outside-click listeners are set up the
+  // first time the pointer or focus reaches the row (they are hidden until then), and the modals the first time
+  // they open, so a sidebar of many boards does not build hundreds of closed menus on every load.
+  const [isArmed, setIsArmed] = useState(false);
+  const [isPublishModalMounted, setIsPublishModalMounted] = useState(false);
+  const [isLeaveModalMounted, setIsLeaveModalMounted] = useState(false);
   const [isMenuActive, setIsMenuActive] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const isProjectListOpen = getIsProjectListOpen(projectId);
@@ -140,7 +148,15 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
   );
 
   const handleLeaveProject = () => {
+    setIsLeaveModalMounted(true);
     setLeaveProjectModal(true);
+  };
+  const handleOpenPublishModal = () => {
+    setIsPublishModalMounted(true);
+    setPublishModal(true);
+  };
+  const armRow = () => {
+    if (!isArmed) setIsArmed(true);
   };
 
   useEffect(() => {
@@ -231,16 +247,15 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
         },
       })
     );
+    // isArmed: the drag handle is a new element once its tooltip is added
     // oxlint-disable-next-line eslint-plugin-react-hooks/exhaustive-deps
-  }, [projectId, isLastChild, projectListType, handleOnProjectDrop]);
+  }, [projectId, isLastChild, projectListType, handleOnProjectDrop, isArmed]);
 
   useEffect(() => {
+    if (!isArmed) return;
     if (isMenuActive) toggleAnySidebarDropdown(true);
     else toggleAnySidebarDropdown(false);
-  }, [isMenuActive, toggleAnySidebarDropdown]);
-
-  useOutsideClickDetector(actionSectionRef, () => setIsMenuActive(false));
-  useOutsideClickDetector(projectRef, () => projectRef?.current?.classList?.remove(HIGHLIGHT_CLASS));
+  }, [isArmed, isMenuActive, toggleAnySidebarDropdown]);
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -286,12 +301,34 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
     }
   };
 
+  const menuClassName = cn(
+    "pointer-events-none flex-shrink-0 opacity-0 group-hover/project-item:pointer-events-auto group-hover/project-item:opacity-100",
+    {
+      "pointer-events-auto opacity-100": isMenuActive,
+    }
+  );
+
   const shouldHighlightProject = URLProjectId === project?.id && projectPreferences.navigationMode !== "ACCORDION";
 
   return (
     <>
-      <PublishProjectModal isOpen={publishModalOpen} projectId={projectId} onClose={() => setPublishModal(false)} />
-      <LeaveProjectModal project={project} isOpen={leaveProjectModalOpen} onClose={() => setLeaveProjectModal(false)} />
+      {isPublishModalMounted && (
+        <PublishProjectModal isOpen={publishModalOpen} projectId={projectId} onClose={() => setPublishModal(false)} />
+      )}
+      {isLeaveModalMounted && (
+        <LeaveProjectModal
+          project={project}
+          isOpen={leaveProjectModalOpen}
+          onClose={() => setLeaveProjectModal(false)}
+        />
+      )}
+      {isArmed && (
+        <SidebarRowListeners
+          actionSectionRef={actionSectionRef}
+          projectRef={projectRef}
+          onOutsideMenuClick={() => setIsMenuActive(false)}
+        />
+      )}
       <Disclosure key={`${project.id}_${URLProjectId}`} defaultOpen={isProjectListOpen} as="div">
         <div
           id={`sidebar-${projectId}-${projectListType}`}
@@ -299,6 +336,8 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
             "bg-layer-1 opacity-60": isDragging,
           })}
           ref={projectRef}
+          onPointerEnter={armRow}
+          onFocus={armRow}
         >
           <DropIndicator classNames="absolute top-0" isVisible={instruction === "DRAG_OVER"} />
           <div
@@ -312,8 +351,9 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
             id={`${project?.id}`}
             data-sidebar-row=""
           >
-            {!disableDrag && (
-              <Tooltip
+            {!disableDrag &&
+              (isArmed ? (
+                <Tooltip
                 isMobile={isMobile}
                 tooltipContent={
                   project.sort_order === null ? t("join_the_project_to_rearrange") : t("drag_to_rearrange")
@@ -321,6 +361,22 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
                 position="top-end"
                 disabled={isDragging}
               >
+                  <button
+                  type="button"
+                  className={cn(
+                    "absolute top-1/2 -left-3 hidden -translate-y-1/2 cursor-grab items-center justify-center rounded-sm text-placeholder group-hover/project-item:flex",
+                    {
+                      "cursor-not-allowed opacity-60": project.sort_order === null,
+                      "cursor-grabbing": isDragging,
+                      flex: isMenuActive || renderInExtendedSidebar,
+                    }
+                  )}
+                  ref={dragHandleRef}
+                >
+                  <DragHandle className="bg-transparent" />
+                </button>
+                </Tooltip>
+              ) : (
                 <button
                   type="button"
                   className={cn(
@@ -335,8 +391,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
                 >
                   <DragHandle className="bg-transparent" />
                 </button>
-              </Tooltip>
-            )}
+              ))}
             <>
               {/* Same chevron as the sidebar card tree. */}
               {childProjects && (
@@ -383,6 +438,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
                 )}
               </ControlLink>
               <div className="flex items-center gap-1">
+                {isArmed ? (
                 <CustomMenu
                   customButton={
                     <IconButton
@@ -394,12 +450,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
                       className="text-placeholder"
                     />
                   }
-                  className={cn(
-                    "pointer-events-none flex-shrink-0 opacity-0 group-hover/project-item:pointer-events-auto group-hover/project-item:opacity-100",
-                    {
-                      "pointer-events-auto opacity-100": isMenuActive,
-                    }
-                  )}
+                  className={menuClassName}
                   customButtonClassName="grid place-items-center"
                   placement="bottom-start"
                   ariaLabel={t("aria_labels.projects_sidebar.toggle_quick_actions_menu")}
@@ -425,7 +476,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
 
                   {/* publish project settings */}
                   {isAdmin && (
-                    <CustomMenu.MenuItem onClick={() => setPublishModal(true)}>
+                    <CustomMenu.MenuItem onClick={handleOpenPublishModal}>
                       <div className="relative flex flex-shrink-0 items-center justify-start gap-2">
                         <div className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-sm text-secondary transition-all duration-300 hover:bg-layer-1">
                           <Share2 className="h-3.5 w-3.5 stroke-[1.5]" />
@@ -475,6 +526,12 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
                     </CustomMenu.MenuItem>
                   )}
                 </CustomMenu>
+                ) : (
+                  <SidebarRowMenuStandIn
+                    className={menuClassName}
+                    ariaLabel={t("aria_labels.projects_sidebar.toggle_quick_actions_menu")}
+                  />
+                )}
                 {isAccordionMode && (
                   <IconButton
                     variant="ghost"
@@ -520,5 +577,116 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
         </div>
       </Disclosure>
     </>
+  );
+});
+
+/** The outside-click listeners of a row, added once the row is in use. */
+function SidebarRowListeners(props: {
+  actionSectionRef: RefObject<HTMLButtonElement | null>;
+  projectRef: RefObject<HTMLDivElement | null>;
+  onOutsideMenuClick: () => void;
+}) {
+  const { actionSectionRef, projectRef, onOutsideMenuClick } = props;
+  useOutsideClickDetector(actionSectionRef, onOutsideMenuClick);
+  useOutsideClickDetector(projectRef, () => projectRef?.current?.classList?.remove(HIGHLIGHT_CLASS));
+  return null;
+}
+
+/** Looks exactly like the closed "..." menu (same wrapper and buttons); the real menu replaces it on first use. */
+function SidebarRowMenuStandIn(props: { className: string; ariaLabel: string }) {
+  return (
+    <div className={cn("relative w-min text-left", props.className)} role="presentation" data-main-menu="true">
+      <button type="button" className="grid place-items-center" tabIndex={0} aria-label={props.ariaLabel}>
+        <IconButton variant="ghost" size="sm" icon={MoreHorizontal} className="text-placeholder" />
+      </button>
+    </div>
+  );
+}
+
+/**
+ * One board row of the sidebar. Far from the screen it is a plain copy (same look; no menus, drag-and-drop or
+ * permission look-ups); near the screen, once touched, or when it is the open board, it is the full row.
+ */
+export const SidebarProjectsListItem = observer(function SidebarProjectsListItem(props: Props) {
+  const { projectId, disableDrag, isLastChild, projectListType, renderInExtendedSidebar = false, childProjects } =
+    props;
+  const { t } = useTranslation();
+  const { workspaceSlug, projectId: URLProjectId } = useParams();
+  const { getPartialProjectById } = useProject();
+  const { getIsProjectListOpen } = useCommandPalette();
+  const { preferences: projectPreferences } = useProjectNavigationPreferences();
+  const [rowElement, setRowElement] = useState<HTMLDivElement | null>(null);
+  const isNear = useNearViewport(rowElement);
+  const [isTouched, setIsTouched] = useState(false);
+  const project = getPartialProjectById(projectId);
+
+  const isAccordionOpen = projectPreferences.navigationMode === "ACCORDION" && getIsProjectListOpen(projectId);
+  if (isNear || isTouched || URLProjectId === projectId || isAccordionOpen)
+    return <SidebarProjectsListItemFull {...props} />;
+  if (!project) return null;
+
+  const href = props.landingHref ?? getTabUrl(workspaceSlug?.toString() ?? "", project.id, DEFAULT_TAB_KEY);
+  return (
+    <div>
+      <div
+        id={`sidebar-${projectId}-${projectListType}`}
+        className="relative"
+        ref={setRowElement}
+        onPointerEnter={() => setIsTouched(true)}
+        onFocus={() => setIsTouched(true)}
+      >
+        <DropIndicator classNames="absolute top-0" isVisible={false} />
+        <div
+          className="group/project-item relative flex w-full items-center rounded-md px-2 py-1.5 text-primary hover:bg-layer-transparent-hover"
+          id={`${project.id}`}
+          data-sidebar-row=""
+        >
+          {!disableDrag && (
+            <button
+              type="button"
+              className={cn(
+                "absolute top-1/2 -left-3 hidden -translate-y-1/2 cursor-grab items-center justify-center rounded-sm text-placeholder group-hover/project-item:flex",
+                {
+                  "cursor-not-allowed opacity-60": project.sort_order === null,
+                  flex: renderInExtendedSidebar,
+                }
+              )}
+            >
+              <DragHandle className="bg-transparent" />
+            </button>
+          )}
+          {childProjects && (
+            <button
+              type="button"
+              aria-label={childProjects.isOpen ? `Close ${project.name}` : `Open ${project.name}`}
+              aria-expanded={childProjects.isOpen}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                childProjects.onToggle();
+              }}
+              className="mr-1 -ml-1 grid size-4 flex-shrink-0 place-items-center rounded-sm text-placeholder hover:bg-layer-1"
+            >
+              <ChevronRightIcon className={cn("size-3 transition-transform", { "rotate-90": childProjects.isOpen })} />
+            </button>
+          )}
+          <a href={href} target="_blank" className="flex flex-grow truncate" draggable={false}>
+            <div className="flex w-full flex-grow items-center gap-1.5 text-left select-none">
+              <div className="grid size-4 flex-shrink-0 place-items-center">
+                <Logo logo={project.logo_props} size={16} />
+              </div>
+              <p className="truncate text-13 font-medium text-secondary">{project.name}</p>
+            </div>
+          </a>
+          <div className="flex items-center gap-1">
+            <SidebarRowMenuStandIn
+              className="pointer-events-none flex-shrink-0 opacity-0 group-hover/project-item:pointer-events-auto group-hover/project-item:opacity-100"
+              ariaLabel={t("aria_labels.projects_sidebar.toggle_quick_actions_menu")}
+            />
+          </div>
+        </div>
+        {isLastChild && <DropIndicator isVisible={false} />}
+      </div>
+    </div>
   );
 });

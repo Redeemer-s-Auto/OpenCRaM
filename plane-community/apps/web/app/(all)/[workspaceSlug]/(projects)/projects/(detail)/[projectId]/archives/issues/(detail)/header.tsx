@@ -65,7 +65,7 @@ export const ProjectArchivedIssueDetailsHeader = observer(function ProjectArchiv
               <BreadcrumbLink
                 label={
                   currentProjectDetails && issueDetails
-                    ? `${currentProjectDetails.identifier}-${issueDetails.sequence_id}`
+                    ? issueDetails.name || "Untitled"
                     : ""
                 }
               />

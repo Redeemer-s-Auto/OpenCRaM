@@ -84,9 +84,6 @@ export const RecentIssue = observer(function RecentIssue(props: BlockProps) {
               <div className="grid size-8 flex-shrink-0 place-items-center rounded-sm bg-layer-2">
                 <WorkItemsIcon className="size-4 text-tertiary" />
               </div>
-              <div className="text-13 font-medium whitespace-nowrap text-placeholder">
-                {issueDetails?.project_identifier}-{issueDetails?.sequence_id}
-              </div>
             </div>
           )}
         </div>

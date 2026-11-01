@@ -79,7 +79,7 @@ export const DeleteInboxIssueModal = observer(function DeleteInboxIssueModal({
         <>
           Are you sure you want to delete work item{" "}
           <span className="font-medium break-words text-primary">
-            {projectDetails?.identifier}-{data?.sequence_id}
+            {data?.name}
           </span>
           {""}? The work item will only be deleted from the intake and this action cannot be undone.
         </>

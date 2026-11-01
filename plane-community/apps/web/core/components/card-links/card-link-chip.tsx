@@ -88,7 +88,7 @@ export const CardLinkChip = observer(function CardLinkChip(props: TChipProps) {
       <LinkedCardIcon card={card} />
       <span className="truncate font-medium text-primary">{card.name || "Untitled"}</span>
       <span className="ml-auto flex-shrink-0 truncate text-11 text-tertiary">
-        {card.project_name} · {card.project_identifier}-{card.sequence_id}
+        {card.project_name}
       </span>
     </Link>
   );

@@ -110,9 +110,6 @@ export function SelectDuplicateInboxIssueModal(props: Props) {
                       backgroundColor: stateColor,
                     }}
                   />
-                  <span className="flex-shrink-0 text-11 text-secondary">
-                    {getProjectById(issue?.project_id)?.identifier}-{issue.sequence_id}
-                  </span>
                   <span className="text-secondary">{issue.name}</span>
                 </div>
               </Combobox.Option>

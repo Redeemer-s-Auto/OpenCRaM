@@ -82,9 +82,6 @@ function PageRow(props: {
           )}
           {hasChildren && <span className="flex-shrink-0 text-11 text-tertiary">{row.children.length}</span>}
         </a>
-        <span className="hidden flex-shrink-0 text-11 text-tertiary sm:inline">
-          {row.project_identifier}-{row.sequence_id}
-        </span>
         <span className="w-36 flex-shrink-0 truncate text-right text-11 text-tertiary" title={row.updated_at}>
           Edited {calculateTimeAgo(row.updated_at)}
           {row.updated_by_name ? ` by ${row.updated_by_name}` : ""}

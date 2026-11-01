@@ -133,7 +133,7 @@ export const IssueRelationSelect = observer(function IssueRelationSelect(props: 
                         className="text-caption-sm-medium"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {`${projectDetails?.identifier}-${currentIssue?.sequence_id}`}
+                        {currentIssue?.name}
                       </Link>
                     </Tooltip>
                     {!disabled && (

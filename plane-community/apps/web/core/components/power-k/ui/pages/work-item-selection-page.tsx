@@ -88,7 +88,7 @@ export function WorkItemSelectionPage(props: Props) {
             heading="Issues"
             items={recentIssues}
             getKey={(issue) => issue.id}
-            getLabel={(issue) => `${issue.project_identifier}-${issue.sequence_id} ${issue.name}`}
+            getLabel={(issue) => `${issue.name}`}
             renderItem={(issue) => (
               <div className="flex items-center gap-2">
                 {issue.project_id && (
@@ -126,7 +126,7 @@ export function WorkItemSelectionPage(props: Props) {
           heading="Issues"
           items={issueResults}
           getKey={(issue) => issue.id}
-          getLabel={(issue) => `${issue.project__identifier}-${issue.sequence_id} ${issue.name}`}
+          getLabel={(issue) => `${issue.name}`}
           renderItem={(issue) => (
             <div className="flex items-center gap-2">
               {issue.project_id && issue.project__identifier && issue.sequence_id && (

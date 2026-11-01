@@ -55,7 +55,9 @@ const useIssuePeekOverviewRedirection = (isEpic: boolean = false) => {
         router.push(shortcut.status === "visible" ? linkedCardHref(workspaceSlug, shortcut.card) : workItemLink);
         return;
       }
-      if (isMobile || (forceMode !== "peek" && getCardOpenMode() === "page")) {
+      // a phone-width screen always gets the full page, never the half-width panel
+      const isNarrow = typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+      if (isMobile || isNarrow || (forceMode !== "peek" && getCardOpenMode() === "page")) {
         router.push(workItemLink);
       } else {
         setPeekIssue({ workspaceSlug, projectId: project_id, issueId: id, nestingLevel, isArchived: !!archived_at });

@@ -24,7 +24,6 @@ import { cn, createIssuePayload, generateWorkItemLink } from "@plane/utils";
 // components
 import { MultipleSelectEntityAction } from "@/components/core/multiple-select";
 import RenderIfVisible from "@/components/core/render-if-visible-HOC";
-import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useIssues } from "@/hooks/store/use-issues";
@@ -340,29 +339,9 @@ const IssueRowDetails = observer(function IssueRowDetails(props: IssueRowDetails
             {!isEpic && !issueDetail.tempId && (
               <SeenCheck issue={issueDetail} updateIssue={updateIssue} isReadOnly={disableUserActions} />
             )}
-            {/* Identifier section - conditionally rendered */}
-            {displayProperties?.key && (
-              <div className="flex h-full min-w-24 flex-shrink-0 items-center">
-                <div className="relative flex cursor-pointer items-center text-11 hover:text-primary">
-                  {issueDetail.project_id && (
-                    <IssueIdentifier
-                      issueId={issueDetail.id}
-                      projectId={issueDetail.project_id}
-                      size="xs"
-                      variant="tertiary"
-                      displayProperties={displayProperties}
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Workitem section */}
             <div
-              className={cn("flex flex-grow items-center gap-0.5 py-2", {
-                "min-w-[360px]": !displayProperties?.key,
-                "min-w-60": displayProperties?.key,
-              })}
+              className="flex min-w-[360px] flex-grow items-center gap-0.5 py-2"
             >
               {/* select checkbox */}
               {projectId && canSelectIssues && (

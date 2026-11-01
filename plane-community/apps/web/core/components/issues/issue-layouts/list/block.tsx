@@ -23,7 +23,6 @@ import { cn, generateWorkItemLink } from "@plane/utils";
 import { MultipleSelectEntityAction } from "@/components/core/multiple-select";
 import { SeenCheck } from "@/components/custom-fields/seen-check";
 import { IssueProperties } from "@/components/issues/issue-layouts/properties";
-import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
@@ -35,7 +34,6 @@ import { RowAddButton } from "../row-add-button";
 import { RowDragGrip } from "../row-drag-grip";
 import type { TRowInlineAdd } from "../row-line-tools";
 import { InlineRowTitle, RowLineMenu, isBlankName } from "../row-line-tools";
-import { calculateIdentifierWidth } from "../utils";
 // card shortcuts: a shortcut card shows its target's live title
 import { ShortcutAwareTitle, shortcutAwareName } from "@/components/card-links/shortcut-title";
 import type { TRenderQuickActions } from "./list-view-types";
@@ -92,7 +90,7 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
   const projectId = routerProjectId?.toString();
   // hooks
   const { sidebarCollapsed: isSidebarCollapsed } = useAppTheme();
-  const { getProjectIdentifierById, currentProjectNextSequenceId } = useProject();
+  const { getProjectIdentifierById } = useProject();
   const {
     getIsIssuePeeked,
     peekIssue,
@@ -155,13 +153,6 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
       });
     }
   };
-
-  // Calculate width for: projectIdentifier + "-" + dynamic sequence number digits
-  // Use next_work_item_sequence from backend (static value from project endpoint)
-  const maxSequenceId = currentProjectNextSequenceId ?? 1;
-  const keyMinWidth = displayProperties?.key
-    ? calculateIdentifierWidth(projectIdentifier?.length ?? 0, maxSequenceId)
-    : 0;
 
   const workItemLink = generateWorkItemLink({
     workspaceSlug,
@@ -319,19 +310,6 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
                     />
                   </div>
                 </Tooltip>
-              )}
-              {displayProperties && (displayProperties.key || displayProperties.issue_type) && (
-                <div className="flex-shrink-0" style={{ minWidth: `${keyMinWidth}px` }}>
-                  {issue.project_id && (
-                    <IssueIdentifier
-                      issueId={issueId}
-                      projectId={issue.project_id}
-                      size="xs"
-                      variant="tertiary"
-                      displayProperties={displayProperties}
-                    />
-                  )}
-                </div>
               )}
 
               {/* sub-issues chevron */}

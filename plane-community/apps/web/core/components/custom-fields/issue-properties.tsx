@@ -76,6 +76,23 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
     }
   };
 
+  const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Moves text typed into a long-text property (like "Description") into the page body editor.
+  const moveToBody = async (field: TCustomField) => {
+    const text = String(issue.custom_fields?.[field.id] ?? "").trim();
+    if (!text) return;
+    const paragraphs = text
+      .split(/
++/)
+      .map((line) => `<p>${escapeHtml(line)}</p>`)
+      .join("");
+    await update(workspaceSlug, projectId, issueId, {
+      description_html: `${issue.description_html ?? ""}${paragraphs}`,
+      ...buildCustomFieldsPayload(issue.custom_fields, field.id, ""),
+    });
+    await fetchIssue(workspaceSlug, projectId, issueId);
+  };
+
   return (
     <>
       {shownFields.map((field) => (
@@ -92,6 +109,15 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
             projectId={projectId}
             disabled={disabled}
           />
+          {field.field_type === "long_text" && !disabled && !isBlank(field) && (
+            <button
+              type="button"
+              onClick={() => void moveToBody(field)}
+              className="mt-1 text-11 text-tertiary hover:text-secondary"
+            >
+              Move to page body
+            </button>
+          )}
         </SidebarPropertyListItem>
       ))}
       {blankCount > 0 && (
@@ -100,7 +126,7 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
           onClick={() => setShowEmpty((value) => !value)}
           className="px-2 py-1 text-left text-11 text-tertiary hover:text-secondary"
         >
-          {showEmpty ? "Hide empty properties" : `Show ${blankCount} empty ${blankCount === 1 ? "property" : "properties"}`}
+          {showEmpty ? "Hide empty properties" : `${blankCount} empty ${blankCount === 1 ? "property" : "properties"}`}
         </button>
       )}
       <AddCustomFieldButton workspaceSlug={workspaceSlug} projectId={projectId} variant="row" />

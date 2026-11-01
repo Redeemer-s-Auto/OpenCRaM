@@ -287,6 +287,10 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
                   {onInlineAdd && !issue?.tempId && <RowAddButton onAdd={onInlineAdd} />}
                 </div>
               )}
+              {/* task lists: the check mark, right after the + */}
+              {!issue?.tempId && !isEpic && (
+                <SeenCheck issue={issue} updateIssue={updateIssue} isReadOnly={!canEditIssueProperties} />
+              )}
               {hasAddColumn && isDraggingAllowed && !issue?.tempId && <RowDragGrip />}
               {/* select checkbox */}
               {projectId && canSelectIssues && !isEpic && (
@@ -398,17 +402,6 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
               })}
             </div>
           )}
-          {/* task lists, phone layout: the check mark at the right end of the title line */}
-          {!issue?.tempId && !isEpic && (
-            <div
-              className={cn("flex items-center", {
-                "md:hidden": isSidebarCollapsed,
-                "lg:hidden": !isSidebarCollapsed,
-              })}
-            >
-              <SeenCheck issue={issue} updateIssue={updateIssue} isReadOnly={!canEditIssueProperties} />
-            </div>
-          )}
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
           {!issue?.tempId ? (
@@ -439,17 +432,6 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
                   parentRef: issueRef,
                 })}
               </div>
-              {/* task lists: the check mark at the right end of the row */}
-              {!isEpic && (
-                <div
-                  className={cn("hidden", {
-                    "md:flex": isSidebarCollapsed,
-                    "lg:flex": !isSidebarCollapsed,
-                  })}
-                >
-                  <SeenCheck issue={issue} updateIssue={updateIssue} isReadOnly={!canEditIssueProperties} />
-                </div>
-              )}
             </>
           ) : (
             <div className="h-4 w-4">

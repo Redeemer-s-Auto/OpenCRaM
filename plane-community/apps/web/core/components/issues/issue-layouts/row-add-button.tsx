@@ -53,12 +53,7 @@ export function RowAddButton(props: Props) {
   };
 
   return (
-    <Tooltip
-      tooltipContent={ROW_ADD_TOOLTIP}
-      isMobile={isMobile}
-      position="top-start"
-      renderByDefault={false}
-    >
+    <Tooltip tooltipContent={ROW_ADD_TOOLTIP} isMobile={isMobile} position="top-start" renderByDefault={false}>
       <button
         type="button"
         aria-label={ROW_ADD_TOOLTIP}

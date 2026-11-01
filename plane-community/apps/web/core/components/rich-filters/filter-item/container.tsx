@@ -59,10 +59,13 @@ export function FilterItemContainer(props: FilterItemContainerProps) {
       <div
         ref={itemRef}
         // flex-shrink-0: a chip never squeezes and cuts its own text; on a phone the filter row scrolls instead.
-        className={cn("flex h-7 flex-shrink-0 items-stretch overflow-hidden rounded-sm border transition-all duration-200", {
-          "border-subtle bg-surface-1": variant === "default",
-          "border-danger-strong bg-surface-2": variant === "error",
-        })}
+        className={cn(
+          "flex h-7 flex-shrink-0 items-stretch overflow-hidden rounded-sm border transition-all duration-200",
+          {
+            "border-subtle bg-surface-1": variant === "default",
+            "border-danger-strong bg-surface-2": variant === "error",
+          }
+        )}
       >
         {children}
       </div>

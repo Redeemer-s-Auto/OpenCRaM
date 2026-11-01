@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
+import { useBodyVersion } from "@/components/custom-fields/body-version";
 // plane imports
 import type { EditorRefApi } from "@plane/editor";
 import type { TNameDescriptionLoader } from "@plane/types";
@@ -62,6 +63,7 @@ export const IssueMainContent = observer(function IssueMainContent(props: Props)
   const { setShowAlert } = useReloadConfirmations(isSubmitting === "submitting");
   // derived values
   const issue = issueId ? getIssueById(issueId) : undefined;
+  const bodyVersion = useBodyVersion(issueId);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -116,7 +118,7 @@ export const IssueMainContent = observer(function IssueMainContent(props: Props)
           entityId={issue.id}
           fileAssetType={EFileAssetType.ISSUE_DESCRIPTION}
           initialValue={issue.description_html}
-          key={issue.id}
+          key={`${issue.id}:${bodyVersion}`}
           onSubmit={async (value, isMigrationUpdate) => {
             if (!issue.id || !issue.project_id) return;
             await issueOperations.update(workspaceSlug, issue.project_id, issue.id, {

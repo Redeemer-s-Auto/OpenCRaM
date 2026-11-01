@@ -82,8 +82,7 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
     const text = String(issue.custom_fields?.[field.id] ?? "").trim();
     if (!text) return;
     const paragraphs = text
-      .split(/
-+/)
+      .split(/\n+/)
       .map((line) => `<p>${escapeHtml(line)}</p>`)
       .join("");
     await update(workspaceSlug, projectId, issueId, {

@@ -4,8 +4,9 @@
  * See the LICENSE file for details.
  */
 
+import { useEffect } from "react";
 import { observer } from "mobx-react";
-import { Outlet } from "react-router";
+import { Outlet, useParams } from "react-router";
 // plane imports
 import { Header, Row } from "@plane/ui";
 import { cn } from "@plane/utils";
@@ -17,12 +18,21 @@ import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useProjectNavigationPreferences } from "@/hooks/use-navigation-preferences";
 // layouts
 import { ProjectAuthWrapper } from "@/layouts/auth-layout/project-wrapper";
+// services
+import { ViewService } from "@/services/view.service";
 // local imports
 import type { Route } from "./+types/layout";
+
+const viewService = new ViewService();
 
 function ProjectLayout({ params }: Route.ComponentProps) {
   // router
   const { workspaceSlug, projectId } = params;
+  const { viewId } = useParams();
+  // A view (a task list tab) waits for the board's details before it asks for its own. Ask now, beside them.
+  useEffect(() => {
+    if (viewId) viewService.prefetchViewDetails(workspaceSlug, projectId, viewId);
+  }, [workspaceSlug, projectId, viewId]);
   // store hooks
   const { sidebarCollapsed } = useAppTheme();
   // preferences

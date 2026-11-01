@@ -53,7 +53,7 @@ export const ProjectAuthWrapper = observer(function ProjectAuthWrapper(props: IP
   const [isJoiningProject, setIsJoiningProject] = useState(false);
   // store hooks
   const { fetchUserProjectInfo, allowPermissions, getProjectRoleByWorkspaceSlugAndProjectId } = useUserPermissions();
-  const { fetchProjectDetails } = useProject();
+  const { fetchProjectDetails, getProjectById } = useProject();
   const { joinProject } = useUserPermissions();
   const { fetchAllCycles } = useCycle();
   const { fetchModulesSlim, fetchModules } = useModule();
@@ -76,6 +76,12 @@ export const ProjectAuthWrapper = observer(function ProjectAuthWrapper(props: IP
   );
   const currentProjectRole = getProjectRoleByWorkspaceSlugAndProjectId(workspaceSlug, projectId);
   const isWorkspaceAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE, workspaceSlug);
+  // Cycles and modules are off on almost every board. Their lists are the slowest calls of a board load
+  // (about 0.3-2.5 s each on the 2-CPU server) and nothing on a board shows them while the feature is off,
+  // so fetch them only when the board has the feature on. Turning it on later fills in the key and fetches.
+  const projectDetails = getProjectById(projectId);
+  const isCycleEnabled = !!projectDetails?.cycle_view;
+  const isModuleEnabled = !!projectDetails?.module_view;
   // Initialize module timeline chart
   useEffect(() => {
     initGantt();
@@ -136,13 +142,14 @@ export const ProjectAuthWrapper = observer(function ProjectAuthWrapper(props: IP
     { revalidateIfStale: false, revalidateOnFocus: false }
   );
   // fetching project cycles
-  useSWR(ready(PROJECT_ALL_CYCLES(projectId, currentProjectRole)), () => fetchAllCycles(workspaceSlug, projectId), {
-    revalidateIfStale: false,
-    revalidateOnFocus: false,
-  });
+  useSWR(
+    isCycleEnabled ? ready(PROJECT_ALL_CYCLES(projectId, currentProjectRole)) : null,
+    () => fetchAllCycles(workspaceSlug, projectId),
+    { revalidateIfStale: false, revalidateOnFocus: false }
+  );
   // fetching project modules
   useSWR(
-    ready(PROJECT_MODULES(projectId, currentProjectRole)),
+    isModuleEnabled ? ready(PROJECT_MODULES(projectId, currentProjectRole)) : null,
     async () => {
       await Promise.all([fetchModulesSlim(workspaceSlug, projectId), fetchModules(workspaceSlug, projectId)]);
     },

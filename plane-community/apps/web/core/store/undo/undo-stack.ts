@@ -42,6 +42,10 @@ export class UndoStack {
   private scopes = new Map<string, TScope>();
   private scopeKey = GLOBAL_SCOPE;
   private replaying = 0;
+  /** Changes sent to the server whose undo entry is not recorded yet (see `track`). */
+  private pending = new Set<Promise<unknown>>();
+  private waiting = 0;
+  private recorded = 0;
   private aliases = new Map<string, string>();
   private listeners = new Set<() => void>();
 
@@ -76,7 +80,22 @@ export class UndoStack {
   }
 
   isBusy(): boolean {
-    return this.replaying > 0;
+    return this.replaying > 0 || this.waiting > 0;
+  }
+
+  /**
+   * A change that records its undo entry only after the server answers (a delete, an archive).
+   * Ctrl+Z pressed meanwhile waits for it, so it undoes that change instead of the one before
+   * it (or nothing) while the change goes through without an undo.
+   */
+  track<T>(work: Promise<T>): Promise<T> {
+    const settled = work.then(
+      () => undefined,
+      () => undefined
+    );
+    this.pending.add(settled);
+    void settled.then(() => this.pending.delete(settled));
+    return work;
   }
 
   canUndo(): boolean {
@@ -92,6 +111,7 @@ export class UndoStack {
     if (!this.canRecord()) return;
     const scope = this.current();
     scope.undo.push(entry);
+    this.recorded += 1;
     if (scope.undo.length > this.limit) scope.undo.splice(0, scope.undo.length - this.limit);
     scope.redo = [];
     this.emit();
@@ -147,7 +167,19 @@ export class UndoStack {
 
   private async replay(direction: "undo" | "redo"): Promise<TUndoResult> {
     // one at a time: a held-down key must not run two undos on top of each other
-    if (this.replaying > 0) return { status: "busy" };
+    if (this.replaying > 0 || this.waiting > 0) return { status: "busy" };
+    if (this.pending.size > 0) {
+      // a delete or archive is still on its way: let it finish and record its entry first
+      const before = this.recorded;
+      this.waiting += 1;
+      try {
+        while (this.pending.size > 0) await Promise.all([...this.pending]);
+      } finally {
+        this.waiting -= 1;
+      }
+      // it failed (the row is back already) or recorded nothing: do not undo an older change instead
+      if (this.recorded === before) return { status: "busy" };
+    }
     const scope = this.scopes.get(this.scopeKey);
     const from = direction === "undo" ? scope?.undo : scope?.redo;
     const entry = from?.pop();

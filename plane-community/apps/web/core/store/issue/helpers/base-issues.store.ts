@@ -813,6 +813,11 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
    * @param issueId
    */
   async removeIssue(workspaceSlug: string, projectId: string, issueId: string) {
+    // Ctrl+Z pressed before the server answers waits for this delete (undo-stack.ts track)
+    return undoStack.track(this.removeIssueNow(workspaceSlug, projectId, issueId));
+  }
+
+  private async removeIssueNow(workspaceSlug: string, projectId: string, issueId: string) {
     // Ctrl+Z makes the card again from this copy (taken before it is gone)
     const shouldRecord = undoStack.canRecord() && !this.isArchived;
     const wasInList = this.isIssueInList(issueId);
@@ -855,6 +860,11 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
    * @param issueId
    */
   async issueArchive(workspaceSlug: string, projectId: string, issueId: string) {
+    // Ctrl+Z pressed before the server answers waits for this archive (undo-stack.ts track)
+    return undoStack.track(this.issueArchiveNow(workspaceSlug, projectId, issueId));
+  }
+
+  private async issueArchiveNow(workspaceSlug: string, projectId: string, issueId: string) {
     const shouldRecord = undoStack.canRecord() && !this.isArchived;
     const wasInList = this.isIssueInList(issueId);
     const issueBeforeArchive = clone(this.rootIssueStore.issues.getIssueById(issueId));
@@ -951,6 +961,11 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
    * @returns
    */
   async removeBulkIssues(workspaceSlug: string, projectId: string, issueIds: string[]) {
+    // Ctrl+Z pressed before the server answers waits for this delete (undo-stack.ts track)
+    return undoStack.track(this.removeBulkIssuesNow(workspaceSlug, projectId, issueIds));
+  }
+
+  private async removeBulkIssuesNow(workspaceSlug: string, projectId: string, issueIds: string[]) {
     // copies for Ctrl+Z (made again from these)
     const shouldRecord = undoStack.canRecord() && !this.isArchived;
     const undoSnapshots: TIssue[] = [];

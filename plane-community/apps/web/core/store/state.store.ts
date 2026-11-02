@@ -251,6 +251,9 @@ export class StateStore implements IStateStore {
     const statesResponse = await this.stateService.getWorkspaceStates(workspaceSlug);
     runInAction(() => {
       statesResponse.forEach((state) => {
+        // A board whose own states are already loaded keeps that copy (it carries the board's `order`). The
+        // workspace list now loads after the first cards, so it can land after the board's list.
+        if (this.fetchedMap[state.project_id] && this.stateMap[state.id]) return;
         set(this.stateMap, [state.id], state);
       });
       set(this.fetchedMap, workspaceSlug, true);

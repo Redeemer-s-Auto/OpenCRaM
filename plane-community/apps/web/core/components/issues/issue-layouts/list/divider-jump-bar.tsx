@@ -18,8 +18,25 @@ type Props = {
 };
 
 const HIGHLIGHT_MS = 1500;
-/** Rows above the target render as they come into view and may change height: one quiet re-scroll. */
-const SETTLE_MS = 400;
+/**
+ * Rows render as they come into view and change height (placeholders are not the real height), so one
+ * scroll is not enough: after the jump the divider's place is re-measured and the scroll corrected,
+ * until it holds still at the top of the list for a few checks in a row.
+ */
+const CHECK_MS = 80;
+const MAX_CHECKS = 60;
+const STABLE_CHECKS = 5;
+
+/** The element that scrolls the list (the nearest scrollable ancestor). */
+const scrollParentOf = (element: HTMLElement | null): HTMLElement | null => {
+  let node = element?.parentElement ?? null;
+  while (node) {
+    const overflowY = window.getComputedStyle(node).overflowY;
+    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) return node;
+    node = node.parentElement;
+  }
+  return null;
+};
 
 /**
  * Bookmarks for a list: one chip per divider that has text, in list order. A tap scrolls the list to
@@ -30,6 +47,9 @@ export const DividerJumpBar = observer(function DividerJumpBar(props: Props) {
   const { issueIds, issuesMap, groupId } = props;
   const barRef = useRef<HTMLDivElement | null>(null);
   const [stickyTop, setStickyTop] = useState(0);
+  // the jump that is still settling; a new tap or the person scrolling ends it
+  const stopJumpRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopJumpRef.current?.(), []);
 
   const bookmarks = issueIds
     .map((id) => issuesMap[id])
@@ -52,17 +72,53 @@ export const DividerJumpBar = observer(function DividerJumpBar(props: Props) {
   if (!hasBookmarks) return null;
 
   const jumpTo = (issueId: string) => {
-    const element = document.getElementById(getIssueBlockId(issueId, groupId));
+    stopJumpRef.current?.();
+    const blockId = getIssueBlockId(issueId, groupId);
+    const element = document.getElementById(blockId);
     if (!element) return;
-    const offset = stickyTop + (barRef.current?.offsetHeight ?? 0);
-    const scrollToRow = (behavior: ScrollBehavior) => {
-      element.style.scrollMarginTop = `${offset}px`;
-      element.scrollIntoView({ block: "start", behavior });
+    const container = scrollParentOf(barRef.current);
+    const offset = () => stickyTop + (barRef.current?.offsetHeight ?? 0);
+    // how far the divider is from its place right under the bar (the row element may be re-created)
+    const distance = () => {
+      const target = document.getElementById(blockId);
+      if (!target || !container) return 0;
+      return target.getBoundingClientRect().top - (container.getBoundingClientRect().top + offset());
     };
-    scrollToRow("smooth");
-    setTimeout(() => scrollToRow("auto"), SETTLE_MS);
+    if (!container) {
+      element.style.scrollMarginTop = `${offset()}px`;
+      element.scrollIntoView({ block: "start" });
+    } else {
+      container.scrollTop += distance();
+      let checks = 0;
+      let stable = 0;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const stop = () => {
+        if (timer) clearTimeout(timer);
+        container.removeEventListener("wheel", stop);
+        container.removeEventListener("touchstart", stop);
+        window.removeEventListener("keydown", stop);
+        if (stopJumpRef.current === stop) stopJumpRef.current = null;
+      };
+      const check = () => {
+        const off = distance();
+        if (Math.abs(off) > 1) {
+          const before = container.scrollTop;
+          container.scrollTop += off;
+          // at the very end of the list it cannot go further: that is as close as it gets
+          stable = container.scrollTop === before ? stable + 1 : 0;
+        } else stable += 1;
+        checks += 1;
+        if (stable >= STABLE_CHECKS || checks >= MAX_CHECKS) stop();
+        else timer = setTimeout(check, CHECK_MS);
+      };
+      container.addEventListener("wheel", stop, { passive: true });
+      container.addEventListener("touchstart", stop, { passive: true });
+      window.addEventListener("keydown", stop);
+      stopJumpRef.current = stop;
+      timer = setTimeout(check, CHECK_MS);
+    }
     element.classList.add(HIGHLIGHT_CLASS);
-    setTimeout(() => element.classList.remove(HIGHLIGHT_CLASS), HIGHLIGHT_MS);
+    setTimeout(() => document.getElementById(blockId)?.classList.remove(HIGHLIGHT_CLASS), HIGHLIGHT_MS);
   };
 
   return (

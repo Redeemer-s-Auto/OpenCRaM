@@ -33,7 +33,7 @@ import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // local components
 import type { TRenderQuickActions } from "../list/list-view-types";
-import { buildInlineAddData } from "../quick-add/inline-row";
+import { buildInlineAddData, spreadSortOrderTies } from "../quick-add/inline-row";
 import type { TRowAddPlacement } from "../row-add-button";
 import { RowAddButton } from "../row-add-button";
 import type { TRowAddKind, TRowInlineAdd } from "../row-line-tools";
@@ -114,10 +114,15 @@ export const SpreadsheetIssueRow = observer(function SpreadsheetIssueRow(props: 
 
   // One click, one finished row: it is made at once, so the row looks like every other row and has its own +.
   // A blank line (or a divider) made at once next to this row; the cursor goes into its title.
-  const handleInlineAdd = (placement: TRowAddPlacement, kind: TRowAddKind = "line") => {
+  const handleInlineAdd = async (placement: TRowAddPlacement, kind: TRowAddKind = "line") => {
     if (!siblingIds || !quickAddCallback || !routerProjectId) return;
-    const data = buildInlineAddData(issue, placement, siblingIds, (id) => issueMap[id]);
     const projectId = routerProjectId.toString();
+    // rows sharing one sort_order leave no room between them: spread them first (Notes)
+    if (updateIssue)
+      await spreadSortOrderTies(issue, placement, siblingIds, (id) => issueMap[id], (id, sort_order) =>
+        updateIssue(issueMap[id]?.project_id ?? projectId, id, { sort_order })
+      ).catch(() => 0);
+    const data = buildInlineAddData(issue, placement, siblingIds, (id) => issueMap[id]);
     quickAddCallback(projectId, { ...createIssuePayload(projectId, { ...data, ...blankRowFields(kind) }) } as TIssue)
       .then((created) => requestRowTitleFocus(created?.id))
       .catch((error: { message?: string }) =>

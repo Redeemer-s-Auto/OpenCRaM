@@ -196,6 +196,9 @@ class ProjectViewSet(BaseViewSet):
             "teamspace_id",
             "private_owner_id",
             "is_sealed",
+            # Notes: a Notion folder board ("notion" / "folder:<page id>") opens on its landing page in the sidebar
+            "external_source",
+            "external_id",
             "teamspace__name",
             "teamspace__slug",
             "teamspace__position",

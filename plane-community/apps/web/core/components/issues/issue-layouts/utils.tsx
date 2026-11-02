@@ -7,6 +7,7 @@
 
 import type { CSSProperties } from "react";
 import { extractInstruction } from "@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item";
+import { extractClosestEdge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import { clone, isNil, pull, uniq, concat } from "lodash-es";
 import scrollIntoView from "smooth-scroll-into-view-if-needed";
 import type { FC } from "react";
@@ -84,6 +85,8 @@ export type GroupDropLocation = {
   subGroupId?: string;
   id: string | undefined;
   canAddIssueBelow?: boolean;
+  /** List rows (Notes): true = drop right below the row `id`, false = right above it, as the drop line shows. */
+  dropAfter?: boolean;
 };
 
 export type IssueUpdates = {
@@ -442,6 +445,8 @@ export const getDestinationFromDropPayload = (payload: IPragmaticDropPayload): G
 
   // extract instruction from destination issue
   const extractedInstruction = destinationIssueData ? extractInstruction(destinationIssueData)?.type : "";
+  // list rows also carry the nearest edge (Notes): it decides above / below exactly as the line shows
+  const closestEdge = destinationIssueData ? extractClosestEdge(destinationIssueData) : null;
 
   return {
     groupId: destinationColumnData.groupId as string,
@@ -449,6 +454,7 @@ export const getDestinationFromDropPayload = (payload: IPragmaticDropPayload): G
     columnId: destinationColumnData.columnId as string,
     id: destinationIssueData?.id as string | undefined,
     canAddIssueBelow: extractedInstruction === "reorder-below",
+    dropAfter: closestEdge ? closestEdge === "bottom" : undefined,
   };
 };
 
@@ -464,7 +470,8 @@ const handleSortOrder = (
   destinationIssueId: string | undefined,
   getIssueById: (issueId: string) => TIssue | undefined,
   shouldAddIssueAtTop = false,
-  canAddIssueBelow = false
+  canAddIssueBelow = false,
+  dropAfter?: boolean
 ) => {
   const sortOrderDefaultValue = 65535;
   let currentIssueState = {};
@@ -474,11 +481,13 @@ const handleSortOrder = (
     : shouldAddIssueAtTop
       ? 0
       : destinationIssues.length;
+  // Notes list rows: below the row = the slot after it
+  if (dropAfter && destinationIssueId && destinationIndex >= 0) destinationIndex += 1;
 
   const isDestinationLastChild = destinationIndex === destinationIssues.length - 1;
 
   // if issue can be added below and if the destination issue is the last child, then add to the end of the list
-  if (canAddIssueBelow && isDestinationLastChild) {
+  if (dropAfter === undefined && canAddIssueBelow && isDestinationLastChild) {
     destinationIndex = destinationIssues.length;
   }
 
@@ -551,7 +560,11 @@ export const handleGroupDragDrop = async (
 
   let updatedIssue: Partial<TIssue> = {};
   const issueUpdates: IssueUpdates = {};
-  const destinationIssues = getIssueIds(destination.groupId, destination.subGroupId) ?? [];
+  // List rows (Notes): the dragged card is left out of its own neighbours, so it lands between the two
+  // rows the drop line sits between.
+  const groupIssueIds = getIssueIds(destination.groupId, destination.subGroupId) ?? [];
+  const destinationIssues =
+    destination.dropAfter === undefined ? groupIssueIds : groupIssueIds.filter((id) => id !== source.id);
 
   const sourceIssue = getIssueById(source.id);
 
@@ -570,7 +583,8 @@ export const handleGroupDragDrop = async (
       destination.id,
       getIssueById,
       shouldAddIssueAtTop,
-      !!destination.canAddIssueBelow
+      !!destination.canAddIssueBelow,
+      destination.dropAfter
     ),
   };
 

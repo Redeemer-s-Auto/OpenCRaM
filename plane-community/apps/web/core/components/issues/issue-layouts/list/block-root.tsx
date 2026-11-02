@@ -8,7 +8,8 @@ import type { MutableRefObject } from "react";
 import React, { useEffect, useRef, useState } from "react";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
-import { attachInstruction, extractInstruction } from "@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item";
+import { attachInstruction } from "@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item";
+import { attachClosestEdge, extractClosestEdge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // plane helpers
@@ -27,7 +28,7 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // types
-import { buildInlineAddData } from "../quick-add/inline-row";
+import { buildInlineAddData, spreadSortOrderTies } from "../quick-add/inline-row";
 import type { TRowAddPlacement } from "../row-add-button";
 import type { TRowAddKind } from "../row-line-tools";
 import { blankRowFields, requestRowTitleFocus } from "../row-line-tools";
@@ -108,11 +109,16 @@ export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
 
   // One click, one finished row: a blank line (or a divider) made at once, right next to this row,
   // with its own +. The cursor goes into its title so it can be typed straight away.
-  const handleInlineAdd = (placement: TRowAddPlacement, kind: TRowAddKind = "line") => {
+  const handleInlineAdd = async (placement: TRowAddPlacement, kind: TRowAddKind = "line") => {
     const issue = issuesMap[issueId];
     if (!issue || !siblingIds || !quickAddCallback || !routerProjectId) return;
-    const data = buildInlineAddData(issue, placement, siblingIds, (id) => issuesMap[id], groupQuickAddData);
     const projectId = routerProjectId.toString();
+    // rows sharing one sort_order leave no room between them: spread them first (Notes)
+    if (updateIssue)
+      await spreadSortOrderTies(issue, placement, siblingIds, (id) => issuesMap[id], (id, sort_order) =>
+        updateIssue(issuesMap[id]?.project_id ?? projectId, id, { sort_order })
+      ).catch(() => 0);
+    const data = buildInlineAddData(issue, placement, siblingIds, (id) => issuesMap[id], groupQuickAddData);
     quickAddCallback(projectId, { ...createIssuePayload(projectId, { ...data, ...blankRowFields(kind) }) } as TIssue)
       .then((created) => requestRowTitleFocus(created?.id))
       .catch((error: { message?: string }) =>
@@ -133,24 +139,20 @@ export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
           const data = { id: issueId, type: "ISSUE" };
 
           // attach instruction for last in list
-          return attachInstruction(data, {
+          const withInstruction = attachInstruction(data, {
             input,
             element,
             currentLevel: 0,
             indentPerLevel: 0,
             mode: isLastChild ? "last-in-group" : "standard",
           });
+          // Notes (Notion style): the line goes to the row edge nearest the pointer (top half: above
+          // this row, bottom half: below it), and the card lands exactly there (utils: dropAfter).
+          return attachClosestEdge(withInstruction, { input, element, allowedEdges: ["top", "bottom"] });
         },
         onDrag: ({ self }) => {
-          const extractedInstruction = extractInstruction(self?.data)?.type;
-          // check if the highlight is to be shown above or below
-          setInstruction(
-            extractedInstruction
-              ? extractedInstruction === "reorder-below" && isLastChild
-                ? "DRAG_BELOW"
-                : "DRAG_OVER"
-              : undefined
-          );
+          const edge = extractClosestEdge(self?.data);
+          setInstruction(edge === "bottom" ? "DRAG_BELOW" : edge === "top" ? "DRAG_OVER" : undefined);
         },
         onDragLeave: () => {
           setInstruction(undefined);
@@ -226,7 +228,7 @@ export const IssueBlockRoot = observer(function IssueBlockRoot(props: Props) {
             quickAddCallback={quickAddCallback}
           />
         ))}
-      {isLastChild && <DropIndicator classNames={"absolute z-[2]"} isVisible={instruction === "DRAG_BELOW"} />}
+      <DropIndicator classNames={"absolute bottom-0 z-[2]"} isVisible={instruction === "DRAG_BELOW"} />
     </div>
   );
 });

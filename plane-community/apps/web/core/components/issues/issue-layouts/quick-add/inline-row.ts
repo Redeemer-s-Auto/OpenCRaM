@@ -24,6 +24,38 @@ export const endOfListSortOrder = (issues: (TIssue | undefined)[]): number => {
 };
 
 /**
+ * Two rows with the SAME sort_order have no room between them: a card put "between" them gets their
+ * value too and lands on either side after a reload. Before a card is added next to ``row``, the run of
+ * rows sharing the boundary value is spread out evenly up to the next distinct value (only those rows'
+ * sort_order changes, so the order on screen stays the same). Returns the sort_order writes made.
+ */
+export const spreadSortOrderTies = async (
+  row: TIssue,
+  placement: TRowAddPlacement,
+  siblingIds: string[],
+  getIssueById: (issueId: string) => TIssue | undefined,
+  save: (issueId: string, sortOrder: number) => Promise<void>
+): Promise<number> => {
+  const index = siblingIds.indexOf(row.id);
+  if (index < 0) return 0;
+  // the boundary: the row and the neighbour on the side the card goes
+  const first = placement === "below" ? index : index - 1;
+  const base = first >= 0 ? getIssueById(siblingIds[first])?.sort_order : undefined;
+  const next = getIssueById(siblingIds[first + 1] ?? "")?.sort_order;
+  if (typeof base !== "number" || typeof next !== "number" || next > base) return 0;
+  // the run of rows after the boundary that sit at (or below) the same value
+  let end = first + 1;
+  while (end < siblingIds.length && (getIssueById(siblingIds[end])?.sort_order ?? Infinity) <= base) end += 1;
+  const after = getIssueById(siblingIds[end] ?? "")?.sort_order;
+  const room = typeof after === "number" && after > base ? after - base : SORT_ORDER_GAP;
+  const step = room / (end - first + 1);
+  const writes: Promise<void>[] = [];
+  for (let k = first + 1; k < end; k += 1) writes.push(save(siblingIds[k], base + step * (k - first)));
+  await Promise.all(writes);
+  return writes.length;
+};
+
+/**
  * Pre-filled values for a card added right above or below ``row`` with the row's + button.
  *
  * The new card sits beside the row it was added from: same state, and the same priority, labels,

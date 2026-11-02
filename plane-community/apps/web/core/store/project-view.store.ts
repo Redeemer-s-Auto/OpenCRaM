@@ -305,6 +305,12 @@ export class ProjectViewStore implements IProjectViewStore {
     });
 
     const response = await this.viewService.patchView(workspaceSlug, projectId, viewId, data);
+    // the server's saved view is what the store keeps (a view GET answered meanwhile may hold the old one)
+    if (response && typeof response === "object" && response.id === viewId) {
+      runInAction(() => {
+        set(this.viewMap, [viewId], { ...this.getViewById(viewId), ...response });
+      });
+    }
 
     if (shouldRecord && !sameValue(oldData, newData)) {
       const touchesFilters = keys.some((k) => ["rich_filters", "display_filters", "display_properties"].includes(k));

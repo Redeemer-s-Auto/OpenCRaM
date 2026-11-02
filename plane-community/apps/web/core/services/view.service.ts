@@ -19,12 +19,27 @@ const SHARED_VIEW_DETAILS_MS = 5000;
 const sharedViewDetails = new Map<string, { promise: Promise<IProjectView>; startedAt: number }>();
 const forgetSharedViewDetails = () => sharedViewDetails.clear();
 /**
+ * Bumped when a view write starts and when it ends. A view GET that overlapped a write may carry the values
+ * from before it (the server answered first, or the answer arrived late): it is asked again once the writes
+ * are over, so the page and its filters never take a stale view after a save.
+ */
+let viewWriteGeneration = 0;
+const viewWritesInFlight = new Set<Promise<unknown>>();
+const STALE_VIEW_RETRIES = 3;
+/**
  * Runs a view write with the shared copy dropped when the write STARTS and again when it ENDS (success or
  * failure), so a GET that started while the write was in flight is never handed out afterwards.
  */
 const viewWrite = <T>(write: () => Promise<T>): Promise<T> => {
   forgetSharedViewDetails();
-  return write().finally(forgetSharedViewDetails);
+  viewWriteGeneration += 1;
+  const settled = write().finally(() => {
+    viewWritesInFlight.delete(settled);
+    viewWriteGeneration += 1;
+    forgetSharedViewDetails();
+  });
+  viewWritesInFlight.add(settled);
+  return settled;
 };
 
 export class ViewService extends APIService {
@@ -90,9 +105,18 @@ export class ViewService extends APIService {
     const url = `/api/workspaces/${workspaceSlug}/projects/${projectId}/views/${viewId}/`;
     const shared = sharedViewDetails.get(url);
     if (shared && Date.now() - shared.startedAt < SHARED_VIEW_DETAILS_MS) return shared.promise;
-    const promise: Promise<IProjectView> = this.get(url)
-      .then((response) => response?.data)
-      .catch((error) => {
+    const fetchFresh = async (): Promise<IProjectView> => {
+      for (let attempt = 0; ; attempt++) {
+        const generation = viewWriteGeneration;
+        const overlapped = viewWritesInFlight.size > 0;
+        const data = (await this.get(url))?.data as IProjectView;
+        const stale = overlapped || generation !== viewWriteGeneration;
+        if (!stale || attempt >= STALE_VIEW_RETRIES) return data;
+        // wait for the writes to end, then ask again (not shared: a fresh answer)
+        await Promise.allSettled([...viewWritesInFlight]);
+      }
+    };
+    const promise: Promise<IProjectView> = fetchFresh().catch((error) => {
         if (sharedViewDetails.get(url)?.promise === promise) sharedViewDetails.delete(url);
         throw error?.response?.data;
       });

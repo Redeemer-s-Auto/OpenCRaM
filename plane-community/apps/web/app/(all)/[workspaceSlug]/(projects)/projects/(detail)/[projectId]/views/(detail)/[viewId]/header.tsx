@@ -207,7 +207,8 @@ export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader
             <span className="hidden @4xl:inline">Add work item</span>
           </Button>
         )}
-        <div className="hidden md:block">
+        {/* The view's own menu (Edit, Copy link, Delete...): an icon button at every width, phones included; h-7 keeps the row at the other buttons' height. */}
+        <div className="flex h-7 flex-shrink-0 items-center">
           <ViewQuickActions
             parentRef={parentRef}
             customClassName="flex-shrink-0 flex items-center justify-center size-[26px] bg-layer-1/70 rounded-sm"

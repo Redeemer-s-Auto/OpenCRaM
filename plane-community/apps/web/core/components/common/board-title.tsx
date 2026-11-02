@@ -44,10 +44,12 @@ export const BoardTitle = observer(function BoardTitle(props: Props) {
   const name = project?.name;
   const logo = project?.logo_props;
   const hasLogo = !!logo?.in_use;
-  // Same rule as the board's settings page: board admins change the icon.
+  // Same rule as the board's settings page: board admins change the icon. An archived board
+  // cannot be changed (the API refuses every save), so it gets no picker.
   const canEdit =
     !!workspaceSlug &&
     !!projectId &&
+    !project?.archived_at &&
     allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.PROJECT, workspaceSlug.toString(), projectId);
 
   const handleLogoChange = (value: TChangeHandlerProps) => {

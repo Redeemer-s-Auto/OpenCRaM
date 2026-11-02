@@ -7,7 +7,7 @@
 import { useRef } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
-import { MoveDiagonal, MoveRight } from "lucide-react";
+import { Maximize2, X } from "lucide-react";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 import { CenterPanelIcon, CopyLinkIcon, FullScreenPanelIcon, SidePanelIcon } from "@plane/propel/icons";
@@ -159,15 +159,27 @@ export const IssuePeekOverviewHeader = observer(function IssuePeekOverviewHeader
       }`}
     >
       <div className="flex items-center gap-4">
-        <Tooltip tooltipContent={t("common.close_peek_view")} isMobile={isMobile}>
-          <button onClick={removeRoutePeekId}>
-            <MoveRight className="h-4 w-4 text-tertiary hover:text-secondary" />
+        {/* Notion style: Close (X, or Esc) and "Open as full page"; the list stays visible beside the panel. */}
+        <Tooltip tooltipContent="Close (Esc)" isMobile={isMobile}>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={removeRoutePeekId}
+            className="grid size-6 place-items-center rounded-sm text-tertiary hover:bg-layer-1 hover:text-secondary"
+          >
+            <X className="size-4" />
           </button>
         </Tooltip>
 
-        <Tooltip tooltipContent={t("issue.open_in_full_screen")} isMobile={isMobile}>
-          <Link href={workItemLink} onClick={() => removeRoutePeekId()}>
-            <MoveDiagonal className="h-4 w-4 text-tertiary hover:text-secondary" />
+        <Tooltip tooltipContent="Open as full page" isMobile={isMobile}>
+          <Link
+            href={workItemLink}
+            aria-label="Open as full page"
+            onClick={() => removeRoutePeekId()}
+            className="flex h-6 items-center gap-1 rounded-sm px-1 text-12 text-tertiary hover:bg-layer-1 hover:text-secondary"
+          >
+            <Maximize2 className="size-3.5" />
+            <span className="hidden sm:inline">Open</span>
           </Link>
         </Tooltip>
         {currentMode && embedIssue === false && (

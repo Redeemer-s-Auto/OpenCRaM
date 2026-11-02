@@ -68,6 +68,12 @@ export interface IBaseProjectMemberStore {
     projectId: string,
     data: Partial<IProjectUserPropertiesResponse>
   ) => Promise<IProjectUserPropertiesResponse>;
+  /** Notes: PATCH only `preferences` (merged into what the store holds), so no other user property is resent. */
+  updateProjectUserPreferences: (
+    workspaceSlug: string,
+    projectId: string,
+    preferences: IProjectUserPropertiesResponse["preferences"]
+  ) => Promise<void>;
   // bulk operation actions
   bulkAddMembersToProject: (
     workspaceSlug: string,
@@ -118,6 +124,7 @@ export class BaseProjectMemberStore implements IBaseProjectMemberStore {
       fetchProjectMembers: action,
       fetchProjectUserProperties: action,
       updateProjectUserProperties: action,
+      updateProjectUserPreferences: action,
       bulkAddMembersToProject: action,
       updateMemberRole: action,
       removeMemberFromProject: action,
@@ -490,6 +497,25 @@ export class BaseProjectMemberStore implements IBaseProjectMemberStore {
         } else {
           unset(this.projectUserPropertiesMap, [projectId]);
         }
+      });
+      throw error;
+    }
+  };
+
+  updateProjectUserPreferences = async (
+    workspaceSlug: string,
+    projectId: string,
+    preferences: IProjectUserPropertiesResponse["preferences"]
+  ): Promise<void> => {
+    const previous = this.projectUserPropertiesMap[projectId]?.preferences;
+    runInAction(() => {
+      set(this.projectUserPropertiesMap, [projectId, "preferences"], preferences);
+    });
+    try {
+      await this.projectService.updateProjectUserProperties(workspaceSlug, projectId, { preferences });
+    } catch (error) {
+      runInAction(() => {
+        if (previous) set(this.projectUserPropertiesMap, [projectId, "preferences"], previous);
       });
       throw error;
     }

@@ -15,7 +15,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createRoot } from "react-dom/client";
 import scrollIntoView from "smooth-scroll-into-view-if-needed";
 import { Settings, Share2, LogOut, MoreHorizontal } from "lucide-react";
-import { Disclosure, Transition } from "@headlessui/react";
+import { Disclosure } from "@headlessui/react";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel, MEMBER_TRACKER_ELEMENTS } from "@plane/constants";
 import { useOutsideClickDetector } from "@plane/hooks";
@@ -40,8 +40,6 @@ import { useProjectNavigationPreferences } from "@/hooks/use-navigation-preferen
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // local imports
 import { HIGHLIGHT_CLASS, highlightIssueOnDrop } from "../../issues/issue-layouts/utils";
-import { ProjectNavigation } from "./project-navigation";
-import { SidebarCardTree } from "@/components/one-unit/sidebar-card-tree";
 import { useNavigationItems } from "@/components/navigation/use-navigation-items";
 
 type Props = {
@@ -272,10 +270,9 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
 
   const isAccordionMode = projectPreferences.navigationMode === "ACCORDION";
 
-  // One click on the name opens the board (its default list); the arrow alone opens and closes the sub-items.
+  // One click on the name opens the board (its default list); the arrow on the left opens and closes its child boards.
   const handleItemClick = () => {
     router.push(defaultTabUrl);
-    if (isAccordionMode) setIsProjectListOpen(true);
     // on a phone the menu is a drawer over the page: it gets out of the way after a tap
     if (window.innerWidth < 768) toggleSidebar(true);
     // close the extended sidebar if it is open
@@ -455,48 +452,11 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
                     </CustomMenu.MenuItem>
                   )}
                 </CustomMenu>
-                {/* Phones have no hover, so below md the arrow is always shown. */}
-                {isAccordionMode && (
-                  <IconButton
-                    variant="ghost"
-                    size="sm"
-                    icon={ChevronRightIcon}
-                    onClick={() => setIsProjectListOpen(!isProjectListOpen)}
-                    className={cn("inline-flex text-placeholder md:hidden md:group-hover/project-item:inline-flex", {
-                      "md:inline-flex": isMenuActive,
-                    })}
-                    iconClassName={cn("transition-transform", {
-                      "rotate-90": isProjectListOpen,
-                    })}
-                    aria-label={t(
-                      isProjectListOpen
-                        ? "aria_labels.projects_sidebar.close_project_menu"
-                        : "aria_labels.projects_sidebar.open_project_menu"
-                    )}
-                  />
-                )}
               </div>
             </>
           </div>
-          {isAccordionMode && (
-            <Transition
-              show={isProjectListOpen}
-              enter="transition duration-100 ease-out"
-              enterFrom="transform scale-95 opacity-0"
-              enterTo="transform scale-100 opacity-100"
-              leave="transition duration-75 ease-out"
-              leaveFrom="transform scale-100 opacity-100"
-              leaveTo="transform scale-95 opacity-0"
-            >
-              {isProjectListOpen && (
-                <Disclosure.Panel static as="div" className="relative mt-1 mb-1.5 flex flex-col gap-0.5 pl-6">
-                  <div className="absolute top-0 bottom-1 left-[15px] w-[1px] bg-layer-3" />
-                  <ProjectNavigation workspaceSlug={workspaceSlug.toString()} projectId={projectId.toString()} />
-                  <SidebarCardTree workspaceSlug={workspaceSlug.toString()} projectId={projectId.toString()} />
-                </Disclosure.Panel>
-              )}
-            </Transition>
-          )}
+          {/* Notes: a board is one row (Notion style). Its views are tabs on the board page and its pages
+              are reached from the board header; only child boards nest here, under the arrow on the left. */}
           {isLastChild && <DropIndicator isVisible={instruction === "DRAG_BELOW"} />}
         </div>
       </Disclosure>

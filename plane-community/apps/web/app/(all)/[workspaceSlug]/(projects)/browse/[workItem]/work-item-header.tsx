@@ -6,6 +6,7 @@
 
 import React from "react";
 import { observer } from "mobx-react";
+import { ArrowLeft } from "lucide-react";
 import { useParams } from "next/navigation";
 // plane ui
 import { WorkItemsIcon } from "@plane/propel/icons";
@@ -42,9 +43,25 @@ export const WorkItemDetailsHeader = observer(function WorkItemDetailsHeader() {
   const ancestors = useCardAncestors(workspaceSlug?.toString(), issueId?.toString(), issueDetails?.parent_id);
 
   if (!workspaceSlug || !projectId || !issueId) return null;
+  // Phones: a card opens full screen; Back returns to the list it came from (or the board).
+  const handleBack = () => {
+    const historyIndex = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (historyIndex > 0) router.back();
+    else router.push(`/${workspaceSlug}/projects/${projectId}/issues/`);
+  };
   return (
     <Header>
       <Header.LeftItem className="min-w-0 flex-nowrap overflow-hidden">
+        <button
+          type="button"
+          aria-label="Back"
+          data-peek-back=""
+          onClick={handleBack}
+          className="mr-1 flex h-7 flex-shrink-0 items-center gap-1 rounded-md px-1.5 text-13 text-secondary hover:bg-layer-1 md:hidden"
+        >
+          <ArrowLeft className="size-4" />
+          <span>Back</span>
+        </button>
         <Breadcrumbs onBack={router.back} isLoading={loader === "init-loader"}>
           <CommonProjectBreadcrumbs workspaceSlug={workspaceSlug?.toString()} projectId={projectId?.toString()} />
           <Breadcrumbs.Item

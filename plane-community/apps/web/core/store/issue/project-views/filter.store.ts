@@ -18,6 +18,7 @@ import type {
   TIssueParams,
   IssuePaginationOptions,
   IProjectView,
+  IProjectViewUserDisplay,
   TWorkItemFilterExpression,
   TSupportedFilterForUpdate,
 } from "@plane/types";
@@ -146,10 +147,46 @@ export class ProjectViewIssuesFilter extends IssueFilterHelperStore implements I
     }
   );
 
+  /** Notes: this person's own Display choices on a view, kept in their board user properties (any device). */
+  private getViewUserDisplay = (projectId: string | undefined, viewId: string): IProjectViewUserDisplay | undefined => {
+    if (!projectId) return undefined;
+    return this.rootIssueStore.rootStore.memberRoot.project.getProjectUserProperties(projectId)?.preferences?.views?.[
+      viewId
+    ];
+  };
+
+  /** Notes: a Display change on a view lasts (reload, other browser, other device), for this person only. */
+  private saveViewUserDisplay = (
+    workspaceSlug: string,
+    projectId: string,
+    viewId: string,
+    kind: "display_filters" | "display_properties",
+    changed: Partial<IIssueDisplayFilterOptions> | Partial<IIssueDisplayProperties>
+  ) => {
+    const members = this.rootIssueStore.rootStore.memberRoot.project;
+    const current = members.getProjectUserProperties(projectId);
+    if (!current?.preferences) return;
+    const views = { ...current.preferences.views };
+    const own = { ...views[viewId] };
+    own[kind] = { ...own[kind], ...changed } as never;
+    views[viewId] = own;
+    members
+      .updateProjectUserPreferences(workspaceSlug, projectId, { ...current.preferences, views })
+      .catch((error) => console.log("error while saving the view's display choices", error));
+  };
+
   mutateFilters: IProjectViewIssuesFilter["mutateFilters"] = action((workspaceSlug, viewId, viewDetails) => {
     const richFilters: TWorkItemFilterExpression = viewDetails?.rich_filters;
-    const displayFilters: IIssueDisplayFilterOptions = this.computedDisplayFilters(viewDetails?.display_filters);
-    const displayProperties: IIssueDisplayProperties = this.computedDisplayProperties(viewDetails?.display_properties);
+    // this person's own Display choices win over the view's saved ones
+    const own = this.getViewUserDisplay(viewDetails?.project, viewId);
+    const displayFilters: IIssueDisplayFilterOptions = this.computedDisplayFilters({
+      ...viewDetails?.display_filters,
+      ...own?.display_filters,
+    });
+    const displayProperties: IIssueDisplayProperties = this.computedDisplayProperties({
+      ...viewDetails?.display_properties,
+      ...own?.display_properties,
+    } as IIssueDisplayProperties);
 
     // fetching the kanban toggle helpers in the local storage
     const kanbanFilters = {
@@ -178,7 +215,14 @@ export class ProjectViewIssuesFilter extends IssueFilterHelperStore implements I
 
   fetchFilters = async (workspaceSlug: string, projectId: string, viewId: string) => {
     try {
-      const viewDetails = await this.issueFilterService.getViewDetails(workspaceSlug, projectId, viewId);
+      const members = this.rootIssueStore.rootStore.memberRoot.project;
+      const [viewDetails] = await Promise.all([
+        this.issueFilterService.getViewDetails(workspaceSlug, projectId, viewId),
+        // the person's own Display choices must be in hand before the view is drawn
+        members.getProjectUserProperties(projectId)
+          ? Promise.resolve()
+          : members.fetchProjectUserProperties(workspaceSlug, projectId).catch(() => undefined),
+      ]);
       this.mutateFilters(workspaceSlug, viewId, viewDetails);
     } catch (error) {
       console.log("error while fetching project view filters", error);
@@ -306,6 +350,7 @@ export class ProjectViewIssuesFilter extends IssueFilterHelperStore implements I
             );
           }
 
+          this.saveViewUserDisplay(workspaceSlug, projectId, viewId, "display_filters", updatedDisplayFilters);
           break;
         }
         case EIssueFilterType.DISPLAY_PROPERTIES: {
@@ -321,6 +366,7 @@ export class ProjectViewIssuesFilter extends IssueFilterHelperStore implements I
               );
             });
           });
+          this.saveViewUserDisplay(workspaceSlug, projectId, viewId, "display_properties", updatedDisplayProperties);
 
           break;
         }

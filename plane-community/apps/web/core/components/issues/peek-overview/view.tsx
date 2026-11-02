@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
 import { createPortal } from "react-dom";
 // plane imports
@@ -60,6 +60,8 @@ export const IssueView = observer(function IssueView(props: IIssueView) {
   const [isArchiveIssueModalOpen, setIsArchiveIssueModalOpen] = useState(false);
   const [isDuplicateIssueModalOpen, setIsDuplicateIssueModalOpen] = useState(false);
   const [isEditIssueModalOpen, setIsEditIssueModalOpen] = useState(false);
+  // Notes: the side panel can be dragged wider or narrower by its left edge (not remembered)
+  const [sideWidth, setSideWidth] = useState<number | null>(null);
   // ref
   const issuePeekOverviewRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorRefApi>(null);
@@ -112,6 +114,63 @@ export const IssueView = observer(function IssueView(props: IIssueView) {
 
   useKeypress("Escape", () => !embedIssue && handleKeyDown());
 
+  // Notes: Up / Down move the panel to the previous / next row of the list behind it.
+  useEffect(() => {
+    if (embedIssue) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true'], [role='listbox'], [role='menu']")) return;
+      if (isAnyModalOpen || isAnyEpicModalOpen || isAnyLocalModalOpen) return;
+      const ids: string[] = [];
+      document.querySelectorAll<HTMLElement>("[id^='issue-']").forEach((element) => {
+        const id = element.id.slice("issue-".length);
+        // dividers (section headers, blank lines) are not cards: the panel skips them
+        if (element.hasAttribute("data-divider-row") || getIssueById(id)?.is_divider) return;
+        if (/^[0-9a-f-]{36}$/.test(id) && !ids.includes(id)) ids.push(id);
+      });
+      const index = ids.indexOf(issueId);
+      if (index === -1) return;
+      const nextId = ids[event.key === "ArrowDown" ? index + 1 : index - 1];
+      const next = nextId ? getIssueById(nextId) : undefined;
+      if (!next?.project_id) return;
+      event.preventDefault();
+      setPeekIssue({ workspaceSlug, projectId: next.project_id, issueId: next.id, isArchived: !!next.archived_at });
+      document.getElementById(`issue-${next.id}`)?.scrollIntoView({ block: "nearest" });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [
+    embedIssue,
+    issueId,
+    workspaceSlug,
+    isAnyModalOpen,
+    isAnyEpicModalOpen,
+    isAnyLocalModalOpen,
+    getIssueById,
+    setPeekIssue,
+  ]);
+
+  const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    const panel = issuePeekOverviewRef.current;
+    if (!panel) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const right = panel.getBoundingClientRect().right;
+    const onMove = (moveEvent: PointerEvent) => {
+      const width = right - moveEvent.clientX;
+      setSideWidth(Math.round(Math.min(Math.max(width, 360), right - 240)));
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  const isWide = typeof window !== "undefined" && window.innerWidth >= 768;
+
   const handleRestore = async () => {
     if (!issueOperations.restore) return;
     await issueOperations.restore(workspaceSlug, projectId, issueId);
@@ -139,11 +198,22 @@ export const IssueView = observer(function IssueView(props: IIssueView) {
         <div
           ref={issuePeekOverviewRef}
           className={peekOverviewIssueClassName}
+          data-peek-panel=""
           style={{
+            ...(sideWidth && isWide && !embedIssue && peekMode === "side-peek" ? { width: sideWidth } : {}),
             boxShadow:
               "0px 4px 8px 0px rgba(0, 0, 0, 0.12), 0px 6px 12px 0px rgba(16, 24, 40, 0.12), 0px 1px 16px 0px rgba(16, 24, 40, 0.12)",
           }}
         >
+          {!embedIssue && peekMode === "side-peek" && isWide && (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Drag to resize the panel"
+              onPointerDown={startResize}
+              className="absolute top-0 bottom-0 left-0 z-10 w-1.5 cursor-col-resize hover:bg-accent-primary/30"
+            />
+          )}
           {isError ? (
             <div className="relative h-screen w-full overflow-hidden">
               <IssuePeekOverviewError removeRoutePeekId={removeRoutePeekId} />

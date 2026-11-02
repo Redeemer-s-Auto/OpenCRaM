@@ -53,6 +53,8 @@ import { renderFormattedDate, getFileURL } from "@plane/utils";
 import { store } from "@/lib/store-context";
 import { ISSUE_FILTER_DEFAULT_DATA } from "@/store/issue/helpers/base-issues.store";
 import { DEFAULT_DISPLAY_PROPERTIES } from "@/store/issue/issue-details/sub_issues_filter.store";
+// Notes: the default "Backlog" state shows no name
+import { BACKLOG_GROUP_LABEL, stateDisplayName } from "@/components/issues/state-display";
 // constants
 import { ISSUE_GROUP_BY_OPTIONS } from "@plane/constants";
 // components
@@ -245,7 +247,7 @@ const getStateColumns = ({ projectId }: TGetColumns): IGroupByColumn[] | undefin
   // map project states to group by columns
   return _states.map((state) => ({
     id: state.id,
-    name: state.name,
+    name: stateDisplayName(state) || BACKLOG_GROUP_LABEL,
     icon: (
       <div className="size-4 rounded-full">
         <StateGroupIcon stateGroup={state.group} color={state.color} size={EIconSize.LG} percentage={state.order} />
@@ -260,7 +262,7 @@ const getStateGroupColumns = (): IGroupByColumn[] => {
   // map state groups to group by columns
   return Object.values(stateGroups).map((stateGroup) => ({
     id: stateGroup.key,
-    name: stateGroup.label,
+    name: stateGroup.key === "backlog" ? BACKLOG_GROUP_LABEL : stateGroup.label,
     icon: (
       <div className="size-4 rounded-full">
         <StateGroupIcon stateGroup={stateGroup.key} size={EIconSize.LG} />

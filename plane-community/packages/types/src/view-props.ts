@@ -211,6 +211,12 @@ export interface IIssueFiltersResponse {
   display_properties: IIssueDisplayProperties;
 }
 
+/** Notes: one person's own Display choices on a board view (shown properties, layout, grouping, sort). */
+export interface IProjectViewUserDisplay {
+  display_filters?: Partial<IIssueDisplayFilterOptions>;
+  display_properties?: Partial<IIssueDisplayProperties>;
+}
+
 export interface IProjectUserPropertiesResponse extends IIssueFiltersResponse {
   sort_order: number;
   preferences: {
@@ -218,6 +224,8 @@ export interface IProjectUserPropertiesResponse extends IIssueFiltersResponse {
       block_display: boolean;
     };
     navigation: IProjectMemberNavigationPreferences;
+    /** Notes: per view id, this person's Display choices; they win over the view's saved ones. */
+    views?: Record<string, IProjectViewUserDisplay>;
   };
 }
 

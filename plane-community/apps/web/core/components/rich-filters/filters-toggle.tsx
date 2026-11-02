@@ -77,14 +77,32 @@ export const FiltersToggle = observer(function FiltersToggle<P extends TFilterPr
     );
   }
 
+  // Notion style: the chips are hidden until this button is clicked, so it carries the number of filters on.
+  const conditionCount = filter?.allConditionsForDisplay.length ?? 0;
   return (
-    <IconButton
-      size="lg"
-      variant="secondary"
-      icon={showFilterRowChangesPill ? FilterAppliedIcon : FilterIcon}
-      onClick={handleToggleFilter}
-      className={buttonClassName}
-      iconClassName={iconClassName}
-    />
+    <span className="relative inline-flex flex-shrink-0" data-filter-count={conditionCount}>
+      <IconButton
+        size="lg"
+        variant="secondary"
+        icon={showFilterRowChangesPill ? FilterAppliedIcon : FilterIcon}
+        onClick={handleToggleFilter}
+        className={buttonClassName}
+        iconClassName={iconClassName}
+        aria-label={
+          conditionCount > 0
+            ? `${isFilterRowVisible ? "Hide" : "Show"} filters (${conditionCount} on)`
+            : `${isFilterRowVisible ? "Hide" : "Show"} filters`
+        }
+        aria-expanded={isFilterRowVisible}
+      />
+      {conditionCount > 0 && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-1.5 -right-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-accent-primary px-1 text-[10px] leading-none font-semibold text-on-color"
+        >
+          {conditionCount}
+        </span>
+      )}
+    </span>
   );
 });

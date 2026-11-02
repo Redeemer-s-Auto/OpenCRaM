@@ -218,9 +218,9 @@ export class WorkItemFilterStore implements IWorkItemFilterStore {
       onExpressionChange: params.onExpressionChange,
       options: {
         expression: params.expressionOptions,
-        visibility: params.showOnMount
-          ? { autoSetVisibility: false, isVisibleOnMount: true }
-          : { autoSetVisibility: true },
+        // Notes (Notion style): the chips start hidden even when the view has filters; the filter
+        // button shows that filters are on, with their count, and one click shows the chips.
+        visibility: { autoSetVisibility: false, isVisibleOnMount: !!params.showOnMount },
       },
     });
 }

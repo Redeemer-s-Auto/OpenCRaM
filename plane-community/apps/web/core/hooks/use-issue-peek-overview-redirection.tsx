@@ -10,7 +10,7 @@ import type { TIssue } from "@plane/types";
 import { EIssueServiceType } from "@plane/types";
 // helpers
 import { generateWorkItemLink } from "@plane/utils";
-// one-unit screens: a card opens as a full page unless the person chose the side peek
+// one-unit screens: a card opens in the half-width side peek unless the person chose "Page"
 import { getCardOpenMode } from "@/components/one-unit/card-open-mode";
 // card shortcuts: opening a shortcut card opens the card it points to
 import { getShortcutTarget, linkedCardHref } from "@/components/card-links/store";

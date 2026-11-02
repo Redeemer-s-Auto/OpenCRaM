@@ -59,6 +59,8 @@ export const useTabPreferences = (workspaceSlug: string, projectId: string): TTa
   const updatePreferences = async (newPreferences: TTabPreferences) => {
     await updateProjectUserProperties(workspaceSlug, projectId, {
       preferences: {
+        // keep the rest (Notes: each view's own Display choices live here too)
+        ...storePreferences?.preferences,
         pages: storePreferences?.preferences?.pages || { block_display: false },
         navigation: {
           default_tab: newPreferences.defaultTab,

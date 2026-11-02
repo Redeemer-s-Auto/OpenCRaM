@@ -24,6 +24,7 @@ import { EIssuesStoreType } from "@plane/types";
 import { Header } from "@plane/ui";
 // components
 import { BoardTitle } from "@/components/common/board-title";
+import { BoardPagesLink } from "@/components/common/board-pages-link";
 import { isTaskListHub } from "@/components/task-list-hub/config";
 import { CountChip } from "@/components/common/count-chip";
 // constants
@@ -103,6 +104,7 @@ export const IssuesHeader = observer(function IssuesHeader() {
             canUserCreateIssue={canUserCreateIssue}
           />
         </div>
+        {!isHub && <BoardPagesLink workspaceSlug={workspaceSlug?.toString()} projectId={projectId?.toString()} />}
         {canUserCreateIssue && (
           <Button
             variant="primary"

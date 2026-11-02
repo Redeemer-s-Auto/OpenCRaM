@@ -6,19 +6,21 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * How a click on a card opens it: as a full page (default, Notion-style) or in the side peek.
- * Kept per browser, so no server setting or migration is needed.
+ * How a click on a card opens it: in the half-width side peek (default, as in Notion) or as a full page.
+ * Kept per browser, so no server setting or migration is needed. The key changed with the default
+ * (2026-11-02) so an old "page" choice made under the previous default does not override it.
+ * Below 768 px a card always opens full screen; Ctrl/Cmd+click always opens a new tab.
  */
 export type TCardOpenMode = "page" | "peek";
 
-const STORAGE_KEY = "notes.cardOpenMode";
+const STORAGE_KEY = "notes.cardOpenMode.v2";
 const listeners = new Set<() => void>();
 
 export function getCardOpenMode(): TCardOpenMode {
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === "peek" ? "peek" : "page";
+    return window.localStorage.getItem(STORAGE_KEY) === "page" ? "page" : "peek";
   } catch {
-    return "page";
+    return "peek";
   }
 }
 
@@ -44,6 +46,6 @@ function subscribe(listener: () => void) {
 }
 
 export function useCardOpenMode(): [TCardOpenMode, (mode: TCardOpenMode) => void] {
-  const mode = useSyncExternalStore(subscribe, getCardOpenMode, () => "page" as TCardOpenMode);
+  const mode = useSyncExternalStore(subscribe, getCardOpenMode, () => "peek" as TCardOpenMode);
   return [mode, setCardOpenMode];
 }

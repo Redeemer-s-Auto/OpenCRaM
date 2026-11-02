@@ -144,89 +144,95 @@ export const ProjectViewTabs = observer(function ProjectViewTabs(props: Props) {
     );
 
   return (
-    <div className="flex w-full flex-shrink-0 items-center gap-1 border-b border-subtle bg-surface-1 px-2 md:px-3">
-      {/* One row that scrolls sideways when it is too wide: the tabs, then the filter chips. */}
-      <div className="horizontal-scrollbar flex scrollbar-sm min-w-0 flex-1 items-center gap-2 overflow-x-auto py-1">
-        <div className="flex flex-shrink-0 items-center gap-1" role="tablist" aria-label="Views">
-          {shown.map((view) => {
-            const active = view.id === activeViewId;
-            return (
-              <Link
-                key={view.id}
-                href={viewPath(view.id)}
-                className={tabClass(active)}
-                role="tab"
-                aria-selected={active}
-                onClick={() => writeLastTab(projectId, view.id)}
-              >
-                {view.is_hidden && <EyeOff className="size-3.5 flex-shrink-0" aria-label="Hidden view" />}
-                <span className="max-w-40 truncate">{view.name}</span>
-              </Link>
-            );
-          })}
-          {/* All is the last tab: the board's own page, no filter */}
-          <Link
-            href={`${boardPath}/issues`}
-            className={tabClass(!activeViewId)}
-            role="tab"
-            aria-selected={!activeViewId}
-            onClick={() => writeLastTab(projectId, ALL_TAB)}
-          >
-            All
-          </Link>
+    <div className="flex w-full flex-shrink-0 flex-col border-b border-subtle bg-surface-1">
+      <div className="flex w-full items-center gap-1 px-2 md:px-3">
+        {/* One row of tabs that scrolls sideways when it is too wide. */}
+        <div className="horizontal-scrollbar flex scrollbar-sm min-w-0 flex-1 items-center gap-2 overflow-x-auto py-1">
+          <div className="flex flex-shrink-0 items-center gap-1" role="tablist" aria-label="Views">
+            {shown.map((view) => {
+              const active = view.id === activeViewId;
+              return (
+                <Link
+                  key={view.id}
+                  href={viewPath(view.id)}
+                  className={tabClass(active)}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => writeLastTab(projectId, view.id)}
+                >
+                  {view.is_hidden && <EyeOff className="size-3.5 flex-shrink-0" aria-label="Hidden view" />}
+                  <span className="max-w-40 truncate">{view.name}</span>
+                </Link>
+              );
+            })}
+            {/* All is the last tab: the board's own page, no filter */}
+            <Link
+              href={`${boardPath}/issues`}
+              className={tabClass(!activeViewId)}
+              role="tab"
+              aria-selected={!activeViewId}
+              onClick={() => writeLastTab(projectId, ALL_TAB)}
+            >
+              All
+            </Link>
+          </div>
         </div>
-        {filters && (
-          <div className="flex flex-shrink-0 items-center border-l border-subtle pl-2 empty:hidden">{filters}</div>
-        )}
-      </div>
-      <CustomMenu
-        customButton={
-          <span
-            className="flex size-7 items-center justify-center rounded-md text-tertiary hover:bg-layer-transparent-hover hover:text-primary"
-            aria-label="More views"
-          >
-            <MoreHorizontal className="size-4" />
-          </span>
-        }
-        buttonClassName="flex-shrink-0"
-        placement="bottom-end"
-        closeOnSelect
-      >
-        <p className="px-1 pb-1 text-11 font-medium text-tertiary">Hidden views</p>
-        {hidden.length === 0 && (
-          <CustomMenu.MenuItem disabled>
-            <span className="text-placeholder">None hidden</span>
-          </CustomMenu.MenuItem>
-        )}
-        {hidden.map((view) => (
-          <CustomMenu.MenuItem key={view.id} onClick={() => router.push(viewPath(view.id))}>
-            <span className="flex items-center gap-2">
-              <EyeOff className="size-3.5 flex-shrink-0" />
-              <span className="truncate">{view.name}</span>
+        <CustomMenu
+          customButton={
+            <span
+              className="flex size-7 items-center justify-center rounded-md text-tertiary hover:bg-layer-transparent-hover hover:text-primary"
+              aria-label="More views"
+            >
+              <MoreHorizontal className="size-4" />
             </span>
-          </CustomMenu.MenuItem>
-        ))}
-        {(canToggleActive || isAdmin) && <hr className="my-1 border-subtle" />}
-        {canToggleActive && activeView && (
-          <CustomMenu.MenuItem onClick={() => void handleToggleHidden()}>
-            <span className="flex items-center gap-2">
-              {activeView.is_hidden ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
-              {activeView.is_hidden ? "Show this view in the tabs" : "Hide this view from the tabs"}
-            </span>
-          </CustomMenu.MenuItem>
-        )}
-        {isAdmin && (
-          <CustomMenu.MenuItem onClick={() => void handleAddTaskListViews()}>
-            <span className="flex items-center gap-2">
-              <ListChecks className="size-3.5" />
-              <span>
-                <span className="block">Add task list views</span>
-                <span className="block text-11 text-tertiary">Active, Completed, Checked, All + a Seen box</span>
+          }
+          buttonClassName="flex-shrink-0"
+          placement="bottom-end"
+          closeOnSelect
+        >
+          <p className="px-1 pb-1 text-11 font-medium text-tertiary">Hidden views</p>
+          {hidden.length === 0 && (
+            <CustomMenu.MenuItem disabled>
+              <span className="text-placeholder">None hidden</span>
+            </CustomMenu.MenuItem>
+          )}
+          {hidden.map((view) => (
+            <CustomMenu.MenuItem key={view.id} onClick={() => router.push(viewPath(view.id))}>
+              <span className="flex items-center gap-2">
+                <EyeOff className="size-3.5 flex-shrink-0" />
+                <span className="truncate">{view.name}</span>
               </span>
-            </span>
-          </CustomMenu.MenuItem>
-        )}
-      </CustomMenu>
+            </CustomMenu.MenuItem>
+          ))}
+          {(canToggleActive || isAdmin) && <hr className="my-1 border-subtle" />}
+          {canToggleActive && activeView && (
+            <CustomMenu.MenuItem onClick={() => void handleToggleHidden()}>
+              <span className="flex items-center gap-2">
+                {activeView.is_hidden ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+                {activeView.is_hidden ? "Show this view in the tabs" : "Hide this view from the tabs"}
+              </span>
+            </CustomMenu.MenuItem>
+          )}
+          {isAdmin && (
+            <CustomMenu.MenuItem onClick={() => void handleAddTaskListViews()}>
+              <span className="flex items-center gap-2">
+                <ListChecks className="size-3.5" />
+                <span>
+                  <span className="block">Add task list views</span>
+                  <span className="block text-11 text-tertiary">Active, Completed, Checked, All + a Seen box</span>
+                </span>
+              </span>
+            </CustomMenu.MenuItem>
+          )}
+        </CustomMenu>
+      </div>
+      {/* Notes (Notion style): the filter chips get their own line under the tabs, shown only after the
+          filter button is clicked; the filter row renders nothing while it is closed. */}
+      {filters && (
+        <div className="horizontal-scrollbar flex scrollbar-sm w-full items-center gap-2 overflow-x-auto px-2 pb-1 empty:hidden md:px-3">
+          {filters}
+        </div>
+      )}
     </div>
   );
 });

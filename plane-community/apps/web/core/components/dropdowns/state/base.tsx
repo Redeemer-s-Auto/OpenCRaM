@@ -21,6 +21,8 @@ import { BUTTON_VARIANTS_WITH_TEXT } from "@/components/dropdowns/constants";
 import type { TDropdownProps } from "@/components/dropdowns/types";
 // hooks
 import { useDropdown } from "@/hooks/use-dropdown";
+// Notes: the default "Backlog" state shows no name
+import { stateDisplayName } from "@/components/issues/state-display";
 // plane web imports
 import { StateOption } from "@/components/workflow";
 
@@ -169,7 +171,7 @@ export const WorkItemStateDropdownBase = observer(function WorkItemStateDropdown
             className={buttonClassName}
             isActive={isOpen}
             tooltipHeading={t("state")}
-            tooltipContent={selectedState?.name ?? t("state")}
+            tooltipContent={(selectedState ? stateDisplayName(selectedState) : "") || t("state")}
             showTooltip={showTooltip}
             variant={buttonVariant}
             renderToolTipByDefault={renderByDefault}
@@ -187,7 +189,9 @@ export const WorkItemStateDropdownBase = observer(function WorkItemStateDropdown
                   />
                 )}
                 {BUTTON_VARIANTS_WITH_TEXT.includes(buttonVariant) && (
-                  <span className="flex-grow truncate text-left">{selectedState?.name ?? t("state")}</span>
+                  <span className="flex-grow truncate text-left">
+                    {selectedState ? stateDisplayName(selectedState) : t("state")}
+                  </span>
                 )}
                 {dropdownArrow && (
                   <ChevronDownIcon

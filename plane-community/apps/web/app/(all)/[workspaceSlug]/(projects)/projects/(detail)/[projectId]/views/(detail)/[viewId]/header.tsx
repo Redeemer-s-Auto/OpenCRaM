@@ -25,6 +25,7 @@ import { EIssuesStoreType, EViewAccess, EIssueLayoutTypes } from "@plane/types";
 import { Header } from "@plane/ui";
 // components
 import { BoardTitle } from "@/components/common/board-title";
+import { BoardPagesLink } from "@/components/common/board-pages-link";
 import { PropertiesButton } from "@/components/custom-fields/properties-button";
 import {
   DisplayFiltersSelection,
@@ -191,6 +192,7 @@ export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader
             />
           )}
         </>
+        <BoardPagesLink workspaceSlug={workspaceSlug?.toString()} projectId={projectId?.toString()} />
         {canUserCreateIssue && (
           <Button
             variant="primary"

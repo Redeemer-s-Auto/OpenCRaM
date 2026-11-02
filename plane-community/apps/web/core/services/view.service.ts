@@ -117,9 +117,9 @@ export class ViewService extends APIService {
       }
     };
     const promise: Promise<IProjectView> = fetchFresh().catch((error) => {
-        if (sharedViewDetails.get(url)?.promise === promise) sharedViewDetails.delete(url);
-        throw error?.response?.data;
-      });
+      if (sharedViewDetails.get(url)?.promise === promise) sharedViewDetails.delete(url);
+      throw error?.response?.data;
+    });
     sharedViewDetails.set(url, { promise, startedAt: Date.now() });
     return promise;
   }

@@ -50,7 +50,13 @@ export function startEarlyBoardGets(): void {
       } catch {
         // not JSON: keep the text, as axios does
       }
-      const response = { data, status: res.status, statusText: res.statusText, headers: {}, config: {} } as AxiosResponse;
+      const response = {
+        data,
+        status: res.status,
+        statusText: res.statusText,
+        headers: {},
+        config: {},
+      } as AxiosResponse;
       if (!anyStatus && (res.status < 200 || res.status >= 300))
         throw Object.assign(new Error(`Request failed with status code ${res.status}`), { response });
       return response;
@@ -73,4 +79,3 @@ export function startEarlyBoardGets(): void {
     // the page simply asks the usual way
   }
 }
-

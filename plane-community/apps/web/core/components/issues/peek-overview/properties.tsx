@@ -68,11 +68,13 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
   const [showEmpty, setShowEmpty] = useState(false);
   const issue = getIssueById(issueId);
   if (!issue) return <></>;
-  const hiddenBuiltIns = showEmpty ? 0 : ((!issue?.assignee_ids?.length) ? 1 : 0) + ((!issue?.priority || issue?.priority === "none") ? 1 : 0) + ((!issue.start_date) ? 1 : 0) + ((!issue.target_date) ? 1 : 0) + ((issue.estimate_point === undefined || issue.estimate_point === null) ? 1 : 0) + ((!issue.module_ids?.length) ? 1 : 0) + ((!issue.cycle_id) ? 1 : 0) + ((!issue.parent_id) ? 1 : 0) + ((!issue.label_ids?.length) ? 1 : 0);
+  const stateDetails = getStateById(issue.state_id);
+  // "Backlog" is where every imported card sits: it is folded into the empty properties like a blank value.
+  const stateIsBacklog = stateDetails?.group === "backlog";
+  const hiddenBuiltIns = showEmpty ? 0 : ((!issue?.assignee_ids?.length) ? 1 : 0) + ((!issue?.priority || issue?.priority === "none") ? 1 : 0) + ((!issue.start_date) ? 1 : 0) + ((!issue.target_date) ? 1 : 0) + ((issue.estimate_point === undefined || issue.estimate_point === null) ? 1 : 0) + ((!issue.module_ids?.length) ? 1 : 0) + ((!issue.cycle_id) ? 1 : 0) + ((!issue.parent_id) ? 1 : 0) + ((!issue.label_ids?.length) ? 1 : 0) + (stateIsBacklog ? 1 : 0);
   const createdByDetails = getUserDetails(issue?.created_by);
   const projectDetails = getProjectById(issue.project_id);
   const isEstimateEnabled = projectDetails?.estimate;
-  const stateDetails = getStateById(issue.state_id);
 
   const minDate = getDate(issue.start_date);
   minDate?.setDate(minDate.getDate());
@@ -84,20 +86,22 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
     <div>
       <h6 className="text-body-xs-medium">{t("common.properties")}</h6>
       <div className={`mt-3 w-full space-y-3 ${disabled ? "opacity-60" : ""}`}>
-        <SidebarPropertyListItem icon={StatePropertyIcon} label={t("common.state")}>
-          <StateDropdown
-            value={issue?.state_id}
-            onChange={(val) => issueOperations.update(workspaceSlug, projectId, issueId, { state_id: val })}
-            projectId={projectId}
-            disabled={disabled}
-            buttonVariant="transparent-with-text"
-            className="group w-full grow"
-            buttonContainerClassName="w-full text-left h-7.5"
-            buttonClassName={`text-body-xs-medium ${issue?.state_id ? "" : "text-placeholder"}`}
-            dropdownArrow
-            dropdownArrowClassName="h-3.5 w-3.5 hidden group-hover:inline"
-          />
-        </SidebarPropertyListItem>
+        <HideWhenBlank hide={!showEmpty && stateIsBacklog}>
+          <SidebarPropertyListItem icon={StatePropertyIcon} label={t("common.state")}>
+            <StateDropdown
+              value={issue?.state_id}
+              onChange={(val) => issueOperations.update(workspaceSlug, projectId, issueId, { state_id: val })}
+              projectId={projectId}
+              disabled={disabled}
+              buttonVariant="transparent-with-text"
+              className="group w-full grow"
+              buttonContainerClassName="w-full text-left h-7.5"
+              buttonClassName={`text-body-xs-medium ${issue?.state_id ? "" : "text-placeholder"}`}
+              dropdownArrow
+              dropdownArrowClassName="h-3.5 w-3.5 hidden group-hover:inline"
+            />
+          </SidebarPropertyListItem>
+        </HideWhenBlank>
 
         <HideWhenBlank hide={!showEmpty && (!issue?.assignee_ids?.length)}>
         <SidebarPropertyListItem icon={MembersPropertyIcon} label={t("common.assignees")}>

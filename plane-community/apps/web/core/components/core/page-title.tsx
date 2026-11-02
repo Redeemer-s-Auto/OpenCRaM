@@ -22,7 +22,8 @@ type PageHeadTitleProps = {
 
 /** "<page name> - Notes" on the hub theme, so a narrow tab still shows which page it is. */
 export function tabTitle(title: string) {
-  return brand.tabName ? `${title} - ${brand.tabName}` : title;
+  // The sign-in screens say "Sign up - Plane"; on the hub theme that becomes "Sign up - Notes".
+  return brand.tabName ? `${title.replace(/ - Plane$/, "")} - ${brand.tabName}` : title;
 }
 
 export function PageHead(props: PageHeadTitleProps) {

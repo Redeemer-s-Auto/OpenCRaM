@@ -105,15 +105,22 @@ export const ProjectViewLayoutRoot = observer(function ProjectViewLayoutRoot() {
       >
         {({ filter: projectViewWorkItemsFilter }) => (
           <div className="relative flex h-full w-full flex-col overflow-hidden">
-            <ProjectViewTabs workspaceSlug={workspaceSlug} projectId={projectId} activeViewId={viewId} />
-            {projectViewWorkItemsFilter && (
-              <WorkItemFiltersRow
-                filter={projectViewWorkItemsFilter}
-                trackerElements={{
-                  saveView: PROJECT_VIEW_TRACKER_ELEMENTS.HEADER_SAVE_VIEW_BUTTON,
-                }}
-              />
-            )}
+            <ProjectViewTabs
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              activeViewId={viewId}
+              filters={
+                projectViewWorkItemsFilter && (
+                  <WorkItemFiltersRow
+                    variant="inline"
+                    filter={projectViewWorkItemsFilter}
+                    trackerElements={{
+                      saveView: PROJECT_VIEW_TRACKER_ELEMENTS.HEADER_SAVE_VIEW_BUTTON,
+                    }}
+                  />
+                )
+              }
+            />
             <div className="relative h-full w-full overflow-auto">
               <ProjectViewIssueLayout activeLayout={activeLayout} viewId={viewId.toString()} />
             </div>

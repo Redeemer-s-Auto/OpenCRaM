@@ -18,15 +18,14 @@ import {
   WORK_ITEM_TRACKER_ELEMENTS,
 } from "@plane/constants";
 import { Button } from "@plane/propel/button";
-import { LockIcon, ViewsIcon } from "@plane/propel/icons";
+import { LockIcon } from "@plane/propel/icons";
 import { Tooltip } from "@plane/propel/tooltip";
-import type { ICustomSearchSelectOption, IIssueDisplayFilterOptions, IIssueDisplayProperties } from "@plane/types";
+import type { IIssueDisplayFilterOptions, IIssueDisplayProperties } from "@plane/types";
 import { EIssuesStoreType, EViewAccess, EIssueLayoutTypes } from "@plane/types";
-import { Breadcrumbs, Header, BreadcrumbNavigationSearchDropdown } from "@plane/ui";
+import { Header } from "@plane/ui";
 // components
-import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
+import { BoardTitle } from "@/components/common/board-title";
 import { PropertiesButton } from "@/components/custom-fields/properties-button";
-import { SwitcherIcon, SwitcherLabel } from "@/components/common/switcher-label";
 import {
   DisplayFiltersSelection,
   FiltersDropdown,
@@ -41,9 +40,7 @@ import { useIssues } from "@/hooks/store/use-issues";
 import { useProject } from "@/hooks/store/use-project";
 import { useProjectView } from "@/hooks/store/use-project-view";
 import { useUserPermissions } from "@/hooks/store/user";
-import { useAppRouter } from "@/hooks/use-app-router";
 // plane web imports
-import { CommonProjectBreadcrumbs } from "@/components/breadcrumbs/common";
 
 const VIEW_LAYOUTS = [
   EIssueLayoutTypes.LIST,
@@ -57,8 +54,6 @@ const VIEW_LAYOUTS = [
 export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader() {
   // refs
   const parentRef = useRef(null);
-  // router
-  const router = useAppRouter();
   const { workspaceSlug, projectId, viewId: routerViewId } = useParams();
   const viewId = routerViewId ? routerViewId.toString() : undefined;
   // store hooks
@@ -68,8 +63,8 @@ export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader
   const { toggleCreateIssueModal } = useCommandPalette();
   const { allowPermissions } = useUserPermissions();
 
-  const { currentProjectDetails, loader } = useProject();
-  const { projectViewIds, getViewById } = useProjectView();
+  const { currentProjectDetails } = useProject();
+  const { getViewById } = useProjectView();
 
   const activeLayout = issueFilters?.displayFilters?.layout;
 
@@ -124,76 +119,33 @@ export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader
 
   if (!viewDetails) return;
 
-  const switcherOptions = projectViewIds
-    ?.map((id) => {
-      const _view = id === viewId ? viewDetails : getViewById(id);
-      if (!_view) return;
-      return {
-        value: _view.id,
-        query: _view.name,
-        content: <SwitcherLabel logo_props={_view.logo_props} name={_view.name} LabelIcon={ViewsIcon} />,
-      };
-    })
-    .filter((option) => option !== undefined) as ICustomSearchSelectOption[];
-
   return (
-    <Header>
-      {/* Phones: the breadcrumbs give up width first, so the buttons on the right always fit. */}
-      <Header.LeftItem className="min-w-0 overflow-hidden">
-        <Breadcrumbs isLoading={loader === "init-loader"}>
-          <CommonProjectBreadcrumbs workspaceSlug={workspaceSlug?.toString()} projectId={projectId?.toString()} />
-          <Breadcrumbs.Item
-            component={
-              <BreadcrumbLink
-                label="Views"
-                href={`/${workspaceSlug}/projects/${projectId}/views/`}
-                icon={<ViewsIcon className="h-4 w-4 text-tertiary" />}
-              />
-            }
-          />
-          <Breadcrumbs.Item
-            component={
-              <BreadcrumbNavigationSearchDropdown
-                selectedItem={viewId?.toString() ?? ""}
-                navigationItems={switcherOptions}
-                onChange={(value: string) => {
-                  router.push(`/${workspaceSlug}/projects/${projectId}/views/${value}`);
-                }}
-                title={viewDetails?.name}
-                icon={
-                  <Breadcrumbs.Icon>
-                    <SwitcherIcon logo_props={viewDetails.logo_props} LabelIcon={ViewsIcon} size={16} />
-                  </Breadcrumbs.Icon>
-                }
-                isLast
-              />
-            }
-          />
-        </Breadcrumbs>
-
-        {viewDetails?.access === EViewAccess.PRIVATE ? (
-          <div className="cursor-default text-tertiary">
-            <Tooltip tooltipContent={"Private"}>
-              <LockIcon className="h-4 w-4" />
-            </Tooltip>
-          </div>
-        ) : (
-          <></>
-        )}
+    // The board name is the heading; the buttons wrap under it only when both do not fit on one line.
+    <Header className="flex-wrap gap-y-1 py-1.5">
+      <Header.LeftItem className="max-w-full min-w-0 flex-grow-0 flex-nowrap">
+        <BoardTitle projectId={projectId?.toString()}>
+          {viewDetails?.access === EViewAccess.PRIVATE && (
+            <div className="flex-shrink-0 cursor-default text-tertiary">
+              <Tooltip tooltipContent={"Private"}>
+                <LockIcon className="h-4 w-4" />
+              </Tooltip>
+            </div>
+          )}
+        </BoardTitle>
       </Header.LeftItem>
-      <Header.RightItem className="flex-shrink-0 items-center">
+      <Header.RightItem className="ml-auto flex-shrink-0 items-center">
         <>
-          {/* Phones: the six layout icons ran off a 375 px screen, so a one-button menu stands in. */}
+          {/* Narrow header (phone, half screen): a one-button menu stands in for the six layout icons. */}
           {!viewDetails.is_locked && (
             <>
-              <div className="hidden md:flex">
+              <div className="hidden @4xl:flex">
                 <LayoutSelection
                   layouts={VIEW_LAYOUTS}
                   onChange={(layout) => handleLayoutChange(layout)}
                   selectedLayout={activeLayout}
                 />
               </div>
-              <div className="flex md:hidden">
+              <div className="flex @4xl:hidden">
                 <MobileLayoutSelection
                   layouts={VIEW_LAYOUTS}
                   onChange={(layout) => handleLayoutChange(layout)}
@@ -250,9 +202,9 @@ export const ProjectViewIssuesHeader = observer(function ProjectViewIssuesHeader
             aria-label="Add work item"
             title="Add work item"
           >
-            {/* Phones: a "+" alone, so the button stays on a 375 px screen. */}
-            <Plus className="size-4 md:hidden" />
-            <span className="hidden md:inline">Add work item</span>
+            {/* Narrow header: a "+" alone, so the button always fits. */}
+            <Plus className="size-4 @4xl:hidden" />
+            <span className="hidden @4xl:inline">Add work item</span>
           </Button>
         )}
         <div className="hidden md:block">

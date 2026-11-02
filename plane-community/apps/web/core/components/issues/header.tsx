@@ -7,7 +7,7 @@
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // icons
-import { Circle } from "lucide-react";
+import { Circle, Plus } from "lucide-react";
 // plane imports
 import {
   EUserPermissions,
@@ -18,12 +18,12 @@ import {
 } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/propel/button";
-import { NewTabIcon, WorkItemsIcon } from "@plane/propel/icons";
+import { NewTabIcon } from "@plane/propel/icons";
 import { Tooltip } from "@plane/propel/tooltip";
 import { EIssuesStoreType } from "@plane/types";
-import { Breadcrumbs, Header } from "@plane/ui";
+import { Header } from "@plane/ui";
 // components
-import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
+import { BoardTitle } from "@/components/common/board-title";
 import { CountChip } from "@/components/common/count-chip";
 // constants
 import { HeaderFilters } from "@/components/issues/filters";
@@ -33,14 +33,9 @@ import { useCommandPalette } from "@/hooks/store/use-command-palette";
 import { useIssues } from "@/hooks/store/use-issues";
 import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
-import { useAppRouter } from "@/hooks/use-app-router";
 import { usePlatformOS } from "@/hooks/use-platform-os";
-// plane web imports
-import { CommonProjectBreadcrumbs } from "@/components/breadcrumbs/common";
 
 export const IssuesHeader = observer(function IssuesHeader() {
-  // router
-  const router = useAppRouter();
   const { workspaceSlug, projectId } = useParams();
   // store hooks
   const {
@@ -49,7 +44,7 @@ export const IssuesHeader = observer(function IssuesHeader() {
   // i18n
   const { t } = useTranslation();
 
-  const { currentProjectDetails, loader } = useProject();
+  const { currentProjectDetails } = useProject();
 
   const { toggleCreateIssueModal } = useCommandPalette();
   const { allowPermissions } = useUserPermissions();
@@ -67,33 +62,20 @@ export const IssuesHeader = observer(function IssuesHeader() {
   );
 
   return (
-    <Header>
-      <Header.LeftItem>
-        <div className="flex items-center gap-2.5">
-          <Breadcrumbs onBack={() => router.back()} isLoading={loader === "init-loader"} className="flex-grow-0">
-            <CommonProjectBreadcrumbs workspaceSlug={workspaceSlug?.toString()} projectId={projectId?.toString()} />
-            <Breadcrumbs.Item
-              component={
-                <BreadcrumbLink
-                  label="Work Items"
-                  href={`/${workspaceSlug}/projects/${projectId}/issues/`}
-                  icon={<WorkItemsIcon className="h-4 w-4 text-tertiary" />}
-                  isLast
-                />
-              }
-              isLast
-            />
-          </Breadcrumbs>
+    // The board name is the heading; the buttons wrap under it only when both do not fit on one line.
+    <Header className="flex-wrap gap-y-1 py-1.5">
+      <Header.LeftItem className="max-w-full min-w-0 flex-grow-0 flex-nowrap">
+        <BoardTitle projectId={projectId?.toString()}>
           {issuesCount && issuesCount > 0 ? (
             <Tooltip
               isMobile={isMobile}
               tooltipContent={`There are ${issuesCount} ${issuesCount > 1 ? "work items" : "work item"} in this project`}
               position="bottom"
             >
-              <CountChip count={issuesCount} />
+              <CountChip count={issuesCount} className="flex-shrink-0" />
             </Tooltip>
           ) : null}
-        </div>
+        </BoardTitle>
         {currentProjectDetails?.anchor ? (
           <a
             href={publishedURL}
@@ -109,8 +91,8 @@ export const IssuesHeader = observer(function IssuesHeader() {
           <></>
         )}
       </Header.LeftItem>
-      <Header.RightItem>
-        <div className="hidden gap-2 md:flex">
+      <Header.RightItem className="ml-auto flex-shrink-0 items-center">
+        <div className="flex items-center gap-2">
           <HeaderFilters
             projectId={projectId}
             currentProjectDetails={currentProjectDetails}
@@ -126,9 +108,12 @@ export const IssuesHeader = observer(function IssuesHeader() {
               toggleCreateIssueModal(true, EIssuesStoreType.PROJECT);
             }}
             data-ph-element={WORK_ITEM_TRACKER_ELEMENTS.HEADER_ADD_BUTTON.WORK_ITEMS}
+            aria-label={t("issue.add.label")}
+            title={t("issue.add.label")}
           >
-            <div className="block sm:hidden">{t("issue.label", { count: 1 })}</div>
-            <div className="hidden sm:block">{t("issue.add.label")}</div>
+            {/* Narrow header: a "+" alone, so the button always fits. */}
+            <Plus className="size-4 @4xl:hidden" />
+            <span className="hidden @4xl:inline">{t("issue.add.label")}</span>
           </Button>
         )}
       </Header.RightItem>

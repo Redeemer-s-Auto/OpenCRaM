@@ -273,6 +273,9 @@ export const ListGroup = observer(function ListGroup(props: Props) {
       <Row
         className={cn("w-full flex-shrink-0 border-b border-subtle bg-layer-1 py-1 pr-3 hover:bg-layer-1-hover", {
           "sticky top-0 z-[2]": isExpanded && groupIssueCount > 0,
+          // not grouped: the one "All work items" bar is only a count and a "+": thin, and gone on a phone
+          // (the header "+" and the "New work item" row at the bottom still add cards there)
+          "py-0 max-md:hidden": !group_by,
         })}
       >
         <HeaderGroupByCard

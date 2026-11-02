@@ -272,14 +272,12 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
 
   const isAccordionMode = projectPreferences.navigationMode === "ACCORDION";
 
+  // One click on the name opens the board (its default list); the arrow alone opens and closes the sub-items.
   const handleItemClick = () => {
-    if (projectPreferences.navigationMode === "ACCORDION") {
-      setIsProjectListOpen(!isProjectListOpen);
-    } else {
-      router.push(defaultTabUrl);
-      // on a phone the menu is a drawer over the page: it gets out of the way after a tap
-      if (window.innerWidth < 768) toggleSidebar(true);
-    }
+    router.push(defaultTabUrl);
+    if (isAccordionMode) setIsProjectListOpen(true);
+    // on a phone the menu is a drawer over the page: it gets out of the way after a tap
+    if (window.innerWidth < 768) toggleSidebar(true);
     // close the extended sidebar if it is open
     if (isExtendedProjectSidebarOpened && !isAccordionMode) {
       toggleExtendedProjectSidebar(false);
@@ -357,30 +355,12 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
                 </button>
               )}
               <ControlLink href={defaultTabUrl} className="flex flex-grow truncate" onClick={handleItemClick}>
-                {isAccordionMode ? (
-                  <Disclosure.Button
-                    as="button"
-                    type="button"
-                    className={cn("flex w-full flex-grow items-center gap-1.5 text-left select-none", {})}
-                    aria-label={
-                      isProjectListOpen
-                        ? t("aria_labels.projects_sidebar.close_project_menu")
-                        : t("aria_labels.projects_sidebar.open_project_menu")
-                    }
-                  >
-                    <div className="grid size-4 flex-shrink-0 place-items-center">
-                      <Logo logo={project.logo_props} size={16} />
-                    </div>
-                    <p className="truncate text-13 font-medium text-secondary">{project.name}</p>
-                  </Disclosure.Button>
-                ) : (
-                  <div className="flex w-full flex-grow items-center gap-1.5 text-left select-none">
-                    <div className="grid size-4 flex-shrink-0 place-items-center">
-                      <Logo logo={project.logo_props} size={16} />
-                    </div>
-                    <p className="truncate text-13 font-medium text-secondary">{project.name}</p>
+                <div className="flex w-full flex-grow items-center gap-1.5 text-left select-none">
+                  <div className="grid size-4 flex-shrink-0 place-items-center">
+                    <Logo logo={project.logo_props} size={16} />
                   </div>
-                )}
+                  <p className="truncate text-13 font-medium text-secondary">{project.name}</p>
+                </div>
               </ControlLink>
               <div className="flex items-center gap-1">
                 <CustomMenu
@@ -475,14 +455,15 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
                     </CustomMenu.MenuItem>
                   )}
                 </CustomMenu>
+                {/* Phones have no hover, so below md the arrow is always shown. */}
                 {isAccordionMode && (
                   <IconButton
                     variant="ghost"
                     size="sm"
                     icon={ChevronRightIcon}
                     onClick={() => setIsProjectListOpen(!isProjectListOpen)}
-                    className={cn("hidden text-placeholder group-hover/project-item:inline-flex", {
-                      "inline-flex": isMenuActive,
+                    className={cn("inline-flex text-placeholder md:hidden md:group-hover/project-item:inline-flex", {
+                      "md:inline-flex": isMenuActive,
                     })}
                     iconClassName={cn("transition-transform", {
                       "rotate-90": isProjectListOpen,
@@ -508,7 +489,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
               leaveTo="transform scale-95 opacity-0"
             >
               {isProjectListOpen && (
-                <Disclosure.Panel as="div" className="relative mt-1 mb-1.5 flex flex-col gap-0.5 pl-6">
+                <Disclosure.Panel static as="div" className="relative mt-1 mb-1.5 flex flex-col gap-0.5 pl-6">
                   <div className="absolute top-0 bottom-1 left-[15px] w-[1px] bg-layer-3" />
                   <ProjectNavigation workspaceSlug={workspaceSlug.toString()} projectId={projectId.toString()} />
                   <SidebarCardTree workspaceSlug={workspaceSlug.toString()} projectId={projectId.toString()} />

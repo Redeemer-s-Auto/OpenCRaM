@@ -10,19 +10,15 @@ import { useParams } from "next/navigation";
 // ui
 import { EUserPermissions, EUserPermissionsLevel, PROJECT_VIEW_TRACKER_ELEMENTS } from "@plane/constants";
 import { Button } from "@plane/propel/button";
-import { ViewsIcon } from "@plane/propel/icons";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import { Breadcrumbs, Header } from "@plane/ui";
+import { Header } from "@plane/ui";
 // components
-import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
+import { BoardTitle } from "@/components/common/board-title";
 import { ViewListHeader } from "@/components/views/view-list-header";
 // hooks
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
-import { useProject } from "@/hooks/store/use-project";
 import { useProjectView } from "@/hooks/store/use-project-view";
 import { useUserPermissions } from "@/hooks/store/user";
-// plane web imports
-import { CommonProjectBreadcrumbs } from "@/components/breadcrumbs/common";
 
 export const ProjectViewsHeader = observer(function ProjectViewsHeader() {
   const { workspaceSlug, projectId } = useParams();
@@ -30,7 +26,6 @@ export const ProjectViewsHeader = observer(function ProjectViewsHeader() {
   const [addingTaskList, setAddingTaskList] = useState(false);
   // store hooks
   const { toggleCreateViewModal } = useCommandPalette();
-  const { loader } = useProject();
   const { addTaskListViews } = useProjectView();
   const { allowPermissions } = useUserPermissions();
   // derived values
@@ -58,24 +53,11 @@ export const ProjectViewsHeader = observer(function ProjectViewsHeader() {
 
   return (
     <>
-      <Header>
-        <Header.LeftItem>
-          <Breadcrumbs isLoading={loader === "init-loader"}>
-            <CommonProjectBreadcrumbs workspaceSlug={workspaceSlug?.toString()} projectId={projectId?.toString()} />
-            <Breadcrumbs.Item
-              component={
-                <BreadcrumbLink
-                  label="Views"
-                  href={`/${workspaceSlug}/projects/${projectId}/views/`}
-                  icon={<ViewsIcon className="h-4 w-4 text-tertiary" />}
-                  isLast
-                />
-              }
-              isLast
-            />
-          </Breadcrumbs>
+      <Header className="flex-wrap gap-y-1 py-1.5">
+        <Header.LeftItem className="max-w-full min-w-0 flex-grow-0 flex-nowrap">
+          <BoardTitle projectId={projectId?.toString()} suffix="Views" />
         </Header.LeftItem>
-        <Header.RightItem>
+        <Header.RightItem className="ml-auto">
           <ViewListHeader />
           {isAdmin && (
             <div className="hidden md:block">

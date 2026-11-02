@@ -91,7 +91,8 @@ export const IssueMainContent = observer(function IssueMainContent(props: Props)
           />
         )}
 
-        <div className="mb-2.5 flex items-center justify-between gap-4">
+        {/* Phones: no gap under this row; it is empty unless a save is in progress. */}
+        <div className="flex items-center justify-between gap-4 md:mb-2.5">
           <IssueTypeSwitcher issueId={issueId} disabled={isArchived || !isEditable} />
           <div className="flex items-center gap-3">
             <NameDescriptionUpdateStatus isSubmitting={isSubmitting} />

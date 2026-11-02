@@ -11,17 +11,15 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { EPageAccess } from "@plane/constants";
 // plane types
 import { Button } from "@plane/propel/button";
-import { PageIcon } from "@plane/propel/icons";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { TPage } from "@plane/types";
 // plane ui
-import { Breadcrumbs, Header } from "@plane/ui";
+import { Header } from "@plane/ui";
 // helpers
-import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
+import { BoardTitle } from "@/components/common/board-title";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
 // plane web imports
-import { CommonProjectBreadcrumbs } from "@/components/breadcrumbs/common";
 import { EPageStoreType, usePageStore } from "@/hooks/store";
 
 export const PagesListHeader = observer(function PagesListHeader() {
@@ -33,7 +31,7 @@ export const PagesListHeader = observer(function PagesListHeader() {
   const searchParams = useSearchParams();
   const pageType = searchParams.get("type");
   // store hooks
-  const { currentProjectDetails, loader } = useProject();
+  const { currentProjectDetails } = useProject();
   const { canCurrentUserCreatePage, createPage } = usePageStore(EPageStoreType.PROJECT);
   // handle page create
   const handleCreatePage = async () => {
@@ -60,25 +58,12 @@ export const PagesListHeader = observer(function PagesListHeader() {
   };
 
   return (
-    <Header>
-      <Header.LeftItem>
-        <Breadcrumbs isLoading={loader === "init-loader"}>
-          <CommonProjectBreadcrumbs workspaceSlug={workspaceSlug?.toString()} projectId={projectId?.toString()} />
-          <Breadcrumbs.Item
-            component={
-              <BreadcrumbLink
-                label="Pages"
-                href={`/${workspaceSlug}/projects/${currentProjectDetails?.id}/pages/`}
-                icon={<PageIcon className="h-4 w-4 text-tertiary" />}
-                isLast
-              />
-            }
-            isLast
-          />
-        </Breadcrumbs>
+    <Header className="flex-wrap gap-y-1 py-1.5">
+      <Header.LeftItem className="max-w-full min-w-0 flex-grow-0 flex-nowrap">
+        <BoardTitle projectId={projectId?.toString()} suffix="Pages" />
       </Header.LeftItem>
       {canCurrentUserCreatePage && (
-        <Header.RightItem>
+        <Header.RightItem className="ml-auto">
           <Button variant="primary" size="lg" onClick={handleCreatePage} loading={isCreatingPage}>
             {isCreatingPage ? "Adding" : "Add page"}
           </Button>

@@ -141,7 +141,14 @@ export const HeaderFilters = observer(function HeaderFilters(props: Props) {
         />
       )}
       {canUserCreateIssue ? (
-        <Button className="hidden px-2 md:block" onClick={() => setAnalyticsModal(true)} variant="secondary" size="lg">
+        <Button
+          className="px-2"
+          onClick={() => setAnalyticsModal(true)}
+          variant="secondary"
+          size="lg"
+          aria-label={t("common.analytics")}
+          title={t("common.analytics")}
+        >
           <div className="hidden @4xl:flex">{t("common.analytics")}</div>
           <div className="flex @4xl:hidden">
             <ChartNoAxesColumn className="size-3.5" />

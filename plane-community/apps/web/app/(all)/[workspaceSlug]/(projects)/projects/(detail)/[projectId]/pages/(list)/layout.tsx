@@ -14,7 +14,7 @@ import { PagesListHeader } from "./header";
 export default function ProjectPagesListLayout() {
   return (
     <>
-      <AppHeader header={<PagesListHeader />} />
+      <AppHeader rowClassName="h-auto min-h-11" header={<PagesListHeader />} />
       <ContentWrapper>
         <Outlet />
       </ContentWrapper>

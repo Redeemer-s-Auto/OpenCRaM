@@ -42,6 +42,7 @@ interface IHeaderGroupByCard {
 export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHeaderGroupByCard) {
   const {
     groupID,
+    groupBy,
     icon,
     title,
     count,
@@ -90,7 +91,12 @@ export const HeaderGroupByCard = observer(function HeaderGroupByCard(props: IHea
 
   return (
     <>
-      <div className="group/list-header flex w-full flex-shrink-0 items-center gap-2 py-1.5">
+      <div
+        className={cn("group/list-header flex w-full flex-shrink-0 items-center gap-2 py-1.5", {
+          // not grouped: the single "All work items" bar is kept thin
+          "py-1": !groupBy,
+        })}
+      >
         {canSelectIssues && (
           <div className="absolute left-1 flex w-3.5 flex-shrink-0 items-center">
             <MultipleSelectGroupAction

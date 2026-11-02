@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
 import { Eye, EyeOff, ListChecks, MoreHorizontal } from "lucide-react";
@@ -15,6 +16,8 @@ import type { IProjectView } from "@plane/types";
 import { CustomMenu } from "@plane/ui";
 import { cn } from "@plane/utils";
 // hooks
+import { isTaskListHub } from "@/components/task-list-hub/config";
+import { useProject } from "@/hooks/store/use-project";
 import { useProjectView } from "@/hooks/store/use-project-view";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
 import { useAppRouter } from "@/hooks/use-app-router";
@@ -49,19 +52,23 @@ type Props = {
   projectId: string;
   /** The open saved view; undefined on the board's own work-items page ("All"). */
   activeViewId?: string;
+  /** The filter chips, drawn after the tabs in the same row (one compact row instead of two). */
+  filters?: ReactNode;
 };
 
 /**
  * A row of tabs above a board: "All" plus the board's saved views, so a person can switch
  * between (for a task list) Active, Completed and the hidden Checked view. Scrolls sideways
- * on a phone. The last pick is remembered per board; opening the board goes back to it.
+ * on a phone. The last pick is remembered per board; opening the board goes back to it, or to the
+ * first tab when nothing was picked yet.
  */
 export const ProjectViewTabs = observer(function ProjectViewTabs(props: Props) {
-  const { workspaceSlug, projectId, activeViewId } = props;
+  const { workspaceSlug, projectId, activeViewId, filters } = props;
   // router
   const router = useAppRouter();
   // store hooks
   const { getProjectViews, updateView, addTaskListViews } = useProjectView();
+  const { getPartialProjectById } = useProject();
   const { data: currentUser } = useUser();
   const { allowPermissions } = useUserPermissions();
   // derived values
@@ -82,14 +89,24 @@ export const ProjectViewTabs = observer(function ProjectViewTabs(props: Props) {
       return;
     }
     if (redirected.current === projectId || views.length === 0) return;
+    // the hub's own page is the hub screen, never one of its views
+    if (isTaskListHub(getPartialProjectById(projectId)?.identifier)) return;
     redirected.current = projectId;
     const last = readLastTab(projectId);
-    if (last && last !== ALL_TAB && views.some((view) => view.id === last)) router.replace(viewPath(last));
+    if (last === ALL_TAB) return;
+    if (last && views.some((view) => view.id === last)) router.replace(viewPath(last));
+    // Never picked a tab here: open the first tab (a task list's "Active"), as the sidebar promises.
+    else if (shown[0]) router.replace(viewPath(shown[0].id));
     // views.length is enough: the list is loaded with the board
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeViewId, projectId, views.length]);
 
-  if (views.length === 0) return null;
+  if (views.length === 0)
+    return filters ? (
+      <div className="horizontal-scrollbar flex scrollbar-sm w-full flex-shrink-0 items-center gap-2 overflow-x-auto border-b border-subtle bg-surface-1 px-2 py-1 empty:hidden md:px-3">
+        {filters}
+      </div>
+    ) : null;
 
   const handleToggleHidden = async () => {
     if (!activeView) return;
@@ -120,7 +137,7 @@ export const ProjectViewTabs = observer(function ProjectViewTabs(props: Props) {
 
   const tabClass = (active: boolean) =>
     cn(
-      "flex h-8 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-13 font-medium transition-colors",
+      "flex h-7 flex-shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-13 font-medium whitespace-nowrap transition-colors",
       active
         ? "border-strong bg-layer-1 text-primary"
         : "border-transparent text-tertiary hover:bg-layer-transparent-hover hover:text-primary"
@@ -128,42 +145,44 @@ export const ProjectViewTabs = observer(function ProjectViewTabs(props: Props) {
 
   return (
     <div className="flex w-full flex-shrink-0 items-center gap-1 border-b border-subtle bg-surface-1 px-2 md:px-3">
-      <div
-        className="horizontal-scrollbar scrollbar-sm flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1.5"
-        role="tablist"
-        aria-label="Views"
-      >
-        {shown.map((view) => {
-          const active = view.id === activeViewId;
-          return (
-            <Link
-              key={view.id}
-              href={viewPath(view.id)}
-              className={tabClass(active)}
-              role="tab"
-              aria-selected={active}
-              onClick={() => writeLastTab(projectId, view.id)}
-            >
-              {view.is_hidden && <EyeOff className="size-3.5 flex-shrink-0" aria-label="Hidden view" />}
-              <span className="max-w-40 truncate">{view.name}</span>
-            </Link>
-          );
-        })}
-        {/* All is the last tab: the board's own page, no filter */}
-        <Link
-          href={`${boardPath}/issues`}
-          className={tabClass(!activeViewId)}
-          role="tab"
-          aria-selected={!activeViewId}
-          onClick={() => writeLastTab(projectId, ALL_TAB)}
-        >
-          All
-        </Link>
+      {/* One row that scrolls sideways when it is too wide: the tabs, then the filter chips. */}
+      <div className="horizontal-scrollbar flex scrollbar-sm min-w-0 flex-1 items-center gap-2 overflow-x-auto py-1">
+        <div className="flex flex-shrink-0 items-center gap-1" role="tablist" aria-label="Views">
+          {shown.map((view) => {
+            const active = view.id === activeViewId;
+            return (
+              <Link
+                key={view.id}
+                href={viewPath(view.id)}
+                className={tabClass(active)}
+                role="tab"
+                aria-selected={active}
+                onClick={() => writeLastTab(projectId, view.id)}
+              >
+                {view.is_hidden && <EyeOff className="size-3.5 flex-shrink-0" aria-label="Hidden view" />}
+                <span className="max-w-40 truncate">{view.name}</span>
+              </Link>
+            );
+          })}
+          {/* All is the last tab: the board's own page, no filter */}
+          <Link
+            href={`${boardPath}/issues`}
+            className={tabClass(!activeViewId)}
+            role="tab"
+            aria-selected={!activeViewId}
+            onClick={() => writeLastTab(projectId, ALL_TAB)}
+          >
+            All
+          </Link>
+        </div>
+        {filters && (
+          <div className="flex flex-shrink-0 items-center border-l border-subtle pl-2 empty:hidden">{filters}</div>
+        )}
       </div>
       <CustomMenu
         customButton={
           <span
-            className="flex size-8 items-center justify-center rounded-md text-tertiary hover:bg-layer-transparent-hover hover:text-primary"
+            className="flex size-7 items-center justify-center rounded-md text-tertiary hover:bg-layer-transparent-hover hover:text-primary"
             aria-label="More views"
           >
             <MoreHorizontal className="size-4" />

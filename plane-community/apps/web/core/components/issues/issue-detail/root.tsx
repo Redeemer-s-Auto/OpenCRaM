@@ -238,7 +238,7 @@ export const IssueDetailRoot = observer(function IssueDetailRoot(props: TIssueDe
       ) : (
         // Phones: the body, then the fields panel below it, one scroll. Wider: side by side.
         <div className="flex h-full w-full flex-col overflow-y-auto md:flex-row md:overflow-hidden">
-          <div className="w-full space-y-6 px-4 py-5 md:h-full md:overflow-y-auto md:px-9">
+          <div className="w-full space-y-6 px-4 pt-2 pb-5 md:h-full md:overflow-y-auto md:px-9 md:pt-5">
             <IssueMainContent
               workspaceSlug={workspaceSlug}
               projectId={projectId}

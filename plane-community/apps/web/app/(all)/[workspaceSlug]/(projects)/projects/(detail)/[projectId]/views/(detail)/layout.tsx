@@ -13,7 +13,8 @@ import { ProjectViewIssuesHeader } from "./[viewId]/header";
 export default function ProjectViewIssuesLayout() {
   return (
     <>
-      <AppHeader header={<ProjectViewIssuesHeader />} />
+      {/* auto height: on a narrow screen the buttons wrap under the board name */}
+      <AppHeader header={<ProjectViewIssuesHeader />} rowClassName="h-auto min-h-11" />
       <ContentWrapper>
         <Outlet />
       </ContentWrapper>

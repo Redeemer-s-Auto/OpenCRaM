@@ -22,7 +22,8 @@ export type TFiltersRowProps<K extends TFilterProperty, E extends TExternalFilte
   buttonConfig?: TAddFilterButtonProps<K, E>["buttonConfig"];
   disabledAllOperations?: boolean;
   filter: IFilterInstance<K, E>;
-  variant?: "modal" | "header";
+  /** inline: no row of its own; chips and buttons sit in one line inside a host row (the board's view tabs). */
+  variant?: "modal" | "header" | "inline";
   trackerElements?: {
     clearFilter?: string;
     saveView?: string;
@@ -149,6 +150,16 @@ export const FiltersRow = observer(function FiltersRow<K extends TFilterProperty
       {mainContent}
     </Header>
   );
+
+  if (variant === "inline") {
+    if (!filter.isVisible) return null;
+    return (
+      <div className="flex flex-shrink-0 items-center gap-2">
+        {leftContent}
+        {rightContent}
+      </div>
+    );
+  }
 
   if (!filter.configManager.areConfigsReady && !hasAnyConditions) {
     return (

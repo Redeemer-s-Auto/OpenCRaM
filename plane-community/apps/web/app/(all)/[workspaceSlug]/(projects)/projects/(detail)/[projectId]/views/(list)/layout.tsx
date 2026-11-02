@@ -14,7 +14,7 @@ import { ViewMobileHeader } from "./mobile-header";
 export default function ProjectViewsListLayout() {
   return (
     <>
-      <AppHeader header={<ProjectViewsHeader />} mobileHeader={<ViewMobileHeader />} />
+      <AppHeader rowClassName="h-auto min-h-11" header={<ProjectViewsHeader />} mobileHeader={<ViewMobileHeader />} />
       <ContentWrapper>
         <Outlet />
       </ContentWrapper>

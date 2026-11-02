@@ -85,15 +85,21 @@ export const ProjectLayoutRoot = observer(function ProjectLayoutRoot() {
       >
         {({ filter: projectWorkItemsFilter }) => (
           <div className="relative flex h-full w-full flex-col overflow-hidden">
-            <ProjectViewTabs workspaceSlug={workspaceSlug} projectId={projectId} />
-            {projectWorkItemsFilter && (
-              <WorkItemFiltersRow
-                filter={projectWorkItemsFilter}
-                trackerElements={{
-                  saveView: PROJECT_VIEW_TRACKER_ELEMENTS.PROJECT_HEADER_SAVE_AS_VIEW_BUTTON,
-                }}
-              />
-            )}
+            <ProjectViewTabs
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              filters={
+                projectWorkItemsFilter && (
+                  <WorkItemFiltersRow
+                    variant="inline"
+                    filter={projectWorkItemsFilter}
+                    trackerElements={{
+                      saveView: PROJECT_VIEW_TRACKER_ELEMENTS.PROJECT_HEADER_SAVE_AS_VIEW_BUTTON,
+                    }}
+                  />
+                )
+              }
+            />
             <div className="relative h-full w-full overflow-auto bg-surface-1">
               {/* mutation loader */}
               {issues?.getIssueLoader() === "mutation" && (

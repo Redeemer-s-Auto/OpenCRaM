@@ -9,53 +9,23 @@
 // first service call for exactly that address takes the answer (once). Anything not taken within a short
 // while is dropped, so nothing old is ever handed out.
 
+// The entry script starts the GETs (lib/early-board-gets.ts, imported ONLY by app/entry.client.tsx) and leaves
+// them in a window slot; the services take them from here. The two files share nothing at runtime on purpose:
+// while the entry script and the services imported one module, every page load threw one more React #418
+// (hydration mismatch): 47 instead of 46 per load, measured 2026-11-01 on the dev stack.
 import type { AxiosResponse } from "axios";
-import { create } from "axios";
-import { API_BASE_URL } from "@plane/constants";
 
+export type TEarlyGets = Map<string, { promise: Promise<AxiosResponse>; startedAt: number }>;
+export const EARLY_GETS_SLOT = "__notesEarlyGets";
 const MAX_AGE_MS = 15000;
-const early = new Map<string, { promise: Promise<AxiosResponse>; startedAt: number }>();
-
-const BOARD_PATH = /^\/([^/]+)\/projects\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/|$)/;
 
 /** The app's own first call: it answers with a user (an id) only when a session exists. */
 export const CURRENT_USER_PATH = "/api/users/me/";
 
-/**
- * On a board page, starts the app's own current-user GET (UserService.currentUser takes the answer, so a
- * signed-out load sends nothing extra), then, only when it answers with a user, the board-details and
- * my-board-membership GETs. Never throws.
- * (The view's own GET is not started here: tried, one load in about a dozen never drew its rows. The project
- * layout still starts it beside the board details.)
- */
-export function startEarlyBoardGets(): void {
-  try {
-    const match = BOARD_PATH.exec(window.location.pathname);
-    if (!match) return;
-    const [, workspaceSlug, projectId] = match;
-    const client = create({ baseURL: API_BASE_URL, withCredentials: true });
-    const start = (url: string, config = {}) => {
-      const promise = client.get(url, config);
-      promise.catch(() => undefined); // an answer nobody takes must not surface as an unhandled rejection
-      early.set(API_BASE_URL + url, { promise, startedAt: Date.now() });
-      return promise;
-    };
-    // same request as UserService.currentUser: a 401 is an answer, not an error
-    start(CURRENT_USER_PATH, { validateStatus: null })
-      .then((response) => {
-        if (!(response?.data as { id?: string } | undefined)?.id) return; // signed out: nothing more
-        start(`/api/workspaces/${workspaceSlug}/projects/${projectId}/`);
-        start(`/api/workspaces/${workspaceSlug}/projects/${projectId}/project-members/me/`);
-      })
-      .catch(() => undefined);
-  } catch {
-    // the page simply asks the usual way
-  }
-}
-
 /** The early answer for this address, if one was started and is still fresh. Each answer is handed out once. */
 export function takeEarlyGet(fullUrl: string): Promise<AxiosResponse> | undefined {
-  if (early.size === 0) return undefined;
+  const early = (window as unknown as Record<string, TEarlyGets | undefined>)[EARLY_GETS_SLOT];
+  if (!early || early.size === 0) return undefined;
   const entry = early.get(fullUrl);
   if (!entry) return undefined;
   early.delete(fullUrl);

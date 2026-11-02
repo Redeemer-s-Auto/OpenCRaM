@@ -8,7 +8,7 @@ import { startTransition, StrictMode } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { HydratedRouter } from "react-router/dom";
 
-import { startEarlyBoardGets } from "@/lib/early-gets";
+import { startEarlyBoardGets } from "@/lib/early-board-gets";
 import polyfills from "@/lib/polyfills";
 import { preloadMatchedRouteChunks } from "@/lib/preload-route-chunks";
 import { isStaleAssetErrorMessage, recoverFromStaleAsset } from "@/lib/stale-asset-error";

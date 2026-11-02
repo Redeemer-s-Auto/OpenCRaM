@@ -596,7 +596,15 @@ function SidebarRowListeners(props: {
 function SidebarRowMenuStandIn(props: { className: string; ariaLabel: string }) {
   return (
     <div className={cn("relative w-min text-left", props.className)} role="presentation" data-main-menu="true">
-      <button type="button" className="grid place-items-center" tabIndex={0} aria-label={props.ariaLabel}>
+      {/* aria-haspopup / aria-expanded as on the real menu button: the phone drawer styles buttons by them */}
+      <button
+        type="button"
+        className="grid place-items-center"
+        tabIndex={0}
+        aria-label={props.ariaLabel}
+        aria-haspopup="menu"
+        aria-expanded={false}
+      >
         <IconButton variant="ghost" size="sm" icon={MoreHorizontal} className="text-placeholder" />
       </button>
     </div>
@@ -626,11 +634,20 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
   const [isTouched, setIsTouched] = useState(false);
   const project = getPartialProjectById(projectId);
 
-  const isAccordionOpen = projectPreferences.navigationMode === "ACCORDION" && getIsProjectListOpen(projectId);
+  const isAccordionMode = projectPreferences.navigationMode === "ACCORDION";
+  const isAccordionOpen = isAccordionMode && getIsProjectListOpen(projectId);
   if (isNear || isTouched || URLProjectId === projectId || isAccordionOpen)
     return <SidebarProjectsListItemFull {...props} />;
   if (!project) return null;
 
+  const rowLabel = (
+    <>
+      <div className="grid size-4 flex-shrink-0 place-items-center">
+        <Logo logo={project.logo_props} size={16} />
+      </div>
+      <p className="truncate text-13 font-medium text-secondary">{project.name}</p>
+    </>
+  );
   const href = props.landingHref ?? getTabUrl(workspaceSlug?.toString() ?? "", project.id, DEFAULT_TAB_KEY);
   return (
     <div>
@@ -677,18 +694,34 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
             </button>
           )}
           <a href={href} target="_blank" className="flex flex-grow truncate" draggable={false}>
-            <div className="flex w-full flex-grow items-center gap-1.5 text-left select-none">
-              <div className="grid size-4 flex-shrink-0 place-items-center">
-                <Logo logo={project.logo_props} size={16} />
-              </div>
-              <p className="truncate text-13 font-medium text-secondary">{project.name}</p>
-            </div>
+            {isAccordionMode ? (
+              <button
+                type="button"
+                className="flex w-full flex-grow items-center gap-1.5 text-left select-none"
+                aria-label={t("aria_labels.projects_sidebar.open_project_menu")}
+                aria-expanded={false}
+              >
+                {rowLabel}
+              </button>
+            ) : (
+              <div className="flex w-full flex-grow items-center gap-1.5 text-left select-none">{rowLabel}</div>
+            )}
           </a>
           <div className="flex items-center gap-1">
             <SidebarRowMenuStandIn
               className="pointer-events-none flex-shrink-0 opacity-0 group-hover/project-item:pointer-events-auto group-hover/project-item:opacity-100"
               ariaLabel={t("aria_labels.projects_sidebar.toggle_quick_actions_menu")}
             />
+            {isAccordionMode && (
+              <IconButton
+                variant="ghost"
+                size="sm"
+                icon={ChevronRightIcon}
+                className="hidden text-placeholder group-hover/project-item:inline-flex"
+                iconClassName="transition-transform"
+                aria-label={t("aria_labels.projects_sidebar.open_project_menu")}
+              />
+            )}
           </div>
         </div>
         {isLastChild && <DropIndicator isVisible={false} />}

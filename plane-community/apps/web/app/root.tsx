@@ -88,13 +88,13 @@ function GardenEmbeddedNavigationBridge() {
 
 export const links: LinksFunction = () => {
   // Hub theme: the deployment's own icon (VITE_BRAND_ICON_URL / VITE_BRAND_LOGO_URL); no Garden manifest.
-  const hubIconLinks = brand.iconUrl
-    ? [
-        { rel: "icon", href: brand.iconUrl },
-        { rel: "shortcut icon", href: brand.iconUrl },
-        { rel: "apple-touch-icon", href: brand.iconUrl },
-      ]
-    : [];
+  // Hub theme: the Shop Notes App's own tab icon (amber notepad, C:/repos/hub-design/icons/apps/notes.svg; Drew, 2026-11-01: tell
+  // ten open tabs apart). Per-page Notes icons are a separate piece of work.
+  const hubIconLinks = [
+    { rel: "icon", type: "image/svg+xml", href: "/notes-app-icon.svg" },
+    { rel: "icon", type: "image/png", sizes: "32x32", href: "/notes-app-icon-32.png" },
+    { rel: "apple-touch-icon", sizes: "180x180", href: "/notes-app-icon-180.png" },
+  ];
   const iconLinks = brand.isHub
     ? hubIconLinks
     : gardenMode

@@ -77,7 +77,7 @@ function ProjectPagesPage({ params }: Route.ComponentProps) {
     );
   return (
     <>
-      <PageHead title={pageTitle} />
+      <PageHead title={pageTitle} logo={project?.logo_props} />
       <PagesListView
         pageType={pageType}
         projectId={projectId}

@@ -40,3 +40,9 @@ test("hub product name falls back to the app name, then Notes", () => {
   assert.equal(resolveBrand({ VITE_BRAND_THEME: "hub" }, "Shop Notes App").productName, "Shop Notes App");
   assert.equal(resolveBrand({ VITE_BRAND_THEME: "hub" }).productName, "Notes");
 });
+
+test("browser tab word: Notes on the hub theme, none on Garden", () => {
+  assert.equal(resolveBrand({ VITE_BRAND_THEME: "hub", VITE_BRAND_NAME: "Shop Notes" }).tabName, "Notes");
+  assert.equal(resolveBrand({ VITE_BRAND_THEME: "hub", VITE_BRAND_TAB_NAME: " Wiki " }).tabName, "Wiki");
+  assert.equal(resolveBrand({ VITE_BRAND_TAB_NAME: "Wiki" }).tabName, "");
+});

@@ -28,7 +28,8 @@ function ProjectViewIssuesPage({ params }: Route.ComponentProps) {
   // derived values
   const projectView = getViewById(viewId);
   const project = getProjectById(projectId);
-  const pageTitle = project?.name && projectView?.name ? `${project?.name} - ${projectView?.name}` : undefined;
+  // The tab reads as the board ("Guisselle's Task List - Notes") with the board's icon.
+  const pageTitle = project?.name && projectView?.name ? project.name : undefined;
 
   const { error } = useSWR(`VIEW_DETAILS_${viewId}`, () => fetchViewDetails(workspaceSlug, projectId, viewId));
 
@@ -48,7 +49,7 @@ function ProjectViewIssuesPage({ params }: Route.ComponentProps) {
 
   return (
     <>
-      <PageHead title={pageTitle} />
+      <PageHead title={pageTitle} logo={project?.logo_props} />
       <ProjectViewLayoutRoot />
     </>
   );

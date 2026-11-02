@@ -64,7 +64,9 @@ export const IssueDetailsPage = observer(function IssueDetailsPage({ params }: R
   const issue = getIssueById(issueId?.toString() || "") || undefined;
   const project = (issue?.project_id && getProjectById(issue?.project_id)) || undefined;
   const issueLoader = !issue || isLoading;
-  const pageTitle = project && issue ? `${issue?.name}` : undefined;
+  // "GSTL-12 Call vendor - Notes", with the board's icon in the tab.
+  const pageTitle =
+    project && issue ? `${project.identifier}-${issue.sequence_id} ${issue.name ?? ""}`.trim() : undefined;
 
   useWorkItemProperties(
     projectId,
@@ -128,7 +130,7 @@ export const IssueDetailsPage = observer(function IssueDetailsPage({ params }: R
 
   return (
     <>
-      <PageHead title={pageTitle} />
+      <PageHead title={pageTitle} logo={project?.logo_props} />
       {workspaceSlug && projectId && issueId && (
         <ProjectAuthWrapper workspaceSlug={workspaceSlug} projectId={projectId}>
           <ShortcutGate workspaceSlug={workspaceSlug.toString()} issueId={issueId.toString()}>

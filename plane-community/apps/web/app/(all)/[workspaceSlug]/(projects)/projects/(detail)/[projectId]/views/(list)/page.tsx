@@ -87,7 +87,7 @@ function ProjectViewsPage({ params }: Route.ComponentProps) {
 
   return (
     <>
-      <PageHead title={pageTitle} />
+      <PageHead title={pageTitle} logo={project?.logo_props} />
       {isFiltersApplied && (
         <Header variant={EHeaderVariant.TERNARY}>
           <ViewAppliedFiltersList

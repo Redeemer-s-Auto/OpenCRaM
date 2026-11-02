@@ -55,7 +55,7 @@ function PageDetailsPage({ params }: Route.ComponentProps) {
   const { uploadEditorAsset, duplicateEditorAsset } = useEditorAsset();
   // derived values
   const workspaceId = workspaceSlug ? (getWorkspaceBySlug(workspaceSlug)?.id ?? "") : "";
-  const { canCurrentUserAccessPage, id, name, updateDescription } = page ?? {};
+  const { canCurrentUserAccessPage, id, name, logo_props, updateDescription } = page ?? {};
   // entity search handler
   const fetchEntityCallback = useCallback(
     async (payload: TSearchEntityRequestPayload) =>
@@ -180,7 +180,7 @@ function PageDetailsPage({ params }: Route.ComponentProps) {
 
   return (
     <>
-      <PageHead title={name} />
+      <PageHead title={name?.trim() || "Untitled"} logo={logo_props} logoKind="lucide" />
       <div className="flex h-full flex-col justify-between">
         <div className="relative flex h-full w-full flex-shrink-0 flex-col overflow-hidden">
           <PageRoot

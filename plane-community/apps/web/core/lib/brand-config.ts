@@ -10,6 +10,8 @@
  * VITE_BRAND_NAME    Name shown next to the logo in the top bar (hub theme), e.g. "Shop Notes".
  * VITE_BRAND_LOGO_URL Logo image URL (hub theme). Served by the deployment, never committed.
  * VITE_BRAND_ICON_URL Browser-tab icon URL (hub theme). Falls back to the logo URL.
+ * VITE_BRAND_TAB_NAME Short word after the page name in a browser tab (hub theme), e.g.
+ *                    "Guisselle's Task List - Notes". Default "Notes".
  *
  * Only the hub theme reads the name/logo/icon values, so a Garden build is unchanged
  * whatever they are set to.
@@ -28,6 +30,8 @@ export type BrandConfig = {
   iconUrl: string;
   /** Name used in product sentences ("Most things start with a project in X."). */
   productName: string;
+  /** Word after the page name in the browser tab ("<page> - Notes"); empty keeps the page title as is. */
+  tabName: string;
 };
 
 type Env = Record<string, string | undefined>;
@@ -46,12 +50,13 @@ export function resolveBrand(env: Env, appName = ""): BrandConfig {
   const theme: BrandTheme = clean(env.VITE_BRAND_THEME).toLowerCase() === "hub" ? "hub" : "garden";
   if (theme === "garden") {
     // The Garden strings were written as "Garden Work"; keep them exactly.
-    return { theme, isHub: false, name: "", logoUrl: "", iconUrl: "", productName: "Garden Work" };
+    return { theme, isHub: false, name: "", logoUrl: "", iconUrl: "", productName: "Garden Work", tabName: "" };
   }
   const name = clean(env.VITE_BRAND_NAME);
   const logoUrl = cleanUrl(env.VITE_BRAND_LOGO_URL);
   const iconUrl = cleanUrl(env.VITE_BRAND_ICON_URL) || logoUrl;
-  return { theme, isHub: true, name, logoUrl, iconUrl, productName: name || clean(appName) || "Notes" };
+  const tabName = clean(env.VITE_BRAND_TAB_NAME) || "Notes";
+  return { theme, isHub: true, name, logoUrl, iconUrl, productName: name || clean(appName) || "Notes", tabName };
 }
 
 const env = process.env;

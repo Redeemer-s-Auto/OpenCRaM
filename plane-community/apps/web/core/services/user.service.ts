@@ -19,6 +19,7 @@ import type {
   TUserProfile,
   IEmailCheckResponse,
 } from "@plane/types";
+import { CURRENT_USER_PATH, takeEarlyGet } from "@/lib/early-gets";
 import { APIService } from "@/services/api.service";
 // types
 // helpers
@@ -54,7 +55,9 @@ export class UserService extends APIService {
 
   async currentUser(): Promise<IUser> {
     // Using validateStatus: null to bypass interceptors for unauthorized errors.
-    return this.get("/api/users/me/", { validateStatus: null })
+    // On a board page the entry script already asked (lib/early-gets.ts): take that answer.
+    const early = takeEarlyGet(this.baseURL + CURRENT_USER_PATH);
+    return (early ?? this.get(CURRENT_USER_PATH, { validateStatus: null }))
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response;

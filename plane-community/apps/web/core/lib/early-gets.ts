@@ -18,8 +18,13 @@ const early = new Map<string, { promise: Promise<AxiosResponse>; startedAt: numb
 
 const BOARD_PATH = /^\/([^/]+)\/projects\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/|$)/;
 
+/** The app's own first call: it answers with a user (an id) only when a session exists. */
+export const CURRENT_USER_PATH = "/api/users/me/";
+
 /**
- * Starts the board-details and my-board-membership GETs when the address is a board page. Never throws.
+ * On a board page, starts the app's own current-user GET (UserService.currentUser takes the answer, so a
+ * signed-out load sends nothing extra), then, only when it answers with a user, the board-details and
+ * my-board-membership GETs. Never throws.
  * (The view's own GET is not started here: tried, one load in about a dozen never drew its rows. The project
  * layout still starts it beside the board details.)
  */
@@ -29,14 +34,20 @@ export function startEarlyBoardGets(): void {
     if (!match) return;
     const [, workspaceSlug, projectId] = match;
     const client = create({ baseURL: API_BASE_URL, withCredentials: true });
-    [
-      `/api/workspaces/${workspaceSlug}/projects/${projectId}/`,
-      `/api/workspaces/${workspaceSlug}/projects/${projectId}/project-members/me/`,
-    ].forEach((url) => {
-      const promise = client.get(url);
+    const start = (url: string, config = {}) => {
+      const promise = client.get(url, config);
       promise.catch(() => undefined); // an answer nobody takes must not surface as an unhandled rejection
       early.set(API_BASE_URL + url, { promise, startedAt: Date.now() });
-    });
+      return promise;
+    };
+    // same request as UserService.currentUser: a 401 is an answer, not an error
+    start(CURRENT_USER_PATH, { validateStatus: null })
+      .then((response) => {
+        if (!(response?.data as { id?: string } | undefined)?.id) return; // signed out: nothing more
+        start(`/api/workspaces/${workspaceSlug}/projects/${projectId}/`);
+        start(`/api/workspaces/${workspaceSlug}/projects/${projectId}/project-members/me/`);
+      })
+      .catch(() => undefined);
   } catch {
     // the page simply asks the usual way
   }

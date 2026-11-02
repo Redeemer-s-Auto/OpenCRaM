@@ -91,8 +91,10 @@ export const IssueMainContent = observer(function IssueMainContent(props: Props)
           />
         )}
 
-        {/* Phones: no gap under this row; it is empty unless a save is in progress. */}
-        <div className="flex items-center justify-between gap-4 md:mb-2.5">
+        {/* Phones: this row only holds "Saving..."/"Saved", so it is shown only while a save runs. */}
+        <div
+          className={`items-center justify-between gap-4 md:mb-2.5 md:flex ${isSubmitting === "saved" ? "hidden" : "flex"}`}
+        >
           <IssueTypeSwitcher issueId={issueId} disabled={isArchived || !isEditable} />
           <div className="flex items-center gap-3">
             <NameDescriptionUpdateStatus isSubmitting={isSubmitting} />

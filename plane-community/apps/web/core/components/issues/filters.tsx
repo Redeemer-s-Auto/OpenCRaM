@@ -97,14 +97,15 @@ export const HeaderFilters = observer(function HeaderFilters(props: Props) {
         projectDetails={currentProjectDetails ?? undefined}
         isEpic={storeType === EIssuesStoreType.EPIC}
       />
-      <div className="hidden @4xl:flex">
+      {/* The seven layout icons only on a wide header; otherwise one menu, so the name keeps its row. */}
+      <div className="hidden @5xl:flex">
         <LayoutSelection
           layouts={LAYOUTS}
           onChange={(layout) => handleLayoutChange(layout)}
           selectedLayout={activeLayout}
         />
       </div>
-      <div className="flex @4xl:hidden">
+      <div className="flex @5xl:hidden">
         <MobileLayoutSelection
           layouts={LAYOUTS}
           onChange={(layout) => handleLayoutChange(layout)}

@@ -24,6 +24,7 @@ import { EIssuesStoreType } from "@plane/types";
 import { Header } from "@plane/ui";
 // components
 import { BoardTitle } from "@/components/common/board-title";
+import { isTaskListHub } from "@/components/task-list-hub/config";
 import { CountChip } from "@/components/common/count-chip";
 // constants
 import { HeaderFilters } from "@/components/issues/filters";
@@ -56,6 +57,8 @@ export const IssuesHeader = observer(function IssuesHeader() {
   const publishedURL = `${SPACE_APP_URL}/issues/${currentProjectDetails?.anchor}`;
 
   const issuesCount = getGroupIssueCount(undefined, undefined, false);
+  // The Task Lists Hub shows other boards' lists: its own count and layout buttons would mislead.
+  const isHub = isTaskListHub(currentProjectDetails?.identifier);
   const canUserCreateIssue = allowPermissions(
     [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
     EUserPermissionsLevel.PROJECT
@@ -66,7 +69,7 @@ export const IssuesHeader = observer(function IssuesHeader() {
     <Header className="flex-wrap gap-y-1 py-1.5">
       <Header.LeftItem className="max-w-full min-w-0 flex-grow-0 flex-nowrap">
         <BoardTitle projectId={projectId?.toString()}>
-          {issuesCount && issuesCount > 0 ? (
+          {!isHub && issuesCount && issuesCount > 0 ? (
             <Tooltip
               isMobile={isMobile}
               tooltipContent={`There are ${issuesCount} ${issuesCount > 1 ? "work items" : "work item"} in this project`}
@@ -92,7 +95,7 @@ export const IssuesHeader = observer(function IssuesHeader() {
         )}
       </Header.LeftItem>
       <Header.RightItem className="ml-auto flex-shrink-0 items-center">
-        <div className="flex items-center gap-2">
+        <div className={isHub ? "hidden" : "flex items-center gap-2"}>
           <HeaderFilters
             projectId={projectId}
             currentProjectDetails={currentProjectDetails}

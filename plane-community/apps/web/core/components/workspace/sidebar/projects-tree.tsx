@@ -15,6 +15,7 @@ import { useParams } from "next/navigation";
 import { useLocalStorage } from "@plane/hooks";
 import type { TPartialProject } from "@plane/types";
 // hooks
+import { isTaskListHub } from "@/components/task-list-hub/config";
 import { useProject } from "@/hooks/store/use-project";
 import { pageHref } from "@/services/page-tree.service";
 // local imports
@@ -123,7 +124,11 @@ export const useSidebarProjectTree = (workspaceSlug: string, projectIds: string[
   projectIds.forEach((projectId) => {
     if (reached.has(projectId)) return;
     const parentId = parentOf.get(projectId);
-    if (parentId) childIds.set(parentId, (childIds.get(parentId) ?? []).filter((id) => id !== projectId));
+    if (parentId)
+      childIds.set(
+        parentId,
+        (childIds.get(parentId) ?? []).filter((id) => id !== projectId)
+      );
     rootIds.push(projectId);
     visit(projectId);
   });
@@ -137,9 +142,7 @@ export const useSidebarProjectTree = (workspaceSlug: string, projectIds: string[
     getChildIds: (projectId) => childIds.get(projectId) ?? NO_CHILDREN,
     isOpen: (projectId) => !closedIds.includes(projectId),
     toggleOpen: (projectId) =>
-      setValue(
-        closedIds.includes(projectId) ? closedIds.filter((id) => id !== projectId) : [...closedIds, projectId]
-      ),
+      setValue(closedIds.includes(projectId) ? closedIds.filter((id) => id !== projectId) : [...closedIds, projectId]),
   };
 };
 
@@ -180,7 +183,8 @@ export const SidebarProjectTreeNode = observer(function ProjectTreeNode(
   const { workspaceSlug } = useParams();
   const slug = workspaceSlug?.toString() ?? "";
   const { getPartialProjectById } = useProject();
-  const isFolder = isFolderProject(getPartialProjectById(projectId));
+  const project = getPartialProjectById(projectId);
+  const isFolder = isFolderProject(project);
   const pageTree = usePageTree(isFolder ? slug : "");
   const landing = isFolder ? pageTree.getLandingPage(projectId) : undefined;
   const hasPages = isFolder && projectHasPages(pageTree, projectId);
@@ -198,7 +202,8 @@ export const SidebarProjectTreeNode = observer(function ProjectTreeNode(
         handleOnProjectDrop={isChild ? undefined : handleOnProjectDrop}
         renderInExtendedSidebar={renderInExtendedSidebar}
         childProjects={hasChildren ? { isOpen, onToggle: () => tree.toggleOpen(projectId) } : undefined}
-        landingHref={landing ? pageHref(slug, projectId, landing.id) : undefined}
+        // The Task Lists Hub opens on its lists (the hub screen), not on its page.
+        landingHref={landing && !isTaskListHub(project?.identifier) ? pageHref(slug, projectId, landing.id) : undefined}
       />
       {hasChildren && isOpen && (
         <div className="flex flex-col gap-0.5 pl-3">

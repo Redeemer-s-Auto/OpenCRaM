@@ -12,11 +12,14 @@ import { ISSUE_DISPLAY_FILTERS_BY_PAGE, PROJECT_VIEW_TRACKER_ELEMENTS } from "@p
 import { EIssueLayoutTypes, EIssuesStoreType } from "@plane/types";
 import { Spinner } from "@plane/ui";
 // components
+import { isTaskListHub } from "@/components/task-list-hub/config";
+import { TaskListHubRoot } from "@/components/task-list-hub/hub-root";
 import { ProjectViewTabs } from "@/components/views/view-tabs";
 import { ProjectLevelWorkItemFiltersHOC } from "@/components/work-item-filters/filters-hoc/project-level";
 import { WorkItemFiltersRow } from "@/components/work-item-filters/filters-row";
 // hooks
 import { useIssues } from "@/hooks/store/use-issues";
+import { useProject } from "@/hooks/store/use-project";
 import { IssuesStoreContext } from "@/hooks/use-issue-layout-store";
 // local imports
 import { IssuePeekOverview } from "../../peek-overview";
@@ -56,6 +59,7 @@ export const ProjectLayoutRoot = observer(function ProjectLayoutRoot() {
   const projectId = routerProjectId ? routerProjectId.toString() : undefined;
   // hooks
   const { issues, issuesFilter } = useIssues(EIssuesStoreType.PROJECT);
+  const { getPartialProjectById } = useProject();
   // derived values
   const workItemFilters = projectId ? issuesFilter?.getIssueFilters(projectId) : undefined;
   const activeLayout = workItemFilters?.displayFilters?.layout;
@@ -69,6 +73,14 @@ export const ProjectLayoutRoot = observer(function ProjectLayoutRoot() {
     },
     { revalidateIfStale: false, revalidateOnFocus: false }
   );
+
+  // The Task Lists Hub shows the open items of every task list instead of its own cards.
+  if (workspaceSlug && isTaskListHub(getPartialProjectById(projectId)?.identifier))
+    return (
+      <IssuesStoreContext.Provider value={EIssuesStoreType.PROJECT}>
+        <TaskListHubRoot workspaceSlug={workspaceSlug} />
+      </IssuesStoreContext.Provider>
+    );
 
   if (!workspaceSlug || !projectId || !workItemFilters) return <></>;
   return (

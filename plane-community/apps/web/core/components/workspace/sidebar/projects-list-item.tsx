@@ -35,6 +35,7 @@ import { PublishProjectModal } from "@/components/project/publish-project/modal"
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
 import { useProject } from "@/hooks/store/use-project";
+import { useProjectView } from "@/hooks/store/use-project-view";
 import { useUserPermissions } from "@/hooks/store/user";
 import { useProjectNavigationPreferences } from "@/hooks/use-navigation-preferences";
 import { usePlatformOS } from "@/hooks/use-platform-os";
@@ -100,6 +101,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
   const router = useRouter();
   // derived values
   const project = getPartialProjectById(projectId);
+  const { getProjectViews, fetchViews } = useProjectView();
 
   // Get available navigation items for this project
   const navigationItems = useNavigationItems({
@@ -271,8 +273,24 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
   const isAccordionMode = projectPreferences.navigationMode === "ACCORDION";
 
   // One click on the name opens the board (its default list); the arrow on the left opens and closes its child boards.
-  const handleItemClick = () => {
-    router.push(defaultTabUrl);
+  const handleItemClick = async () => {
+    // a board opens on its first view by sort order (the same first tab its view tabs show), never the bare issues list
+    let target = defaultTabUrl;
+    if (!landingHref && project) {
+      try {
+        if (!getProjectViews(project.id)) await fetchViews(workspaceSlug.toString(), project.id);
+        const first = [...(getProjectViews(project.id) ?? [])]
+          .filter((view) => !view.is_hidden)
+          .sort(
+            (a, b) =>
+              (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.created_at).localeCompare(String(b.created_at))
+          )[0];
+        if (first) target = `/${workspaceSlug}/projects/${project.id}/views/${first.id}`;
+      } catch {
+        // keep the default tab
+      }
+    }
+    router.push(target);
     // on a phone the menu is a drawer over the page: it gets out of the way after a tap
     if (window.innerWidth < 768) toggleSidebar(true);
     // close the extended sidebar if it is open

@@ -282,7 +282,7 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
               {!issue?.tempId && !isEpic && (
                 <SeenCheck issue={issue} updateIssue={updateIssue} isReadOnly={!canEditIssueProperties} />
               )}
-              {hasAddColumn && isDraggingAllowed && !issue?.tempId && <RowDragGrip className="max-md:hidden" />}
+              {hasAddColumn && isDraggingAllowed && !issue?.tempId && <RowDragGrip />}
               {/* select checkbox */}
               {projectId && canSelectIssues && !isEpic && (
                 <Tooltip

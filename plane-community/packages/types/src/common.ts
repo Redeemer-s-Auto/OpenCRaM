@@ -17,7 +17,7 @@ export type TPaginationInfo = {
 };
 
 export type TLogoProps = {
-  in_use: "emoji" | "icon";
+  in_use: "emoji" | "icon" | "letter";
   emoji?: {
     value?: string;
     url?: string;
@@ -26,6 +26,12 @@ export type TLogoProps = {
     name?: string;
     color?: string;
     background_color?: string;
+  };
+  // A letter badge: a letter on a coloured rounded square.
+  letter?: {
+    text?: string;
+    color?: string;
+    background?: string;
   };
 };
 

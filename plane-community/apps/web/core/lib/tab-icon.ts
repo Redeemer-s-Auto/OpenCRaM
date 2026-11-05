@@ -95,6 +95,23 @@ async function drawMaterial(name: string, color: string): Promise<string | null>
   return canvas.toDataURL("image/png");
 }
 
+/** A letter badge: a letter on a coloured rounded square. */
+function drawLetter(text: string, color: string, background: string): string | null {
+  const made = newCanvas();
+  if (!text || !made) return null;
+  const [canvas, ctx] = made;
+  ctx.fillStyle = background;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, SIZE, SIZE, 14);
+  ctx.fill();
+  ctx.font = `bold 44px ${EMOJI_FONTS}`;
+  ctx.fillStyle = color;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, SIZE / 2, SIZE / 2 + 3);
+  return canvas.toDataURL("image/png");
+}
+
 async function drawLucide(name: string, color: string): Promise<string | null> {
   const icon = LUCIDE_ICONS_LIST.find((item) => item.name === name);
   const made = newCanvas();
@@ -124,6 +141,12 @@ export async function logoToTabIcon(
   try {
     if (logo.in_use === "emoji") {
       href = logo.emoji?.value ? drawEmoji(logo.emoji.value) : safeImageUrl(logo.emoji?.url);
+    } else if (logo.in_use === "letter" && logo.letter?.text) {
+      href = drawLetter(
+        logo.letter.text.trim().slice(0, 1),
+        logo.letter.color || "#ffffff",
+        logo.letter.background || "#7a7a7a"
+      );
     } else if (logo.in_use === "icon" && logo.icon?.name) {
       const color = logo.icon.color || DEFAULT_ICON_COLOR;
       href =

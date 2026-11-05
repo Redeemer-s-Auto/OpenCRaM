@@ -36,7 +36,29 @@ export function Logo({ logo, size = 16, type = "material" }: Props) {
   // Early returns for loading/empty states
   if (!logo || !logo.in_use) return loadingSkeleton;
 
-  const { in_use, emoji, icon } = logo;
+  const { in_use, emoji, icon, letter } = logo;
+
+  // Letter badge: a letter on a coloured rounded square, the same size as other icons
+  if (in_use === "letter") {
+    const text = letter?.text?.trim().slice(0, 1);
+    if (!text) return loadingSkeleton;
+    return (
+      <span
+        className="flex flex-shrink-0 items-center justify-center rounded-sm font-semibold"
+        style={{
+          height: size,
+          width: size,
+          fontSize: Math.round(size * 0.68),
+          lineHeight: 1,
+          color: letter?.color || "#ffffff",
+          backgroundColor: letter?.background || "#7a7a7a",
+        }}
+      >
+        {text}
+      </span>
+    );
+  }
+
   const value = in_use === "emoji" ? emoji?.value : icon?.name;
 
   if (!value) return loadingSkeleton;

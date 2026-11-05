@@ -29,6 +29,20 @@ export function ProjectLogo(props: Props) {
       </span>
     );
 
+  if (logo.in_use === "letter" && logo.letter?.text)
+    return (
+      <span
+        style={{
+          color: logo.letter.color || "#ffffff",
+          backgroundColor: logo.letter.background || "#7a7a7a",
+          fontSize: 11,
+        }}
+        className={cn("inline-grid size-4 place-items-center rounded-sm leading-none font-semibold", className)}
+      >
+        {logo.letter.text.trim().slice(0, 1)}
+      </span>
+    );
+
   if (logo.in_use === "emoji" && logo.emoji)
     return (
       <span className={cn("text-14", className)}>

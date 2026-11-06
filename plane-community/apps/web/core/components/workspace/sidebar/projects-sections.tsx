@@ -10,11 +10,11 @@
 import type { ReactNode } from "react";
 import { observer } from "mobx-react";
 // plane imports
-import { useLocalStorage } from "@plane/hooks";
 import { ChevronRightIcon } from "@plane/propel/icons";
 import { IconButton } from "@plane/propel/icon-button";
 import type { TPartialProject } from "@plane/types";
 import { cn } from "@plane/utils";
+import { isSidebarRowOpen, toggleSidebarRow } from "./sidebar-open-state";
 
 export type TSidebarTeamspaceGroup = {
   id: string;
@@ -71,11 +71,11 @@ type TSidebarSectionProps = {
   children: ReactNode;
 };
 
-/** A collapsible sidebar section styled like the "Projects" header. Starts open. */
+/** A collapsible sidebar section styled like the "Projects" header. Starts closed. */
 export const SidebarProjectSection = observer(function SidebarProjectSection(props: TSidebarSectionProps) {
   const { storageKey, title, actions, children } = props;
-  const { storedValue, setValue } = useLocalStorage<boolean>(storageKey, true);
-  const isOpen = storedValue !== false;
+  const isOpen = isSidebarRowOpen(`section:${storageKey}`);
+  const setValue = (_next: boolean) => toggleSidebarRow(`section:${storageKey}`);
   return (
     <div className="flex flex-col">
       <div
@@ -118,11 +118,9 @@ type TSidebarTeamspaceGroupProps = {
 /** One teamspace inside the "Teamspaces" section: its name, a chevron, and its boards indented under it. */
 export const SidebarTeamspaceGroup = observer(function SidebarTeamspaceGroup(props: TSidebarTeamspaceGroupProps) {
   const { workspaceSlug, teamspace, children } = props;
-  const { storedValue, setValue } = useLocalStorage<boolean>(
-    `sidebar_teamspace_open_${workspaceSlug}_${teamspace.id}`,
-    true
-  );
-  const isOpen = storedValue !== false;
+  const rowKey = `teamspace:${workspaceSlug}:${teamspace.id}`;
+  const isOpen = isSidebarRowOpen(rowKey);
+  const setValue = (_next: boolean) => toggleSidebarRow(rowKey);
   return (
     <div className="flex flex-col">
       <button

@@ -8,7 +8,7 @@ import { useState, useRef, useEffect } from "react";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { autoScrollForElements } from "@atlaskit/pragmatic-drag-and-drop-auto-scroll/element";
 import { observer } from "mobx-react";
-import { useParams, usePathname } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Ellipsis } from "lucide-react";
 import { Disclosure, Transition } from "@headlessui/react";
 // plane imports
@@ -35,7 +35,7 @@ import { SidebarProjectTreeNode, planSiblingPositions, useSidebarProjectTree } f
 
 export const SidebarProjectsList = observer(function SidebarProjectsList() {
   // states
-  const [isAllProjectsListOpen, setIsAllProjectsListOpen] = useState(true);
+  const [isAllProjectsListOpen, setIsAllProjectsListOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isPrivateModalOpen, setIsPrivateModalOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false); // scroll animation state
@@ -51,7 +51,6 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
   const { loader, getPartialProjectById, joinedProjectIds: joinedProjects, updateProject } = useProject();
   // router params
   const { workspaceSlug } = useParams();
-  const pathname = usePathname();
 
   // auth
   const isAuthorizedUser = allowPermissions(
@@ -149,16 +148,10 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
     );
   }, [containerRef]);
 
+  // Starts closed on every load; nothing re-opens it for you.
   const toggleListDisclosure = (isOpen: boolean) => {
     setIsAllProjectsListOpen(isOpen);
-    localStorage.setItem("isAllProjectsListOpen", isOpen.toString());
   };
-  useEffect(() => {
-    if (pathname.includes("projects")) {
-      setIsAllProjectsListOpen(true);
-      localStorage.setItem("isAllProjectsListOpen", "true");
-    }
-  }, [pathname]);
   return (
     <>
       {workspaceSlug && (

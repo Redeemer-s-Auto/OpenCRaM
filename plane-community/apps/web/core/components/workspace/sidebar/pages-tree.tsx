@@ -12,7 +12,6 @@ import { observable, runInAction } from "mobx";
 import { observer } from "mobx-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useLocalStorage } from "@plane/hooks";
 import { ChevronRightIcon } from "@plane/propel/icons";
 import type { TPartialProject } from "@plane/types";
 import { cn } from "@plane/utils";
@@ -21,11 +20,11 @@ import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import type { TPageTreeNode } from "@/services/page-tree.service";
 import { pageHref, pageTreeService } from "@/services/page-tree.service";
+import { isSidebarRowOpen, toggleSidebarRow } from "./sidebar-open-state";
 
 const STALE_MS = 60_000;
 const MAX_DEPTH = 10;
 const NO_PAGES: TPageTreeNode[] = [];
-const NONE_OPEN: string[] = [];
 
 /** A board made from a Notion page by the import: it opens on its landing page and holds pages. */
 export const isFolderProject = (project: TPartialProject | undefined): boolean =>
@@ -91,12 +90,9 @@ export type TSidebarPageTree = ReturnType<typeof usePageTree>;
 
 /** Which pages are open in the sidebar, per workspace. Pages start closed. */
 function useOpenPages(workspaceSlug: string) {
-  const { storedValue, setValue } = useLocalStorage<string[]>(`sidebar_open_pages_${workspaceSlug}`, NONE_OPEN);
-  const openIds = Array.isArray(storedValue) ? storedValue : NONE_OPEN;
   return {
-    isOpen: (pageId: string) => openIds.includes(pageId),
-    toggle: (pageId: string) =>
-      setValue(openIds.includes(pageId) ? openIds.filter((id) => id !== pageId) : [...openIds, pageId]),
+    isOpen: (pageId: string) => isSidebarRowOpen(`page:${workspaceSlug}:${pageId}`),
+    toggle: (pageId: string) => toggleSidebarRow(`page:${workspaceSlug}:${pageId}`),
   };
 }
 

@@ -12,7 +12,6 @@ import type { ReactElement } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // plane imports
-import { useLocalStorage } from "@plane/hooks";
 import type { TPartialProject } from "@plane/types";
 // hooks
 import { isTaskListHub } from "@/components/task-list-hub/config";
@@ -20,9 +19,9 @@ import { useProject } from "@/hooks/store/use-project";
 import { pageHref } from "@/services/page-tree.service";
 // local imports
 import { SidebarProjectPages, isFolderProject, projectHasPages, usePageTree } from "./pages-tree";
+import { isSidebarRowOpen, toggleSidebarRow } from "./sidebar-open-state";
 import { SidebarProjectsListItem } from "./projects-list-item";
 
-const NONE_CLOSED: string[] = [];
 const NO_CHILDREN: string[] = [];
 /** Gap between positions handed out in one go; a drop lands halfway between its neighbours. */
 const POSITION_STEP = 1000;
@@ -88,15 +87,11 @@ export type TSidebarProjectTree = {
 
 /**
  * Arrange sidebar project ids as a tree, each level in sibling order. Call it from an observer component.
- * Which parents are closed is kept per workspace in localStorage; parents start open.
+ * Every parent starts closed on each load; opening one opens only that row (see sidebar-open-state.ts).
  */
 export const useSidebarProjectTree = (workspaceSlug: string, projectIds: string[]): TSidebarProjectTree => {
   const { getPartialProjectById } = useProject();
-  const { storedValue, setValue } = useLocalStorage<string[]>(
-    `sidebar_closed_project_parents_${workspaceSlug}`,
-    NONE_CLOSED
-  );
-  const closedIds = Array.isArray(storedValue) ? storedValue : NONE_CLOSED;
+  const rowKey = (projectId: string) => `board:${workspaceSlug}:${projectId}`;
 
   const inList = new Set(projectIds);
   const parentOf = new Map<string, string>();
@@ -140,9 +135,8 @@ export const useSidebarProjectTree = (workspaceSlug: string, projectIds: string[
   return {
     rootIds,
     getChildIds: (projectId) => childIds.get(projectId) ?? NO_CHILDREN,
-    isOpen: (projectId) => !closedIds.includes(projectId),
-    toggleOpen: (projectId) =>
-      setValue(closedIds.includes(projectId) ? closedIds.filter((id) => id !== projectId) : [...closedIds, projectId]),
+    isOpen: (projectId) => isSidebarRowOpen(rowKey(projectId)),
+    toggleOpen: (projectId) => toggleSidebarRow(rowKey(projectId)),
   };
 };
 

@@ -21,6 +21,7 @@ import { cn } from "@plane/utils";
 import WorkSpaceNotAvailable from "@/app/assets/workspace/workspace-not-available.png?url";
 // components
 import { LogoSpinner } from "@/components/common/logo-spinner";
+import { LiveSync } from "@/components/live-sync/live-sync";
 import { UndoShortcuts } from "@/components/undo/undo-shortcuts";
 // constants
 import {
@@ -238,6 +239,8 @@ export const WorkspaceAuthWrapper = observer(function WorkspaceAuthWrapper(props
     <>
       {/* Ctrl+Z / Ctrl+Shift+Z for every change in Notes, one list per screen */}
       <UndoShortcuts />
+      {/* what another browser changes shows here within seconds, no reload */}
+      <LiveSync />
       {children}
     </>
   );

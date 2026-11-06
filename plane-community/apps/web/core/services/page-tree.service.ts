@@ -73,6 +73,20 @@ export class PageTreeService extends APIService {
       });
   }
 
+  /** Opaque change markers for boards, pages and (with a board id) that board's cards. */
+  async liveStamp(
+    workspaceSlug: string,
+    projectId?: string
+  ): Promise<{ projects: string; pages: string; issues: string | null }> {
+    return this.get(`/api/workspaces/${workspaceSlug}/live-stamp/`, {
+      params: projectId ? { project_id: projectId } : {},
+    })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
   async resolve(workspaceSlug: string, pages: string[], projects: string[]): Promise<TPageLinkResolveResponse> {
     return this.post(`/api/workspaces/${workspaceSlug}/page-links/resolve/`, { pages, projects })
       .then((response) => response?.data ?? { pages: {}, projects: {} })

@@ -162,3 +162,26 @@ class TestSearch:
         # Alpha is made secret: a public board (network=2) is open to every workspace member
         Project.objects.filter(pk=cast.alpha.pk).update(network=0)
         assert "ALP" not in str(cast.outsider_client.get(_url(SEARCH, cast), {"search": ""}).data["projects"])
+
+
+STAMP = "/api/workspaces/{slug}/live-stamp/"
+
+
+@pytest.mark.django_db
+class TestLiveStamp:
+    def test_stamp_moves_when_a_page_changes_and_holds_still_otherwise(self, cast):
+        before = cast.insider_client.get(_url(STAMP, cast))
+        assert before.status_code == 200, before.content
+        again = cast.insider_client.get(_url(STAMP, cast))
+        assert again.data == before.data
+        make_page(cast, "New page")
+        after = cast.insider_client.get(_url(STAMP, cast))
+        assert after.data["pages"] != before.data["pages"]
+        assert after.data["projects"] == before.data["projects"]
+        assert after.data["issues"] is None
+
+    def test_card_stamp_needs_a_board_and_rejects_a_bad_id(self, cast):
+        ok = cast.insider_client.get(_url(STAMP, cast), {"project_id": str(cast.alpha.id)})
+        assert ok.status_code == 200 and ok.data["issues"]
+        bad = cast.insider_client.get(_url(STAMP, cast), {"project_id": "nope"})
+        assert bad.status_code == 400

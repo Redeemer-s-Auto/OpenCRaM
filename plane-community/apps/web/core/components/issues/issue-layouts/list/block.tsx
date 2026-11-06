@@ -30,6 +30,7 @@ import { useProject } from "@/hooks/store/use-project";
 import type { TSelectionHelper } from "@/hooks/use-multiple-select";
 import useIssuePeekOverviewRedirection from "@/hooks/use-issue-peek-overview-redirection";
 import { usePlatformOS } from "@/hooks/use-platform-os";
+import { LazyQuickActions } from "./lazy-quick-actions";
 import { RowAddButton } from "../row-add-button";
 import { RowDragGrip } from "../row-drag-grip";
 import type { TRowInlineAdd } from "../row-line-tools";
@@ -230,10 +231,7 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
                   e.stopPropagation();
                 }}
               >
-                {quickActions({
-                  issue,
-                  parentRef: issueRef,
-                })}
+                <LazyQuickActions render={() => quickActions({ issue, parentRef: issueRef })} />
               </div>
             </>
           )}
@@ -374,10 +372,7 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
                 "lg:hidden": !isSidebarCollapsed,
               })}
             >
-              {quickActions({
-                issue,
-                parentRef: issueRef,
-              })}
+              <LazyQuickActions render={() => quickActions({ issue, parentRef: issueRef })} />
             </div>
           )}
         </div>
@@ -405,10 +400,7 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
                   e.stopPropagation();
                 }}
               >
-                {quickActions({
-                  issue,
-                  parentRef: issueRef,
-                })}
+                <LazyQuickActions render={() => quickActions({ issue, parentRef: issueRef })} />
               </div>
             </>
           ) : (

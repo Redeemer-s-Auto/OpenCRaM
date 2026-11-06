@@ -83,6 +83,10 @@ export const FilterItem = observer(function FilterItem<P extends TFilterProperty
     );
   }
 
+  // Drew's ruling 2026-11-04: no "Seen" chip in the filter row. The task tabs (Active, Completed, Checked)
+  // still apply the Seen filter behind the scenes; only the chip is gone.
+  if (filterConfig.label === "Seen") return null;
+
   return (
     <FilterItemContainer conditionValue={condition.value} showTransition={showTransition}>
       {/* Property section */}

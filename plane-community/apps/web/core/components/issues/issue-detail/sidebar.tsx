@@ -39,7 +39,7 @@ import { useProjectState } from "@/hooks/store/use-project-state";
 // components
 import { IssueParentSelectRoot } from "@/components/issues/parent-select-root";
 import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
-import { HideWhenBlank, IssueCustomFieldProperties } from "@/components/custom-fields/issue-properties";
+import { HideWhenBlank, IssueCustomFieldProperties, useDuplicateBuiltIns } from "@/components/custom-fields/issue-properties";
 import { IssueRepeatSection } from "@/components/repeat";
 import { IssueSharingSection } from "@/components/sharing";
 import { IssueCycleSelect } from "./cycle-select";
@@ -67,6 +67,7 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
   const { getUserDetails } = useMember();
   const { getStateById } = useProjectState();
   const [showEmpty, setShowEmpty] = useState(false);
+  const { hidePriority, hideDueDate } = useDuplicateBuiltIns(projectId);
   const issue = getIssueById(issueId);
   if (!issue) return <></>;
   const stateDetails = getStateById(issue.state_id);
@@ -128,7 +129,7 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
             </SidebarPropertyListItem>
             </HideWhenBlank>
 
-            <HideWhenBlank hide={!showEmpty && (!issue?.priority || issue?.priority === "none")}>
+            <HideWhenBlank hide={hidePriority || (!showEmpty && (!issue?.priority || issue?.priority === "none"))}>
             <SidebarPropertyListItem icon={PriorityPropertyIcon} label={t("common.priority")}>
               <PriorityDropdown
                 value={issue?.priority}
@@ -173,7 +174,7 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
             </SidebarPropertyListItem>
             </HideWhenBlank>
 
-            <HideWhenBlank hide={!showEmpty && (!issue.target_date)}>
+            <HideWhenBlank hide={hideDueDate || (!showEmpty && (!issue.target_date))}>
             <SidebarPropertyListItem icon={DueDatePropertyIcon} label={t("common.order_by.due_date")}>
               <div className="flex w-full items-center gap-2">
                 <DateDropdown

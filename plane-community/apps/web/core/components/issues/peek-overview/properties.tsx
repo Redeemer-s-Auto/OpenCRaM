@@ -31,7 +31,7 @@ import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
 import { PriorityDropdown } from "@/components/dropdowns/priority";
 import { StateDropdown } from "@/components/dropdowns/state/dropdown";
 import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
-import { HideWhenBlank, IssueCustomFieldProperties } from "@/components/custom-fields/issue-properties";
+import { HideWhenBlank, IssueCustomFieldProperties, useDuplicateBuiltIns } from "@/components/custom-fields/issue-properties";
 // helpers
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useMember } from "@/hooks/store/use-member";
@@ -66,6 +66,7 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
   const { getUserDetails } = useMember();
   // derived values
   const [showEmpty, setShowEmpty] = useState(false);
+  const { hidePriority, hideDueDate } = useDuplicateBuiltIns(projectId);
   const issue = getIssueById(issueId);
   if (!issue) return <></>;
   const stateDetails = getStateById(issue.state_id);
@@ -123,7 +124,7 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
         </SidebarPropertyListItem>
         </HideWhenBlank>
 
-        <HideWhenBlank hide={!showEmpty && (!issue?.priority || issue?.priority === "none")}>
+        <HideWhenBlank hide={hidePriority || (!showEmpty && (!issue?.priority || issue?.priority === "none"))}>
         <SidebarPropertyListItem icon={PriorityPropertyIcon} label={t("common.priority")}>
           <PriorityDropdown
             value={issue?.priority}
@@ -175,7 +176,7 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
         </SidebarPropertyListItem>
         </HideWhenBlank>
 
-        <HideWhenBlank hide={!showEmpty && (!issue.target_date)}>
+        <HideWhenBlank hide={hideDueDate || (!showEmpty && (!issue.target_date))}>
         <SidebarPropertyListItem icon={DueDatePropertyIcon} label={t("common.order_by.due_date")}>
           <div className="flex w-full items-center gap-2">
             <DateDropdown

@@ -150,3 +150,16 @@ export const IssueCustomFieldProperties = observer(function IssueCustomFieldProp
     </>
   );
 });
+
+/**
+ * A board imported from Notion has its own "Priority" and "Due Date" fields. The built-in rows with the
+ * same names would show twice in the side panel, so they are hidden on such a board.
+ */
+export const useDuplicateBuiltIns = (projectId: string | undefined) => {
+  const { getProjectFields } = useCustomField();
+  const names = new Set((getProjectFields(projectId) ?? []).map((field) => field.name.trim().toLowerCase()));
+  return {
+    hidePriority: names.has("priority"),
+    hideDueDate: names.has("due date") || names.has("due"),
+  };
+};

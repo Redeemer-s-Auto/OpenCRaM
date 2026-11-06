@@ -35,9 +35,9 @@ export const HeadingListExtension = Extension.create<unknown, HeadingExtensionSt
       key: new PluginKey("heading-list"),
       appendTransaction: (_, __, newState) => {
         const headings: IMarking[] = [];
-        let h1Sequence = 0;
-        let h2Sequence = 0;
-        let h3Sequence = 0;
+        // One counter per level: the outline finds a heading again by "the Nth heading of this level",
+        // so an h4-h6 must not be counted into the h3 numbers.
+        const sequences: Record<number, number> = {};
 
         newState.doc.descendants((node) => {
           if (node.type.name === "heading") {
@@ -48,7 +48,7 @@ export const HeadingListExtension = Extension.create<unknown, HeadingExtensionSt
               type: "heading",
               level: level,
               text: text,
-              sequence: level === 1 ? ++h1Sequence : level === 2 ? ++h2Sequence : ++h3Sequence,
+              sequence: (sequences[level] = (sequences[level] ?? 0) + 1),
             });
           }
         });

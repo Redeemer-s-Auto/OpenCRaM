@@ -10,7 +10,8 @@ import type { IMarking } from "@/types";
 
 function findNthH1(editor: Editor, n: number, level: number): number {
   let count = 0;
-  let pos = 0;
+  // -1 = not found (position 0 is a real node: the first block of the page)
+  let pos = -1;
   editor.state.doc.descendants((node, position) => {
     if (node.type.name === "heading" && node.attrs.level === level) {
       count++;
@@ -56,6 +57,7 @@ export function scrollToNodeViaDOMCoordinates(editor: Editor, pos: number, behav
 export function scrollSummary(editor: Editor, marking: IMarking) {
   if (editor) {
     const pos = findNthH1(editor, marking.sequence, marking.level);
+    if (pos < 0) return;
     scrollToNode(editor, pos);
   }
 }

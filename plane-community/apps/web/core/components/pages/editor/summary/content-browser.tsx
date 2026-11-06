@@ -50,7 +50,10 @@ export function PageContentBrowser(props: Props) {
     3: OutlineHeading3,
   };
 
-  if (headings.length === 0) return emptyState ?? null;
+  // An empty heading has no words to show as a link; h4-h6 show as the smallest outline level.
+  const visibleHeadings = headings.filter((marking) => marking.text.trim().length > 0);
+
+  if (visibleHeadings.length === 0) return emptyState ?? null;
 
   return (
     <div
@@ -62,8 +65,8 @@ export function PageContentBrowser(props: Props) {
         className
       )}
     >
-      {headings.map((marking) => {
-        const Component = HeadingComponent[marking.level];
+      {visibleHeadings.map((marking) => {
+        const Component = HeadingComponent[Math.min(marking.level, 3)];
         if (!Component) return null;
         if (showOutline === true)
           return (

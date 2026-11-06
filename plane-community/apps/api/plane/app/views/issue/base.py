@@ -76,7 +76,7 @@ from plane.utils.grouper import (
 )
 from plane.utils.host import base_host
 from plane.utils.issue_filters import issue_filters
-from plane.utils.order_queryset import order_issue_queryset
+from plane.utils.order_queryset import default_order_for_project, order_issue_queryset
 from plane.utils.paginator import GroupedOffsetPaginator, SubGroupedOffsetPaginator
 from plane.utils.timezone_converter import user_timezone_converter
 
@@ -293,7 +293,7 @@ class IssueViewSet(BaseViewSet):
         query_params = request.query_params.copy()
 
         filters = issue_filters(query_params, "GET")
-        order_by_param = request.GET.get("order_by", "-created_at")
+        order_by_param = default_order_for_project(request.GET.get("order_by", "-created_at"), project_id)
 
         issue_queryset = self.get_queryset()
 

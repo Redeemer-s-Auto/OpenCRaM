@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-from django.db.models import Case, CharField, Min, Value, When
+from django.db.models import Case, CharField, F, FloatField, Min, Value, When
 
 # Custom ordering for priority and state
 PRIORITY_ORDER = ["urgent", "high", "medium", "low", "none"]
@@ -28,6 +28,7 @@ ISSUE_ORDER_BY_ALLOWLIST = frozenset({
     "priority",
     "state__name",
     "state__group",
+    "state_open_first",
     "assignees__first_name",
     "labels__name",
     "issue_module__module__name",
@@ -142,6 +143,30 @@ def sanitize_order_by(value, allowed_fields, default="-created_at"):
     return f"-{bare}" if is_desc else bare
 
 
+# Fork (Notes): "not done first, then manual order". Completed cards sink below all others while
+# every card keeps its manual place (sort_order) inside its own half. One float key, so the
+# paginators (which take a single order key) can use it. sort_order is a double; the offset is far
+# above any real sort_order and still leaves ~1e-6 of precision.
+STATE_OPEN_FIRST = "state_open_first"
+DONE_SORT_OFFSET = 1e9
+
+
+def default_order_for_project(order_by_param, project_id):
+    """A task-list board (it has the Seen checkbox) shown in plain manual order lists its Done
+    cards after the others. Any other sort, and any other board, is returned unchanged."""
+    if order_by_param != "sort_order" or not project_id:
+        return order_by_param
+    from plane.db.models import CustomField
+
+    has_seen = CustomField.objects.filter(
+        project_id=project_id,
+        external_source="task_list",
+        external_id="seen",
+        deleted_at__isnull=True,
+    ).exists()
+    return STATE_OPEN_FIRST if has_seen else order_by_param
+
+
 def order_issue_queryset(issue_queryset, order_by_param="-created_at"):
     # Custom fields: order_by=custom_field__<field_id> (or with a leading '-').
     # The field id is checked against live fields, never passed to the ORM raw.
@@ -165,6 +190,15 @@ def order_issue_queryset(issue_queryset, order_by_param="-created_at"):
             )
         ).order_by("priority_order", "-created_at")
         order_by_param = "priority_order" if order_by_param.startswith("-") else "-priority_order"
+    # Not done first, then manual order (see STATE_OPEN_FIRST)
+    elif order_by_param == STATE_OPEN_FIRST:
+        issue_queryset = issue_queryset.annotate(
+            state_open_first=Case(
+                When(state__group="completed", then=F("sort_order") + Value(DONE_SORT_OFFSET)),
+                default=F("sort_order"),
+                output_field=FloatField(),
+            )
+        ).order_by("state_open_first", "-created_at")
     # State Ordering
     elif order_by_param in ["state__group", "-state__group"]:
         state_order = STATE_ORDER if order_by_param in ["state__name", "state__group"] else STATE_ORDER[::-1]
